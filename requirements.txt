@@ -6,6 +6,7 @@ aiosqlite     # Асинхронный драйвер для SQLite (для ра
 asyncpg        # Асинхронный драйвер для PostgreSQL (для продакшена)
 pydantic
 pydantic-settings
+pydantic[email]
 python-multipart # Для обработки форм (login)
 python-jose[cryptography] # Для работы с JWT токенами
 passlib[bcrypt] # Для хеширования паролей
