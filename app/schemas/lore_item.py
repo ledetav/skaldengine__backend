@@ -7,7 +7,7 @@ class LoreItemBase(BaseModel):
     keywords: str | None = None
 
 class LoreItemCreate(LoreItemBase):
-    character_id: UUID
+    pass
 
 class LoreItemUpdate(BaseModel):
     category: str | None = None
