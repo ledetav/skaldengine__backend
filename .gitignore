@@ -1,3 +1,4 @@
 .env
 diploma.db
 venv/
+__pycache__/
