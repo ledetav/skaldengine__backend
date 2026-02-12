@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.api import deps
 from app.models.user import User
@@ -16,11 +16,10 @@ async def read_personas(
     skip: int = 0,
     limit: int = 10,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user) # <--- Магия здесь
+    current_user: User = Depends(deps.get_current_user)
 ):
     """
     Получить список персон ТЕКУЩЕГО пользователя.
-    Параметры skip и limit реализуют пагинацию.
     """
     query = select(UserPersona)\
         .where(UserPersona.owner_id == current_user.id)\
@@ -31,7 +30,6 @@ async def read_personas(
     personas = result.scalars().all()
     return personas
 
-# --- 2. CREATE (Создать свою персону) ---
 @router.post("/", response_model=UserPersonaSchema, status_code=status.HTTP_201_CREATED)
 async def create_persona(
     persona_in: UserPersonaCreate,
@@ -39,8 +37,20 @@ async def create_persona(
     current_user: User = Depends(deps.get_current_user)
 ):
     """
-    Создать новую персону, привязанную к текущему аккаунту.
+    Создать новую персону.
+    ОГРАНИЧЕНИЕ: Максимум 5 персон для обычных пользователей.
     """
+    if not current_user.is_admin:
+        query = select(func.count()).select_from(UserPersona).where(UserPersona.owner_id == current_user.id)
+        result = await db.execute(query)
+        count = result.scalar()
+        
+        if count >= 5:
+            raise HTTPException(
+                status_code=400, 
+                detail="Вы достигли лимита (максимум 5 персон). Удалите ненужные, чтобы создать новые."
+            )
+
     new_persona = UserPersona(
         **persona_in.model_dump(),
         owner_id=current_user.id
@@ -57,7 +67,6 @@ async def read_persona(
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    # Ищем персону, которая имеет этот ID И принадлежит текущему юзеру
     query = select(UserPersona).where(
         UserPersona.id == persona_id,
         UserPersona.owner_id == current_user.id
@@ -66,7 +75,7 @@ async def read_persona(
     persona = result.scalars().first()
     
     if not persona:
-        raise HTTPException(status_code=404, detail="Persona not found or access denied")
+        raise HTTPException(status_code=404, detail="Persona not found")
     return persona
 
 @router.put("/{persona_id}", response_model=UserPersonaSchema)
@@ -84,7 +93,7 @@ async def update_persona(
     persona = result.scalars().first()
     
     if not persona:
-        raise HTTPException(status_code=404, detail="Persona not found or access denied")
+        raise HTTPException(status_code=404, detail="Persona not found")
     
     update_data = persona_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -109,7 +118,7 @@ async def delete_persona(
     persona = result.scalars().first()
     
     if not persona:
-        raise HTTPException(status_code=404, detail="Persona not found or access denied")
+        raise HTTPException(status_code=404, detail="Persona not found")
     
     await db.delete(persona)
     await db.commit()
