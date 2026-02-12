@@ -1,10 +1,10 @@
 from typing import AsyncGenerator
+from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
 
@@ -46,13 +46,15 @@ async def get_current_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Could not validate credentials",
             )
-    except (JWTError, ValidationError):
+        token_user_id = UUID(token_data) 
+        
+    except (JWTError, ValidationError, ValueError): 
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
         )
         
-    query = select(User).where(User.id == token_data)
+    query = select(User).where(User.id == token_user_id)
     result = await db.execute(query)
     user = result.scalars().first()
     
