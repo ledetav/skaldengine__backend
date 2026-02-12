@@ -10,6 +10,8 @@ from app.models.character import Character
 from app.models.lore_item import LoreItem
 from app.schemas.lore_item import LoreItemCreate, LoreItem as LoreItemSchema
 
+from app.core import rag 
+
 router = APIRouter()
 
 @router.post("/{character_id}", response_model=LoreItemSchema)
@@ -20,7 +22,7 @@ async def create_lore_item(
     current_user: User = Depends(deps.get_current_active_superuser)
 ):
     """
-    Добавить знание (lore) к указанному персонажу.
+    Добавить знание. Автоматически индексируется в ChromaDB.
     """
     character = await db.get(Character, character_id)
     if not character:
@@ -35,7 +37,9 @@ async def create_lore_item(
     await db.commit()
     await db.refresh(new_lore)
     
-    # TODO: Здесь потом добавим вызов ChromaDB
+    # Сохраняем вектор сразу после сохранения в SQL
+    # (В идеале это делать в фоновой задаче BackgroundTasks, но пока так)
+    rag.index_lore_item(new_lore)
     
     return new_lore
 
@@ -45,9 +49,6 @@ async def read_character_lore(
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
 ):
-    """
-    Получить список всех знаний, привязанных к персонажу.
-    """
     character = await db.get(Character, character_id)
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
@@ -56,6 +57,7 @@ async def read_character_lore(
     result = await db.execute(query)
     return result.scalars().all()
 
+# --- 3. DELETE LORE ITEM ---
 @router.delete("/{lore_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lore_item(
     lore_id: UUID,
@@ -68,4 +70,7 @@ async def delete_lore_item(
         
     await db.delete(lore)
     await db.commit()
+    
+    rag.delete_lore_from_index(str(lore_id))
+    
     return None
