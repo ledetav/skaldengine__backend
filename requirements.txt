@@ -11,3 +11,4 @@ python-multipart # Для обработки форм (login)
 python-jose[cryptography] # Для работы с JWT токенами
 passlib[bcrypt] # Для хеширования паролей
 httpx
+aiofiles
