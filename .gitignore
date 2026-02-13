@@ -3,3 +3,4 @@ diploma.db
 venv/
 __pycache__/
 uploads/
+chroma_db/
