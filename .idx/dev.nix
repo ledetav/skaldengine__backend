@@ -9,11 +9,18 @@
     pkgs.python313
     pkgs.uv
     pkgs.python313Packages.alembic
+    # Docker packages
+    pkgs.docker
+    pkgs.docker-compose
     # pkgs.nodejs_20
     # pkgs.nodePackages.nodemon
   ];
   # Sets environment variables in the workspace
   env = {};
+  
+  # Включаем сервис Docker (обязательно для работы демона)
+  services.docker.enable = true;
+
   idx = {
     # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
     extensions = [
