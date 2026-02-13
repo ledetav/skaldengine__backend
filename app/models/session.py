@@ -1,42 +1,39 @@
 import uuid
+from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, Text, Integer
+from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB  # Если PostgreSQL, иначе Text для SQLite
 from datetime import datetime
-from sqlalchemy import String, Text, ForeignKey, Integer, JSON, DateTime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
-
-from .base import Base
+from app.models.base import Base
 
 class Session(Base):
     __tablename__ = "sessions"
 
-    # Уникальный идентификатор сессии
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     
-    # Внешние ключи (кто играет, с кем, в каком сценарии и стиле)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
-    ai_character_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("characters.id"))
-    scenario_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("scenarios.id"), nullable=True)
-    style_profile_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("style_profiles.id"), nullable=True)
+    # Связи
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    character_id = Column(String, ForeignKey("characters.id"), nullable=False)
+    persona_id = Column(String, ForeignKey("user_personas.id"), nullable=False)
+    scenario_id = Column(String, ForeignKey("scenarios.id"), nullable=True) # Может быть Null (Песочница)
+    
+    mode = Column(String, default="sandbox") # "sandbox" или "scenario"
+    language = Column(String, default="ru") # "ru" или "en"
+    speech_style = Column(String, default="third_person") # "first_person", "third_person"
+    
+    character_name_snapshot = Column(String) 
+    persona_name_snapshot = Column(String)
+    relationship_context = Column(Text, nullable=True)
+    
+    # System Instructions + Character Def + Persona Def + Scenario Intro
+    cached_system_prompt = Column(Text)
 
-    # Режим игры: "sandbox" (песочница) или "scenario" (жесткий сюжет)
-    mode: Mapped[str] = mapped_column(String, default="sandbox")
+    current_step = Column(Integer, default=0)
     
-    # Снапшоты (копии данных юзера на момент старта)
-    # Это нужно, чтобы если юзер поменяет описание в профиле, старые чаты не сломались
-    user_name_snapshot: Mapped[str] = mapped_column(String)
-    user_desc_snapshot: Mapped[str] = mapped_column(Text)
-    relationship_context: Mapped[str] = mapped_column(Text)
-    
-    # Динамика сюжета (создается маленькой нейросетью-супервизором)
-    plot_points: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
-    current_plot_index: Mapped[int] = mapped_column(Integer, default=0)
-    
-    # Временные метки
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    user: Mapped["User"] = relationship("User", back_populates="sessions")
-    ai_character: Mapped["Character"] = relationship("Character", back_populates="sessions")
-    scenario: Mapped["Scenario"] = relationship("Scenario", back_populates="sessions")
-    style_profile: Mapped["StyleProfile"] = relationship("StyleProfile")
-    messages: Mapped[list["Message"]] = relationship("Message", back_populates="session", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="sessions")
+    character = relationship("Character") 
+    persona = relationship("UserPersona")
+    scenario = relationship("Scenario")
+    messages = relationship("Message", back_populates="session", cascade="all, delete")
