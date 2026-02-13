@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 
 from app.api import deps
 from app.models.user import User
@@ -121,5 +121,18 @@ async def delete_persona(
         raise HTTPException(status_code=404, detail="Persona not found")
     
     await db.delete(persona)
+    await db.commit()
+    return None
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_all_personas(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+):
+    """
+    Удалить все персоны текущего пользователя.
+    """
+    query = delete(UserPersona).where(UserPersona.owner_id == current_user.id)
+    await db.execute(query)
     await db.commit()
     return None

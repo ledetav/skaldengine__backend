@@ -6,9 +6,8 @@ class MessageBase(BaseModel):
     role: str
     content: str
 
-class MessageCreate(MessageBase):
-    session_id: UUID
-    parent_id: UUID | None = None
+class MessageCreate(BaseModel):
+    content: str
 
 class MessageRegenerate(BaseModel):
     message_id: UUID

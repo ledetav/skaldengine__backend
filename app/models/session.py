@@ -33,7 +33,7 @@ class Session(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="sessions")
-    character = relationship("Character") 
+    ai_character = relationship("Character", back_populates="sessions") 
     persona = relationship("UserPersona")
     scenario = relationship("Scenario")
     messages = relationship("Message", back_populates="session", cascade="all, delete")

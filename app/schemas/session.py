@@ -1,35 +1,36 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
+from typing import Optional, List
 
 class SessionBase(BaseModel):
-    mode: str = "sandbox"
-    relationship_context: str
+    character_id: UUID
+    persona_id: UUID
+    scenario_id: Optional[UUID] = None
+    
+    # Настройки
+    language: str = "ru"
+    speech_style: str = "third_person"
+    relationship_context: Optional[str] = None
 
 class SessionCreate(SessionBase):
-    ai_character_id: UUID
-    scenario_id: UUID | None = None
-    style_profile_id: UUID | None = None
-    user_name_snapshot: str
-    user_desc_snapshot: str
+    pass 
 
 class SessionUpdate(BaseModel):
     relationship_context: str | None = None
-    plot_points: list[str] | None = None
-    current_plot_index: int | None = None
+    current_step: int | None = None
 
 class Session(SessionBase):
     id: UUID
     user_id: UUID
-    ai_character_id: UUID
-    scenario_id: UUID | None
-    style_profile_id: UUID | None
-    user_name_snapshot: str
-    user_desc_snapshot: str
-    plot_points: list[str] | None
-    current_plot_index: int
+    mode: str  # "sandbox" или "scenario"
+    character_name_snapshot: str
+    persona_name_snapshot: str 
+    cached_system_prompt: str # Важно видеть, что сгенерировал промпт-билдер
+    current_step: int = 0
+
     created_at: datetime
-    updated_at: datetime | None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
