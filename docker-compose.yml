@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  # База данных для микросервиса авторизации
+  auth-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_password
+      POSTGRES_DB: auth_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+
+  # База данных для основного микросервиса
+  core-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: core_user
+      POSTGRES_PASSWORD: core_password
+      POSTGRES_DB: core_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - core_db_data:/var/lib/postgresql/data
+
+volumes:
+  auth_db_data:
+  core_db_data:
