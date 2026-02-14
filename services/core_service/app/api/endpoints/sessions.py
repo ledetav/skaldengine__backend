@@ -6,6 +6,7 @@ from sqlalchemy import select, desc
 
 from app.api import deps
 from app.core import prompt_builder, rag
+from app.core.kafka import send_entity_event
 from google.genai import types
 from app.models.session import Session
 from app.models.character import Character
@@ -69,6 +70,13 @@ async def create_session(
     await db.commit()
     await db.refresh(new_session)
     
+    await send_entity_event(
+        event_type="Created",
+        entity_type="Session",
+        entity_id=str(new_session.id),
+        payload={"character_name": character.name, "persona_name": persona.name}
+    )
+    
     return new_session
 
 @router.get("/", response_model=List[SessionSchema])
@@ -119,7 +127,14 @@ async def send_message(
         content=message_in.content
     )
     db.add(user_msg)
-    await db.commit() 
+    await db.commit()
+    
+    await send_entity_event(
+        event_type="Created",
+        entity_type="Message",
+        entity_id=str(user_msg.id),
+        payload={"role": "user", "session_id": str(session.id)}
+    ) 
     
     relevant_lore = rag.search_relevant_lore(
         query=message_in.content, 
@@ -179,6 +194,13 @@ async def send_message(
     await db.commit()
     await db.refresh(ai_msg)
     
+    await send_entity_event(
+        event_type="Created",
+        entity_type="Message",
+        entity_id=str(ai_msg.id),
+        payload={"role": "assistant", "session_id": str(session.id)}
+    )
+    
     return ai_msg
 
 @router.get("/{session_id}/messages", response_model=List[MessageSchema])
@@ -201,3 +223,168 @@ async def read_messages(
         
     result = await db.execute(query)
     return result.scalars().all()
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(
+    session_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    session = await db.get(Session, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    if str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Not your session")
+    
+    await db.delete(session)
+    await db.commit()
+    
+    await send_entity_event(
+        event_type="Deleted",
+        entity_type="Session",
+        entity_id=str(session_id),
+        payload={"character_name": session.character_name_snapshot}
+    )
+    
+    return None
+
+@router.put("/{session_id}/messages/{message_id}", response_model=MessageSchema)
+async def update_message(
+    session_id: UUID,
+    message_id: UUID,
+    message_in: MessageCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    session = await db.get(Session, session_id)
+    if not session or str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    message = await db.get(Message, message_id)
+    if not message or str(message.session_id) != str(session_id):
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    message.content = message_in.content
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+    
+    await send_entity_event(
+        event_type="Updated",
+        entity_type="Message",
+        entity_id=str(message_id),
+        payload={"session_id": str(session_id)}
+    )
+    
+    return message
+
+@router.delete("/{session_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_message(
+    session_id: UUID,
+    message_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    session = await db.get(Session, session_id)
+    if not session or str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    message = await db.get(Message, message_id)
+    if not message or str(message.session_id) != str(session_id):
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    await db.delete(message)
+    await db.commit()
+    
+    await send_entity_event(
+        event_type="Deleted",
+        entity_type="Message",
+        entity_id=str(message_id),
+        payload={"session_id": str(session_id), "role": message.role}
+    )
+    
+    return None
+
+@router.post("/{session_id}/messages/{message_id}/regenerate", response_model=MessageSchema)
+async def regenerate_message(
+    session_id: UUID,
+    message_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    session = await db.get(Session, session_id)
+    if not session or str(session.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    original_message = await db.get(Message, message_id)
+    if not original_message or str(original_message.session_id) != str(session_id):
+        raise HTTPException(status_code=404, detail="Message not found")
+    
+    if original_message.role != "assistant":
+        raise HTTPException(status_code=400, detail="Can only regenerate assistant messages")
+    
+    original_message.is_active = False
+    db.add(original_message)
+    
+    history_query = select(Message)\
+        .where(Message.session_id == session.id, Message.is_active == True)\
+        .order_by(Message.created_at.desc())\
+        .limit(20)
+    history_result = await db.execute(history_query)
+    db_messages = history_result.scalars().all()[::-1]
+    
+    gemini_history = []
+    for msg in db_messages:
+        if msg.id == message_id:
+            break
+        role = "user" if msg.role == "user" else "model"
+        gemini_history.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
+    
+    relevant_lore = rag.search_relevant_lore(
+        query=gemini_history[-1].parts[0].text if gemini_history else "",
+        character_id=str(session.character_id),
+        k=3
+    )
+    
+    lore_injection = ""
+    if relevant_lore:
+        lore_injection = "\n[RECALLED MEMORY / FACTS]\n" + "\n".join(relevant_lore)
+    
+    full_system_instruction = session.cached_system_prompt + lore_injection
+    
+    ai_text = ""
+    try:
+        response = rag.client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=gemini_history,
+            config={
+                "system_instruction": full_system_instruction,
+                "temperature": 1.15,
+                "max_output_tokens": 8192,
+            }
+        )
+        ai_text = response.text
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        ai_text = "(System Error: Neural network unavailable)"
+    
+    new_message = Message(
+        session_id=session.id,
+        parent_id=original_message.parent_id,
+        role="assistant",
+        content=ai_text,
+        is_active=True
+    )
+    db.add(new_message)
+    await db.commit()
+    await db.refresh(new_message)
+    
+    await send_entity_event(
+        event_type="Created",
+        entity_type="Message",
+        entity_id=str(new_message.id),
+        payload={"role": "assistant", "session_id": str(session_id), "regenerated": True}
+    )
+    
+    return new_message
