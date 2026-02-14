@@ -7,8 +7,9 @@ from sqlalchemy import select
 from app.api import deps
 from app.models.character import Character
 from app.models.lore_item import LoreItem
-from app.schemas.lore_item import LoreItemCreate, LoreItem as LoreItemSchema
-from app.core import rag 
+from app.schemas.lore_item import LoreItemCreate, LoreItemUpdate, LoreItem as LoreItemSchema
+from app.core import rag
+from app.core.kafka import send_entity_event 
 
 router = APIRouter()
 
@@ -35,6 +36,13 @@ async def create_lore_item(
     # Индексация в RAG
     rag.index_lore_item(new_lore)
     
+    await send_entity_event(
+        event_type="Created",
+        entity_type="LoreItem",
+        entity_id=str(new_lore.id),
+        payload={"character_id": str(character_id), "category": new_lore.category}
+    )
+    
     return new_lore
 
 @router.get("/{character_id}", response_model=List[LoreItemSchema])
@@ -51,6 +59,36 @@ async def read_character_lore(
     result = await db.execute(query)
     return result.scalars().all()
 
+@router.put("/{lore_id}", response_model=LoreItemSchema)
+async def update_lore_item(
+    lore_id: UUID,
+    lore_update: LoreItemUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+):
+    lore = await db.get(LoreItem, lore_id)
+    if not lore:
+        raise HTTPException(status_code=404, detail="Lore item not found")
+    
+    update_data = lore_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(lore, key, value)
+    
+    db.add(lore)
+    await db.commit()
+    await db.refresh(lore)
+    
+    rag.update_lore_in_index(lore)
+    
+    await send_entity_event(
+        event_type="Updated",
+        entity_type="LoreItem",
+        entity_id=str(lore_id),
+        payload={"updated_fields": list(update_data.keys())}
+    )
+    
+    return lore
+
 @router.delete("/{lore_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_lore_item(
     lore_id: UUID,
@@ -65,4 +103,12 @@ async def delete_lore_item(
     await db.commit()
     
     rag.delete_lore_from_index(str(lore_id))
+    
+    await send_entity_event(
+        event_type="Deleted",
+        entity_type="LoreItem",
+        entity_id=str(lore_id),
+        payload={"character_id": str(lore.character_id)}
+    )
+    
     return None

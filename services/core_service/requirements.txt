@@ -11,3 +11,4 @@ aiofiles
 chromadb
 google-genai
 httpx
+aiokafka
