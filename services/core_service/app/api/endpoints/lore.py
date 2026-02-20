@@ -40,7 +40,12 @@ async def create_lore_item(
         event_type="Created",
         entity_type="LoreItem",
         entity_id=str(new_lore.id),
-        payload={"character_id": str(character_id), "category": new_lore.category}
+        payload={
+            "character_id": str(character_id),
+            "category": new_lore.category,
+            "content": new_lore.content,
+            "keywords": new_lore.keywords
+        }
     )
     
     return new_lore

@@ -38,7 +38,15 @@ async def create_character(
         event_type="Created",
         entity_type="Character",
         entity_id=str(character.id),
-        payload={"name": character.name}
+        payload={
+            "name": character.name,
+            "avatar_url": character.avatar_url,
+            "appearance": character.appearance,
+            "personality_traits": character.personality_traits,
+            "dialogue_style": character.dialogue_style,
+            "inner_world": character.inner_world,
+            "behavioral_cues": character.behavioral_cues
+        }
     )
 
     return character

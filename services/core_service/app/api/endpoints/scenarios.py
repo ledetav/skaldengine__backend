@@ -48,7 +48,14 @@ async def create_scenario(
         event_type="Created",
         entity_type="Scenario",
         entity_id=str(scenario.id),
-        payload={"title": scenario.title, "character_id": str(scenario.owner_character_id) if scenario.owner_character_id else None}
+        payload={
+            "title": scenario.title,
+            "character_id": str(scenario.owner_character_id) if scenario.owner_character_id else None,
+            "description": scenario.description,
+            "start_point": scenario.start_point,
+            "end_point": scenario.end_point,
+            "suggested_relationships": scenario.suggested_relationships
+        }
     )
     
     return scenario

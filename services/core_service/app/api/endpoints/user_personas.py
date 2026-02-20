@@ -57,7 +57,12 @@ async def create_persona(
         event_type="Created",
         entity_type="Persona",
         entity_id=str(new_persona.id),
-        payload={"name": new_persona.name}
+        payload={
+            "name": new_persona.name,
+            "owner_id": str(new_persona.owner_id),
+            "description": new_persona.description,
+            "avatar_url": new_persona.avatar_url
+        }
     )
     
     return new_persona

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from aiokafka import AIOKafkaProducer
 from app.core.config import settings
 from app.schemas.events import BaseEvent
@@ -41,8 +42,10 @@ async def send_entity_event(event_type: str, entity_type: str, entity_id: str, p
 
     message = {
         "event": f"{entity_type}{event_type}",
+        "event_type": event_type,
         "entity_type": entity_type,
         "entity_id": str(entity_id),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "payload": payload or {}
     }
     

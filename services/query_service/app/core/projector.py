@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
-from app.models.read_models import SessionReadModel, MessageReadModel
+from app.models.read_models import SessionReadModel, MessageReadModel, CharacterReadModel, ScenarioReadModel, UserPersonaReadModel, LoreItemReadModel
 
 logger = logging.getLogger("query_projector")
 
@@ -25,6 +25,7 @@ def to_datetime(val: str | None) -> datetime | None:
 
 async def process_event(event_data: dict, db: AsyncSession):
     event_type = event_data.get("event_type")
+    entity_type = event_data.get("entity_type")
     entity_id_str = event_data.get("entity_id")
     
     if not event_type or not entity_id_str:
@@ -32,7 +33,7 @@ async def process_event(event_data: dict, db: AsyncSession):
 
     entity_id = to_uuid(entity_id_str)
 
-    # 1. Проекция: Создание сессии
+    # Session events
     if event_type == "SessionCreated":
         existing = await db.execute(select(SessionReadModel).where(SessionReadModel.id == entity_id))
         if existing.scalar_one_or_none():
@@ -57,7 +58,6 @@ async def process_event(event_data: dict, db: AsyncSession):
         await db.commit()
         logger.info(f"[Query Projector] Session {entity_id} saved to Read Model.")
 
-    # 2. Проекция: Добавление сообщения
     elif event_type == "MessageAdded":
         existing = await db.execute(select(MessageReadModel).where(MessageReadModel.id == entity_id))
         if existing.scalar_one_or_none():
@@ -83,7 +83,73 @@ async def process_event(event_data: dict, db: AsyncSession):
         await db.commit()
         logger.info(f"[Query Projector] Message {entity_id} saved to Read Model.")
 
-    # TODO в будущем: MessageDeactivated (для перегенерации веток), MessageEdited
+    # Character events
+    elif entity_type == "Character":
+        if event_type == "Created":
+            payload = event_data.get("payload", {})
+            char = CharacterReadModel(
+                id=entity_id,
+                name=payload.get("name", ""),
+                avatar_url=payload.get("avatar_url"),
+                appearance=payload.get("appearance", ""),
+                personality_traits=payload.get("personality_traits", ""),
+                dialogue_style=payload.get("dialogue_style", ""),
+                inner_world=payload.get("inner_world"),
+                behavioral_cues=payload.get("behavioral_cues")
+            )
+            db.add(char)
+            await db.commit()
+            logger.info(f"[Query Projector] Character {entity_id} created.")
+
+    # Scenario events
+    elif entity_type == "Scenario":
+        if event_type == "Created":
+            payload = event_data.get("payload", {})
+            scenario = ScenarioReadModel(
+                id=entity_id,
+                owner_character_id=to_uuid(payload.get("character_id")),
+                title=payload.get("title", ""),
+                description=payload.get("description", ""),
+                start_point=payload.get("start_point", ""),
+                end_point=payload.get("end_point", ""),
+                suggested_relationships=payload.get("suggested_relationships", [])
+            )
+            db.add(scenario)
+            await db.commit()
+            logger.info(f"[Query Projector] Scenario {entity_id} created.")
+
+    # Persona events
+    elif entity_type == "Persona":
+        if event_type == "Created":
+            payload = event_data.get("payload", {})
+            persona = UserPersonaReadModel(
+                id=entity_id,
+                owner_id=to_uuid(payload.get("owner_id")),
+                name=payload.get("name", ""),
+                description=payload.get("description", ""),
+                avatar_url=payload.get("avatar_url"),
+                created_at=to_datetime(event_data.get("timestamp"))
+            )
+            db.add(persona)
+            await db.commit()
+            logger.info(f"[Query Projector] Persona {entity_id} created.")
+
+    # LoreItem events
+    elif entity_type == "LoreItem":
+        if event_type == "Created":
+            payload = event_data.get("payload", {})
+            lore = LoreItemReadModel(
+                id=entity_id,
+                character_id=to_uuid(payload.get("character_id")),
+                category=payload.get("category", "fact"),
+                content=payload.get("content", ""),
+                keywords=payload.get("keywords")
+            )
+            db.add(lore)
+            await db.commit()
+            logger.info(f"[Query Projector] LoreItem {entity_id} created.")
+
+    # TODO: Добавить Updated/Deleted для всех сущностей
 
 async def consume_events_forever():
     """Фоновая задача для прослушивания Kafka"""

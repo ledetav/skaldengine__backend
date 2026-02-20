@@ -23,6 +23,18 @@ services:
     volumes:
       - core_db_data:/var/lib/postgresql/data
 
+  # База данных для query микросервиса
+  query-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: query_user
+      POSTGRES_PASSWORD: query_password
+      POSTGRES_DB: query_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - query_db_data:/var/lib/postgresql/data
+
 # Kafka
   kafka:
     image: apache/kafka:latest
@@ -62,4 +74,5 @@ services:
 volumes:
   auth_db_data:
   core_db_data:
+  query_db_data:
   kafka_data: # Том для сохранения данных Kafka
