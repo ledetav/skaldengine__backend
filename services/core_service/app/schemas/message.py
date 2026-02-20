@@ -8,6 +8,7 @@ class MessageBase(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+    parent_id: Optional[UUID] = None
 
 class MessageRegenerate(BaseModel):
     message_id: UUID
