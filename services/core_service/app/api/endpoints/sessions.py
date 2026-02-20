@@ -211,13 +211,6 @@ async def delete_session(
     await db.delete(session)
     await db.commit()
     
-    await send_entity_event(
-        event_type="Deleted",
-        entity_type="Session",
-        entity_id=str(session_id),
-        payload={"character_name": session.character_name_snapshot}
-    )
-    
     return None
 
 @router.put("/{session_id}/messages/{message_id}", response_model=MessageSchema)
@@ -241,13 +234,6 @@ async def update_message(
     await db.commit()
     await db.refresh(message)
     
-    await send_entity_event(
-        event_type="Updated",
-        entity_type="Message",
-        entity_id=str(message_id),
-        payload={"session_id": str(session_id)}
-    )
-    
     return message
 
 @router.delete("/{session_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -267,13 +253,6 @@ async def delete_message(
     
     await db.delete(message)
     await db.commit()
-    
-    await send_entity_event(
-        event_type="Deleted",
-        entity_type="Message",
-        entity_id=str(message_id),
-        payload={"session_id": str(session_id), "role": message.role}
-    )
     
     return None
 
@@ -350,12 +329,5 @@ async def regenerate_message(
     db.add(new_message)
     await db.commit()
     await db.refresh(new_message)
-    
-    await send_entity_event(
-        event_type="Created",
-        entity_type="Message",
-        entity_id=str(new_message.id),
-        payload={"role": "assistant", "session_id": str(session_id), "regenerated": True}
-    )
     
     return new_message

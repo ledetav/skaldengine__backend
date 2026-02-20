@@ -53,7 +53,7 @@ Depth & Dynamics: Remember that characters have hidden motivations, fears, and h
 AI Character Name: {character.name}
 Appearance: {character.appearance}
 Key Personality Traits: {character.personality_traits}
-Manner of Speech: {character.speech_style} 
+Manner of Speech: {character.dialogue_style} 
 Inner World & Motivations: {character.inner_world}
 Specific Behavioral Cues: {character.behavioral_cues}
 """

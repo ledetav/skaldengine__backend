@@ -6,7 +6,7 @@ class CharacterBase(BaseModel):
     avatar_url: str | None = None
     appearance: str
     personality_traits: str
-    speech_style: str
+    dialogue_style: str
     inner_world: str | None = None
     behavioral_cues: str | None = None
 
@@ -18,7 +18,7 @@ class CharacterUpdate(BaseModel):
     avatar_url: str | None = None
     appearance: str | None = None
     personality_traits: str | None = None
-    speech_style: str | None = None
+    dialogue_style: str | None = None
     inner_world: str | None = None
     behavioral_cues: str | None = None
 

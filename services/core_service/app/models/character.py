@@ -19,7 +19,7 @@ class Character(Base):
     # Промптинг (Разбиваем на компоненты)
     appearance: Mapped[str] = mapped_column(Text)       # Внешность
     personality_traits: Mapped[str] = mapped_column(Text) # Характер
-    speech_style: Mapped[str] = mapped_column(Text)       # Стиль речи
+    dialogue_style: Mapped[str] = mapped_column(Text)     # Манера речи персонажа
     inner_world: Mapped[str | None] = mapped_column(Text, nullable=True) # Скрытые мысли
     behavioral_cues: Mapped[str | None] = mapped_column(Text, nullable=True) # Поведение
 

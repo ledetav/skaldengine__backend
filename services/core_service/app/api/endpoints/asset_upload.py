@@ -17,9 +17,10 @@ def validate_image(filename: str):
     return ext
 
 @router.post("/", response_model=dict)
-async def upload_file(
+async def upload_asset(
     file: UploadFile = File(...)
 ):
+    """Upload character or persona avatar image"""
     ext = validate_image(file.filename)
     unique_filename = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)

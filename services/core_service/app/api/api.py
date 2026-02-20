@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import user_personas, characters, lore, sessions, upload, scenarios
+from app.api.endpoints import user_personas, characters, lore, sessions, asset_upload, scenarios
 
 api_router = APIRouter()
 
@@ -8,4 +8,4 @@ api_router.include_router(characters.router, prefix="/characters", tags=["AI Cha
 api_router.include_router(scenarios.router, prefix="/scenarios", tags=["Scenarios"])
 api_router.include_router(lore.router, prefix="/lore", tags=["Characters Lore"])
 api_router.include_router(sessions.router, prefix="/sessions", tags=["Roleplay Sessions"])
-api_router.include_router(upload.router, prefix="/upload", tags=["Files"])
+api_router.include_router(asset_upload.router, prefix="/upload", tags=["Media Assets"])
