@@ -1,11 +1,7 @@
-from app.models.character import Character
-from app.models.user_persona import UserPersona
-from app.models.scenario import Scenario
-
 def build_system_prompt(
-    character: Character,
-    persona: UserPersona,
-    scenario: Scenario | None,
+    character: dict,
+    persona: dict,
+    scenario: dict | None,
     relationship_context: str = "",
     speech_style: str = "third_person",
     language: str = "ru"
@@ -50,26 +46,26 @@ Depth & Dynamics: Remember that characters have hidden motivations, fears, and h
 
     char_block = f"""
 [PART 1: AI CHARACTER]
-AI Character Name: {character.name}
-Appearance: {character.appearance}
-Key Personality Traits: {character.personality_traits}
-Manner of Speech: {character.dialogue_style} 
-Inner World & Motivations: {character.inner_world}
-Specific Behavioral Cues: {character.behavioral_cues}
+AI Character Name: {character['name']}
+Appearance: {character['appearance']}
+Key Personality Traits: {character['personality_traits']}
+Manner of Speech: {character['dialogue_style']} 
+Inner World & Motivations: {character.get('inner_world', '')}
+Specific Behavioral Cues: {character.get('behavioral_cues', '')}
 """
 
     user_block = f"""
 [PART 2: USER CHARACTER]
-User Character Name: {persona.name}
-Appearance & Personality: {persona.description}
+User Character Name: {persona['name']}
+Appearance & Personality: {persona['description']}
 Relationship with AI's Character: {relationship_context if relationship_context else "Stranger / Not specified"}
 """
     scenario_block = ""
     if scenario:
         scenario_block = f"""
 [PART 3: SCENARIO CONTEXT]
-Premise: {scenario.description}
-Current Objective: {scenario.start_point}
+Premise: {scenario['description']}
+Current Objective: {scenario['start_point']}
 """
     else:
         scenario_block = """"""

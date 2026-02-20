@@ -33,3 +33,49 @@ class SessionRead(BaseModel):
 
     class Config:
         from_attributes = True
+
+class CharacterRead(BaseModel):
+    id: UUID
+    name: str
+    avatar_url: Optional[str]
+    appearance: str
+    personality_traits: str
+    dialogue_style: str
+    inner_world: Optional[str]
+    behavioral_cues: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class ScenarioRead(BaseModel):
+    id: UUID
+    owner_character_id: Optional[UUID]
+    title: str
+    description: str
+    start_point: str
+    end_point: str
+    suggested_relationships: List[str]
+
+    class Config:
+        from_attributes = True
+
+class UserPersonaRead(BaseModel):
+    id: UUID
+    owner_id: UUID
+    name: str
+    description: str
+    avatar_url: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class LoreItemRead(BaseModel):
+    id: UUID
+    character_id: UUID
+    category: str
+    content: str
+    keywords: Optional[str]
+
+    class Config:
+        from_attributes = True
