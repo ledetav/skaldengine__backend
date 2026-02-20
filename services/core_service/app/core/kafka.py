@@ -50,3 +50,30 @@ async def send_entity_event(event_type: str, entity_type: str, entity_id: str, p
         logger.info(f"Published event: {message['event']} for ID {entity_id}")
     except Exception as e:
         logger.error(f"Failed to publish event to Kafka: {e}")
+
+async def publish_domain_event(event: BaseEvent, topic: str = settings.KAFKA_TOPIC_EVENTS):
+    """
+    Отправка типизированного события для Event Sourcing.
+    Используем entity_id как ключ партицирования, чтобы события одной сессии 
+    всегда приходили в строгом хронологическом порядке.
+    """
+    global producer
+    if not producer:
+        logger.warning("Kafka Producer is not initialized!")
+        return
+
+    # Сериализуем Pydantic модель в JSON
+    event_dict = event.model_dump(mode='json')
+    
+    try:
+        # Передаем ключ (key), чтобы Kafka гарантировала порядок событий для одной сущности
+        key = str(event.entity_id).encode('utf-8')
+        
+        await producer.send_and_wait(
+            topic, 
+            value=event_dict,
+            key=key 
+        )
+        logger.info(f"Published Event Sourcing event: {event.event_type} for Entity {event.entity_id}")
+    except Exception as e:
+        logger.error(f"Failed to publish event to Kafka: {e}")
