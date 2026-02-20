@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from uuid import UUID
 from datetime import datetime
+from typing import Optional
 
 class MessageBase(BaseModel):
     role: str
@@ -8,6 +9,7 @@ class MessageBase(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+    parent_id: Optional[UUID] = None
 
 class MessageRegenerate(BaseModel):
     message_id: UUID
