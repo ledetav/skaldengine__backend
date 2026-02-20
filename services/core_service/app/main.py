@@ -1,15 +1,32 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
 from app.core.config import settings
 from app.api.api import api_router
 from app.core.kafka import get_kafka_producer, close_kafka_producer
+from app.core.projector import consume_events_forever
+
+projector_task = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global projector_task
     await get_kafka_producer()
+
+    projector_task = asyncio.create_task(consume_events_forever())
+    
     yield
+    
+    if projector_task:
+        projector_task.cancel()
+        try:
+            await projector_task
+        except asyncio.CancelledError:
+            pass
+            
     await close_kafka_producer()
 
 app = FastAPI(
