@@ -1,6 +1,7 @@
 import json
 from aiokafka import AIOKafkaProducer
 from app.core.config import settings
+from app.schemas.events import BaseEvent
 import logging
 
 logger = logging.getLogger(__name__)

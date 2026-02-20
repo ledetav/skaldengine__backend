@@ -22,23 +22,31 @@ async def replay_all_events():
         logger.info("🧹 Read Model (PostgreSQL tables) truncated successfully.")
  
     # НЕ указываем group_id, чтобы консьюмер был анонимным и читал всё с самого начала
+    # НЕ указываем топик в конструкторе, т.к. будем использовать assign() вручную
     consumer = AIOKafkaConsumer(
-        settings.KAFKA_TOPIC_EVENTS,
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
         auto_offset_reset="earliest"
     )
 
-    await consumer.start()
     try:
+        await consumer.start()
+        
         # Принудительно получаем партиции топика
         topic = settings.KAFKA_TOPIC_EVENTS
-        partitions = [TopicPartition(topic, p) for p in await consumer.partitions_for_topic(topic)]
-        consumer.assign(partitions)
+        
+        # Принудительно запрашиваем метаданные топика
+        await consumer._client.force_metadata_update()
+        await asyncio.sleep(0.5)
 
-        if not partitions:
-            logger.info("⚠️ No partitions found. Topic might be empty.")
+        topic_partitions = consumer.partitions_for_topic(topic)
+        
+        if not topic_partitions:
+            logger.info("⚠️ No partitions found. Topic might be empty or not created yet.")
             return
+            
+        partitions = [TopicPartition(topic, p) for p in topic_partitions]
+        consumer.assign(partitions)
 
         # Ищем конец лога (High Watermark - последние актуальные смещения)
         end_offsets = await consumer.end_offsets(partitions)
@@ -58,7 +66,7 @@ async def replay_all_events():
             # Проверяем, достигли ли мы конца лога по всем партициям
             reached_end = True
             for p in partitions:
-                if consumer.position(p) < end_offsets[p]:
+                if await consumer.position(p) < end_offsets[p]:
                     reached_end = False
                     break
 
@@ -85,7 +93,10 @@ async def replay_all_events():
     except Exception as e:
         logger.error(f"❌ Error during replay: {e}")
     finally:
-        await consumer.stop()
+        try:
+            await consumer.stop()
+        except:
+            pass
 
 if __name__ == "__main__":
     asyncio.run(replay_all_events())

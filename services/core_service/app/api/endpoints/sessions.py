@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
