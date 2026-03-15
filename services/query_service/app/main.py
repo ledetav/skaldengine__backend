@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.projector import consume_events_forever
+from app.api.api import api_router
 
 projector_task = None
 

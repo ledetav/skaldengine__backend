@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime
 from aiokafka import AIOKafkaConsumer
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -25,8 +25,8 @@ def to_datetime(val: str | None) -> datetime | None:
 
 async def process_event(event_data: dict, db: AsyncSession):
     event_type = event_data.get("event_type")
-    entity_type = event_data.get("entity_type")
-    entity_id_str = event_data.get("entity_id")
+    entity_type = event_data.get("entity_type") or event_data.get("aggregate_type")
+    entity_id_str = event_data.get("entity_id") or event_data.get("aggregate_id")
     
     if not event_type or not entity_id_str:
         return
@@ -148,6 +148,21 @@ async def process_event(event_data: dict, db: AsyncSession):
             db.add(lore)
             await db.commit()
             logger.info(f"[Query Projector] LoreItem {entity_id} created.")
+
+    # Saga: UserCoreDataPurged
+    elif event_type == "UserCoreDataPurged":
+        user_id = entity_id
+        if user_id:
+            sessions_query = await db.execute(select(SessionReadModel.id).where(SessionReadModel.user_id == user_id))
+            session_ids = sessions_query.scalars().all()
+            if session_ids:
+                await db.execute(delete(MessageReadModel).where(MessageReadModel.session_id.in_(session_ids)))
+            
+            await db.execute(delete(SessionReadModel).where(SessionReadModel.user_id == user_id))
+            await db.execute(delete(UserPersonaReadModel).where(UserPersonaReadModel.owner_id == user_id))
+            
+            await db.commit()
+            logger.info(f"[Query Projector] Purged all read models for user {user_id}.")
 
     # TODO: Добавить Updated/Deleted для всех сущностей
 
