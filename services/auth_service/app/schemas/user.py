@@ -15,6 +15,7 @@ class UserLogin(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     is_admin: bool
+    status: str
     created_at: datetime
 
     class Config:
