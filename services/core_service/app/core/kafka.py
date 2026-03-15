@@ -5,6 +5,11 @@ from app.core.config import settings
 from app.schemas.events import BaseEvent
 import logging
 
+import asyncio
+from sqlalchemy import select
+from app.db.base import AsyncSessionLocal
+from app.models.outbox_event import OutboxEvent
+
 logger = logging.getLogger(__name__)
 
 producer: AIOKafkaProducer | None = None
@@ -81,3 +86,42 @@ async def publish_domain_event(event: BaseEvent, topic: str = settings.KAFKA_TOP
         logger.info(f"Published Event Sourcing event: {event.event_type} for Entity {event.entity_id}")
     except Exception as e:
         logger.error(f"Failed to publish event to Kafka: {e}")
+
+async def core_outbox_relay_worker():
+    """Фоновый процесс, который читает непрочитанные события из БД и шлет в Kafka"""
+    while True:
+        try:
+            prod = await get_kafka_producer()
+            async with AsyncSessionLocal() as db:
+                query = select(OutboxEvent).where(OutboxEvent.processed == False).order_by(OutboxEvent.created_at.asc()).limit(50)
+                result = await db.execute(query)
+                events = result.scalars().all()
+
+                for event in events:
+                    message = {
+                        "event_id": str(event.id),
+                        "aggregate_type": event.aggregate_type,
+                        "aggregate_id": event.aggregate_id,
+                        "event_type": event.event_type,
+                        "payload": event.payload,
+                        "timestamp": event.created_at.isoformat()
+                    }
+                    
+                    # Core будет отвечать в этот же топик, либо можно завести отдельный.
+                    # Будем использовать общий топик ивентов для упрощения.
+                    await prod.send_and_wait(
+                        topic=settings.KAFKA_TOPIC_EVENTS,
+                        value=message,
+                        key=event.aggregate_id.encode('utf-8')
+                    )
+                    
+                    event.processed = True
+                    db.add(event)
+                
+                if events:
+                    await db.commit()
+                    
+        except Exception as e:
+            logger.error(f"Core Outbox Relay Error: {e}")
+        
+        await asyncio.sleep(2)

@@ -24,7 +24,12 @@ async def fetch_from_query(endpoint: str, auth_header: str):
             headers={"Authorization": auth_header}
         )
         if response.status_code == 404:
-            raise HTTPException(status_code=404, detail="Resource not found")
+            raise HTTPException(status_code=404, detail=f"Resource {endpoint} not found")
+
+        if response.status_code == 403:
+            error_detail = response.json().get("detail", "Forbidden")
+            raise HTTPException(status_code=403, detail=f"Query Service denied access: {error_detail}")
+            
         response.raise_for_status()
         return response.json()
 
@@ -51,6 +56,7 @@ async def create_session(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     auth_header = request.headers.get("Authorization")
+    print(f"DEBUG TOKEN: {auth_header}")
     
     character = await fetch_from_query(f"/characters/{session_in.character_id}", auth_header)
     persona = await fetch_from_query(f"/personas/{session_in.persona_id}", auth_header)

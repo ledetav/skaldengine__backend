@@ -5,3 +5,5 @@ from .lore_item import LoreItem
 from .scenario import Scenario
 from .session import Session
 from .message import Message
+from .outbox_event import OutboxEvent
+from .processed_event import ProcessedEvent
