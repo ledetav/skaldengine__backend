@@ -3,15 +3,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from app.core.saga_consumer import consume_auth_events_forever
 
 from app.core.config import settings
 from app.api.api import api_router
 from app.core.kafka import get_kafka_producer, close_kafka_producer
-
-from app.core.kafka import get_kafka_producer, close_kafka_producer, core_outbox_relay_worker # <-- Импортируйте воркер
+from app.core.kafka import get_kafka_producer, close_kafka_producer, core_outbox_relay_worker
 
 projector_task = None
-outbox_task = None # <-- Новая переменная
+outbox_task = None
+saga_task = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
 
     projector_task = asyncio.create_task(consume_events_forever())
     outbox_task = asyncio.create_task(core_outbox_relay_worker())
+    saga_task = asyncio.create_task(consume_auth_events_forever())
     
     yield
     
@@ -36,6 +38,11 @@ async def lifespan(app: FastAPI):
             await outbox_task
         except asyncio.CancelledError:
             pass
+
+    if saga_task:
+        saga_task.cancel()
+        try: await saga_task
+        except asyncio.CancelledError: pass
             
     await close_kafka_producer()
 

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
     KAFKA_TOPIC_EVENTS: str = "skaldenginebackend_entity_events"
+    KAFKA_TOPIC_AUTH_EVENTS: str = "skaldengine_auth_events"
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

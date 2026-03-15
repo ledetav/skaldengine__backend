@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from app.api import deps
 from app.schemas.user import UserResponse
 from app.models.user import User
+from app.models.outbox import OutboxEvent
 
 router = APIRouter()
 
