@@ -100,6 +100,23 @@ async def process_event(event_data: dict, db: AsyncSession):
             db.add(char)
             await db.commit()
             logger.info(f"[Query Projector] Character {entity_id} created.")
+        elif event_type == "Updated":
+            char = await db.get(CharacterReadModel, entity_id)
+            if char:
+                payload = event_data.get("payload", {})
+                if "name" in payload: char.name = payload["name"]
+                if "avatar_url" in payload: char.avatar_url = payload["avatar_url"]
+                if "appearance" in payload: char.appearance = payload["appearance"]
+                if "personality_traits" in payload: char.personality_traits = payload["personality_traits"]
+                if "dialogue_style" in payload: char.dialogue_style = payload["dialogue_style"]
+                if "inner_world" in payload: char.inner_world = payload["inner_world"]
+                if "behavioral_cues" in payload: char.behavioral_cues = payload["behavioral_cues"]
+                await db.commit()
+                logger.info(f"[Query Projector] Character {entity_id} updated.")
+        elif event_type == "Deleted":
+            await db.execute(delete(CharacterReadModel).where(CharacterReadModel.id == entity_id))
+            await db.commit()
+            logger.info(f"[Query Projector] Character {entity_id} deleted.")
 
     # Scenario events
     elif entity_type == "Scenario":
@@ -117,6 +134,21 @@ async def process_event(event_data: dict, db: AsyncSession):
             db.add(scenario)
             await db.commit()
             logger.info(f"[Query Projector] Scenario {entity_id} created.")
+        elif event_type == "Updated":
+            scenario = await db.get(ScenarioReadModel, entity_id)
+            if scenario:
+                payload = event_data.get("payload", {})
+                if "title" in payload: scenario.title = payload["title"]
+                if "description" in payload: scenario.description = payload["description"]
+                if "start_point" in payload: scenario.start_point = payload["start_point"]
+                if "end_point" in payload: scenario.end_point = payload["end_point"]
+                if "suggested_relationships" in payload: scenario.suggested_relationships = payload["suggested_relationships"]
+                await db.commit()
+                logger.info(f"[Query Projector] Scenario {entity_id} updated.")
+        elif event_type == "Deleted":
+            await db.execute(delete(ScenarioReadModel).where(ScenarioReadModel.id == entity_id))
+            await db.commit()
+            logger.info(f"[Query Projector] Scenario {entity_id} deleted.")
 
     # Persona events
     elif entity_type == "Persona":
@@ -133,6 +165,19 @@ async def process_event(event_data: dict, db: AsyncSession):
             db.add(persona)
             await db.commit()
             logger.info(f"[Query Projector] Persona {entity_id} created.")
+        elif event_type == "Updated":
+            persona = await db.get(UserPersonaReadModel, entity_id)
+            if persona:
+                payload = event_data.get("payload", {})
+                if "name" in payload: persona.name = payload["name"]
+                if "description" in payload: persona.description = payload["description"]
+                if "avatar_url" in payload: persona.avatar_url = payload["avatar_url"]
+                await db.commit()
+                logger.info(f"[Query Projector] Persona {entity_id} updated.")
+        elif event_type == "Deleted":
+            await db.execute(delete(UserPersonaReadModel).where(UserPersonaReadModel.id == entity_id))
+            await db.commit()
+            logger.info(f"[Query Projector] Persona {entity_id} deleted.")
 
     # LoreItem events
     elif entity_type == "LoreItem":
@@ -148,6 +193,34 @@ async def process_event(event_data: dict, db: AsyncSession):
             db.add(lore)
             await db.commit()
             logger.info(f"[Query Projector] LoreItem {entity_id} created.")
+        elif event_type == "Updated":
+            lore = await db.get(LoreItemReadModel, entity_id)
+            if lore:
+                payload = event_data.get("payload", {})
+                if "category" in payload: lore.category = payload["category"]
+                if "content" in payload: lore.content = payload["content"]
+                if "keywords" in payload: lore.keywords = payload["keywords"]
+                await db.commit()
+                logger.info(f"[Query Projector] LoreItem {entity_id} updated.")
+        elif event_type == "Deleted":
+            await db.execute(delete(LoreItemReadModel).where(LoreItemReadModel.id == entity_id))
+            await db.commit()
+            logger.info(f"[Query Projector] LoreItem {entity_id} deleted.")
+
+    # Session lifecycle events
+    elif event_type == "SessionDeleted":
+        await db.execute(delete(MessageReadModel).where(MessageReadModel.session_id == entity_id))
+        await db.execute(delete(SessionReadModel).where(SessionReadModel.id == entity_id))
+        await db.commit()
+        logger.info(f"[Query Projector] Session {entity_id} and its messages deleted.")
+
+    # Message lifecycle events
+    elif event_type == "MessageDeactivated":
+        msg = await db.get(MessageReadModel, entity_id)
+        if msg:
+            msg.is_active = False
+            await db.commit()
+            logger.info(f"[Query Projector] Message {entity_id} deactivated.")
 
     # Saga: UserCoreDataPurged
     elif event_type == "UserCoreDataPurged":
@@ -163,8 +236,6 @@ async def process_event(event_data: dict, db: AsyncSession):
             
             await db.commit()
             logger.info(f"[Query Projector] Purged all read models for user {user_id}.")
-
-    # TODO: Добавить Updated/Deleted для всех сущностей
 
 async def consume_events_forever():
     """Фоновая задача для прослушивания Kafka"""
