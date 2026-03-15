@@ -87,7 +87,7 @@ async def publish_domain_event(event: BaseEvent, topic: str = settings.KAFKA_TOP
     except Exception as e:
         logger.error(f"Failed to publish event to Kafka: {e}")
 
-async def core_outbox_relay_worker():
+async def outbox_relay_worker():
     """Фоновый процесс, который читает непрочитанные события из БД и шлет в Kafka"""
     while True:
         try:
@@ -107,8 +107,7 @@ async def core_outbox_relay_worker():
                         "timestamp": event.created_at.isoformat()
                     }
                     
-                    # Core будет отвечать в этот же топик, либо можно завести отдельный.
-                    # Будем использовать общий топик ивентов для упрощения.
+                    # Core отправляет события в skaldenginebackend_entity_events
                     await prod.send_and_wait(
                         topic=settings.KAFKA_TOPIC_EVENTS,
                         value=message,

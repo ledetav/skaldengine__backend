@@ -4,11 +4,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.saga_consumer import consume_auth_events_forever
+from app.core.events_consumer import consume_domain_events_forever
 
 from app.core.config import settings
 from app.api.api import api_router
-from app.core.kafka import get_kafka_producer, close_kafka_producer
-from app.core.kafka import get_kafka_producer, close_kafka_producer, core_outbox_relay_worker
+from app.core.kafka import get_kafka_producer, close_kafka_producer, outbox_relay_worker
 
 projector_task = None
 outbox_task = None
@@ -16,11 +16,11 @@ saga_task = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global projector_task, outbox_task
+    global projector_task, outbox_task, saga_task
     await get_kafka_producer()
 
-    projector_task = asyncio.create_task(consume_events_forever())
-    outbox_task = asyncio.create_task(core_outbox_relay_worker())
+    projector_task = asyncio.create_task(consume_domain_events_forever())
+    outbox_task = asyncio.create_task(outbox_relay_worker())
     saga_task = asyncio.create_task(consume_auth_events_forever())
     
     yield

@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import asyncio
 from app.core.config import settings
 from app.api.api import api_router
 from app.core.kafka import get_kafka_producer, close_kafka_producer, outbox_relay_worker
@@ -30,6 +32,12 @@ async def lifespan(app: FastAPI):
             
     await close_kafka_producer()
 
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url="/docs",
+    lifespan=lifespan
+)
 # CORS
 app.add_middleware(
     CORSMiddleware,
