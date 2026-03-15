@@ -8,7 +8,8 @@ from alembic import context
 from app.core.config import settings
 from app.db.base import Base
 from app.models.user import User
-from app.models.outbox import OutboxEvent  # Импортируем модель, чтобы alembic её увидел
+from app.models.outbox import OutboxEvent
+from app.models.processed_event import ProcessedEvent
 
 config = context.config
 
