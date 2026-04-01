@@ -24,7 +24,7 @@ async def login_access_token(
     user = result.scalars().first()
 
     # Проверяем пароль
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
+    if not user or not security.verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
     # Генерируем токен
@@ -53,7 +53,7 @@ async def register_user(
     # Создание
     user = User(
         email=user_in.email,
-        hashed_password=security.get_password_hash(user_in.password),
+        password_hash=security.get_password_hash(user_in.password),
         is_admin=False
     )
     db.add(user)
