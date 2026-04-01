@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     # Google Gemini / Vertex AI
     GEMINI_API_KEY: str
+    GEMINI_MODEL: str = "gemini-1.5-flash-001"
+    GEMINI_TEMPERATURE: float = 1.0
+    GEMINI_MAX_TOKENS: int = 8000
 
     # Vertex AI (опциональные — для прямой работы с Vertex API)
     VERTEX_PROJECT_ID: str = ""

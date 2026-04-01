@@ -152,9 +152,7 @@ async def send_message(
 
     # ─── Сборка промпта через конвейер (Block 7) ─────────────────────────── #
     from app.core.prompt_pipeline import PromptPipeline
-    pipeline = PromptPipeline(db, chat.id)
-    
-    # Собираем полный payload (Stage 1-6)
+    pipeline = PromptPipeline(db, chat_id)
     payload = await pipeline.build_payload(message_in.content)
     
     # Вызов Gemini
