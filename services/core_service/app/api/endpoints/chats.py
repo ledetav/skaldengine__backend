@@ -169,12 +169,12 @@ async def send_message(
         )
         full_text = response.text or ""
         
-        # Парсим <thought> если он есть
+        # Парсим <Internal_Analysis> если он есть
         import re
-        thought_match = re.search(r"<thought>(.*?)</thought>", full_text, re.DOTALL)
+        thought_match = re.search(r"<Internal_Analysis>(.*?)</Internal_Analysis>", full_text, re.DOTALL)
         if thought_match:
             hidden_thought = thought_match.group(1).strip()
-            ai_text = re.sub(r"<thought>.*?</thought>", "", full_text, flags=re.DOTALL).strip()
+            ai_text = re.sub(r"<Internal_Analysis>.*?</Internal_Analysis>", "", full_text, flags=re.DOTALL).strip()
         else:
             ai_text = full_text.strip()
             
