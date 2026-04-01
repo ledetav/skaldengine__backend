@@ -5,10 +5,15 @@ alembic
 asyncpg
 pydantic
 pydantic-settings
+pydantic[email]
 python-jose[cryptography]
 python-multipart
 aiofiles
-chromadb
+pgvector
+passlib[bcrypt]
+bcrypt
+arq
+redis[hiredis]
 google-genai
 httpx
-aiokafka
+Pillow

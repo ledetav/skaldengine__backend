@@ -1,0 +1,24 @@
+import uuid
+from sqlalchemy import Text, ForeignKey, Integer, Boolean
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base
+
+
+class ChatCheckpoint(Base):
+    """
+    Динамические точки сценария для конкретного чата.
+    Генерируются супервизором при старте scenario-чата.
+    Обновляются супервизором по мере прохождения.
+    """
+    __tablename__ = "chat_checkpoints"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
+
+    order_num: Mapped[int] = mapped_column(Integer)          # Порядковый номер (1, 2, 3...)
+    goal_description: Mapped[str] = mapped_column(Text)       # Цель/событие, сгенерированное супервизором
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # Достиг ли сюжет этой точки
+
+    # Связи
+    chat: Mapped["Chat"] = relationship("Chat", back_populates="checkpoints")

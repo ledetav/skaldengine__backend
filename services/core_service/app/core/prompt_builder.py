@@ -1,19 +1,26 @@
+"""
+Prompt Builder — собирает системный промпт для Chat.
+Обновлён под новую архитектуру: Character (personality, appearance)
+и UserPersona (age, appearance, personality, facts).
+"""
 from app.models.character import Character
 from app.models.user_persona import UserPersona
 from app.models.scenario import Scenario
+
 
 def build_system_prompt(
     character: Character,
     persona: UserPersona,
     scenario: Scenario | None,
     relationship_context: str = "",
-    speech_style: str = "third_person",
+    narrative_voice: str = "third",   # "first" | "second" | "third"
     language: str = "ru"
 ) -> str:
     """
-    Собирает статический системный промпт для сессии.
+    Собирает системный промпт для Chat.
+    Используется при создании чата.
     """
-    
+
     core_directive = """
 [CORE DIRECTIVE: ATMOSPHERE & STYLE]
 This is the fundamental rule of our entire game. Your primary and unwavering directive is to generate a literary and immersive experience. Every single response must be saturated with sensory details. Describe not just what your character sees, but what they hear, feel on their skin, and smell in the air. Create a living picture of the world through sound, scent, texture, and the play of light and shadow. This directive holds the highest priority, even over the speed of plot progression. Before each response, mentally check if it is sufficiently vivid and atmospheric.
@@ -36,44 +43,59 @@ Show, Don't Tell: This is the golden rule. Do not state emotions flatly ("he was
 Depth & Dynamics: Remember that characters have hidden motivations, fears, and hopes. They should react realistically to events and can evolve over time based on their interactions, all within the logic of their established personality.
 """
 
-    style_instruction = ""
-    if speech_style == "first_person":
-        style_instruction = "Strict Perspective: Respond only in the first person as your character. Describe the world, events, and other characters exclusively through their perception."
-    else:
-        style_instruction = "Strict Perspective: Respond only in the limited third person as your character. Describe the world, events, and other characters exclusively through their perception."
+    # Лицо повествования
+    voice_map = {
+        "first": "Strict Perspective: Respond only in the FIRST PERSON as your character. Describe the world and events exclusively through their senses.",
+        "second": "Strict Perspective: Address the user directly in the SECOND PERSON, maintaining your character's voice.",
+        "third": "Strict Perspective: Respond only in the LIMITED THIRD PERSON as your character. Describe the world and other characters exclusively through their perception.",
+    }
+    style_instruction = voice_map.get(narrative_voice, voice_map["third"])
 
-    lang_instruction = ""
-    if language == "ru":
-        lang_instruction = "Response Language: Russian."
-    else:
-        lang_instruction = "Response Language: English"
+    lang_instruction = "Response Language: Russian." if language == "ru" else "Response Language: English."
 
-    char_block = f"""
-[PART 1: AI CHARACTER]
-AI Character Name: {character.name}
-Appearance: {character.appearance}
-Key Personality Traits: {character.personality_traits}
-Manner of Speech: {character.speech_style} 
-Inner World & Motivations: {character.inner_world}
-Specific Behavioral Cues: {character.behavioral_cues}
-"""
+    # Блок персонажа
+    char_lines = [
+        f"[PART 1: AI CHARACTER]",
+        f"AI Character Name: {character.name}",
+    ]
+    if character.appearance:
+        char_lines.append(f"Appearance: {character.appearance}")
+    if character.personality:
+        char_lines.append(f"Key Personality Traits & Inner World: {character.personality}")
+    if character.fandom:
+        char_lines.append(f"Fandom/Universe: {character.fandom}")
+    char_block = "\n".join(char_lines)
 
-    user_block = f"""
-[PART 2: USER CHARACTER]
-User Character Name: {persona.name}
-Appearance & Personality: {persona.description}
-Relationship with AI's Character: {relationship_context if relationship_context else "Stranger / Not specified"}
-"""
+    # Блок персоны пользователя
+    persona_lines = [
+        "[PART 2: USER CHARACTER]",
+        f"User Character Name: {persona.name}",
+    ]
+    if persona.age:
+        persona_lines.append(f"Age: {persona.age}")
+    if persona.appearance:
+        persona_lines.append(f"Appearance: {persona.appearance}")
+    if persona.personality:
+        persona_lines.append(f"Personality: {persona.personality}")
+    if persona.facts:
+        persona_lines.append(f"Background & Facts: {persona.facts}")
+    persona_lines.append(
+        f"Relationship with AI's Character: {relationship_context if relationship_context else 'Stranger / Not specified'}"
+    )
+    user_block = "\n".join(persona_lines)
+
+    # Блок сценария
     scenario_block = ""
     if scenario:
-        scenario_block = f"""
-[PART 3: SCENARIO CONTEXT]
-Premise: {scenario.description}
-Current Objective: {scenario.start_point}
-"""
-    else:
-        scenario_block = """"""
+        scenario_block = (
+            f"\n[PART 3: SCENARIO CONTEXT]\n"
+            f"Premise: {scenario.description}\n"
+            f"Starting Point: {scenario.start_point}"
+        )
 
-    full_prompt = f"{core_directive}\n{anti_mirror}\n{quality_mechanics}\n{style_instruction}\n{lang_instruction}\n\n{char_block}\n{user_block}\n{scenario_block}"
-    
+    full_prompt = (
+        f"{core_directive}\n{anti_mirror}\n{quality_mechanics}\n"
+        f"{style_instruction}\n{lang_instruction}\n\n"
+        f"{char_block}\n\n{user_block}{scenario_block}"
+    )
     return full_prompt.strip()
