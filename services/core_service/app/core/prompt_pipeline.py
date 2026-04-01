@@ -37,7 +37,22 @@ class PromptPipeline:
         
         self.lore_fragments: List[str] = []
         self.memories: List[str] = []
-        self.scenario_directive: Optional[str] = None
+        # [Блок 10] Получаем текущую сценарную цель супервизора
+        checkpoint_res = await self.db.execute(
+            select(ChatCheckpoint)
+            .where(ChatCheckpoint.chat_id == self.chat_id, ChatCheckpoint.is_completed == False)
+            .order_by(ChatCheckpoint.order_num)
+        )
+        checkpoint = checkpoint_res.scalars().first()
+        if checkpoint:
+            base_goal = checkpoint.goal_description
+            # Если юзер застрял (Блок 10.4)
+            if checkpoint.messages_spent >= 15:
+                self.scenario_directive = f"""[КРИТИЧЕСКОЕ ВМЕШАТЕЛЬСТВО СИСТЕМЫ]: Сюжет застопорился. Ты ДОЛЖЕН немедленно, в этом же ответе, форсировать следующее событие: [{base_goal}]. Используй любые радикальные действия (нападение, крик, внезапное открытие, ультиматум), чтобы протолкнуть сюжет!"""
+            else:
+                self.scenario_directive = f"Текущая сценарная цель: {base_goal}"
+        else:
+            self.scenario_directive = "None. Narrative is driven by sandbox interactions."
         self.history: List[types.Content] = []
         
         # Дополнительные атрибуты для Блока 8
@@ -282,7 +297,7 @@ EPISODIC MEMORY RECALL (Recent crucial facts):
 {memory_section}
 
 SCENARIO DIRECTIVE (Inner Drive): 
-{self.scenario_directive or 'None. Narrative is driven by sandbox interactions.'}
+{self.scenario_directive}
 
 ****
 Location: {current_location}

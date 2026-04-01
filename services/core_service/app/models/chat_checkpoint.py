@@ -19,6 +19,7 @@ class ChatCheckpoint(Base):
     order_num: Mapped[int] = mapped_column(Integer)          # Порядковый номер (1, 2, 3...)
     goal_description: Mapped[str] = mapped_column(Text)       # Цель/событие, сгенерированное супервизором
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False)  # Достиг ли сюжет этой точки
+    messages_spent: Mapped[int] = mapped_column(Integer, default=0) # ТЗ Блок 10: счетчик для защиты от «застревания»
 
     # Связи
     chat: Mapped["Chat"] = relationship("Chat", back_populates="checkpoints")

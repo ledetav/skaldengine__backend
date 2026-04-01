@@ -1,6 +1,6 @@
 from uuid import UUID
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -28,6 +28,7 @@ _client = genai.Client(api_key=settings.GEMINI_API_KEY)
 @router.post("/", response_model=ChatSchema, status_code=status.HTTP_201_CREATED)
 async def create_chat(
     chat_in: ChatCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
@@ -64,6 +65,14 @@ async def create_chat(
     db.add(chat)
     await db.commit()
     await db.refresh(chat)
+    
+    # [Блок 10] Инициализация сценария (Генерация маршрута)
+    if chat.mode == "scenario":
+        from app.core.director_service import DirectorService
+        director = DirectorService(db)
+        # В фоне, чтобы не тормозить создание чата
+        background_tasks.add_task(director.initialize_scenario, chat.id)
+
     return chat
 
 
@@ -122,6 +131,7 @@ async def delete_chat(
 async def send_message(
     chat_id: UUID,
     message_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
@@ -154,6 +164,26 @@ async def send_message(
     from app.core.prompt_pipeline import PromptPipeline
     pipeline = PromptPipeline(db, chat_id)
     payload = await pipeline.build_payload(message_in.content)
+    
+    # [Блок 10] Обновление счетчика текущего чекпоинта
+    # Мы берем текущую невыполненную задачу и инкрементируем счетчик
+    from app.models.chat_checkpoint import ChatCheckpoint
+    res = await db.execute(
+        select(ChatCheckpoint)
+        .where(ChatCheckpoint.chat_id == chat_id, ChatCheckpoint.is_completed == False)
+        .order_by(ChatCheckpoint.order_num)
+    )
+    checkpoint = res.scalars().first()
+    if checkpoint:
+        checkpoint.messages_spent += 1
+        db.add(checkpoint)
+        await db.commit()
+
+        # Фоновый мониторинг (Watcher Loop) - запускаем раз в 3 сообщения
+        if checkpoint.messages_spent % 3 == 0:
+            from app.core.director_service import DirectorService
+            director = DirectorService(db)
+            background_tasks.add_task(director.check_progress, chat_id)
     
     # Вызов Gemini
     ai_text = ""
