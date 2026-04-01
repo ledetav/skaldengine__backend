@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  # База данных для микросервиса авторизации
+  # База данных для микросервиса авторизации (с pgvector)
   auth-db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: auth_user
       POSTGRES_PASSWORD: auth_password
@@ -13,9 +13,9 @@ services:
     volumes:
       - auth_db_data:/var/lib/postgresql/data
 
-  # База данных для основного микросервиса
+  # База данных для основного микросервиса (с pgvector)
   core-db:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     environment:
       POSTGRES_USER: core_user
       POSTGRES_PASSWORD: core_password
@@ -25,6 +25,16 @@ services:
     volumes:
       - core_db_data:/var/lib/postgresql/data
 
+  # Redis — кеш и брокер задач (ARQ)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
 volumes:
   auth_db_data:
   core_db_data:
+  redis_data:
