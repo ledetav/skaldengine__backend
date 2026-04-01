@@ -1,28 +1,27 @@
 """
 RAG (Retrieval Augmented Generation) module.
-
-MIGRATION NOTE: ChromaDB removed. Vector search now uses pgvector (EpisodicMemory table).
-This module will be rewritten in blocks 3-6 of the architecture redesign.
+Updated for async support and pgvector integration.
 """
 from google import genai
 from google.genai import types
 from app.core.config import settings
 
-# Gemini client (shared across the app)
+# Gemini client
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
-def generate_embedding(text: str) -> list[float]:
+async def get_embedding(text: str) -> list[float]:
     """
-    Generates a 768-dim embedding vector via Gemini gemini-embedding-001.
-    Used for episodic memory storage and retrieval.
+    Асинхронная генерация эмбеддинга (768-dim) через text-embedding-004.
+    Используется для сохранения воспоминаний.
     """
     try:
-        response = client.models.embed_content(
-            model="gemini-embedding-001",
+        response = await client.aio.models.embed_content(
+            model="text-embedding-004",
             contents=text,
             config=types.EmbedContentConfig(
                 task_type="RETRIEVAL_DOCUMENT",
+                output_dimensionality=768,
             )
         )
         return response.embeddings[0].values
@@ -31,16 +30,17 @@ def generate_embedding(text: str) -> list[float]:
         return []
 
 
-def generate_query_embedding(query: str) -> list[float]:
+async def get_query_embedding(query: str) -> list[float]:
     """
-    Generates a query embedding (task_type=RETRIEVAL_QUERY) for semantic search.
+    Асинхронная генерация эмбеддинга для поискового запроса.
     """
     try:
-        response = client.models.embed_content(
-            model="gemini-embedding-001",
+        response = await client.aio.models.embed_content(
+            model="text-embedding-004",
             contents=query,
             config=types.EmbedContentConfig(
-                task_type="RETRIEVAL_QUERY"
+                task_type="RETRIEVAL_QUERY",
+                output_dimensionality=768,
             )
         )
         return response.embeddings[0].values

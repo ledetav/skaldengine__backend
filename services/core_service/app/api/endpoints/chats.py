@@ -150,53 +150,34 @@ async def send_message(
     await db.commit()
     await db.refresh(user_msg)
 
-    # Строим системный промпт
-    system_prompt = prompt_builder.build_system_prompt(
-        character=character,
-        persona=persona,
-        scenario=scenario,
-        relationship_context=chat.relationship_dynamic or "",
-        narrative_voice=chat.narrative_voice,
-        language=chat.language,
-    )
-
-    # TODO (Block RAG): Добавить поиск по EpisodicMemory через pgvector
-
-    # Загружаем историю (последние 20 сообщений активной ветки)
-    history_q = (
-        select(Message)
-        .where(Message.chat_id == chat.id)
-        .order_by(Message.created_at.desc())
-        .limit(20)
-    )
-    history_result = await db.execute(history_q)
-    db_messages = list(reversed(history_result.scalars().all()))
-
-    gemini_history = []
-    for msg in db_messages:
-        if msg.id == user_msg.id:
-            continue
-        role = "user" if msg.role == "user" else "model"
-        gemini_history.append(
-            types.Content(role=role, parts=[types.Part(text=msg.content)])
-        )
-    gemini_history.append(
-        types.Content(role="user", parts=[types.Part(text=message_in.content)])
-    )
-
+    # ─── Сборка промпта через конвейер (Block 7) ─────────────────────────── #
+    from app.core.prompt_pipeline import PromptPipeline
+    pipeline = PromptPipeline(db, chat.id)
+    
+    # Собираем полный payload (Stage 1-6)
+    payload = await pipeline.build_payload(message_in.content)
+    
     # Вызов Gemini
     ai_text = ""
+    hidden_thought = ""
     try:
+        # Используем параметры из пайплайна
         response = _client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=gemini_history,
-            config={
-                "system_instruction": system_prompt,
-                "temperature": 1.15,
-                "max_output_tokens": 8192,
-            }
+            contents=payload["contents"],
+            config=payload["config"]
         )
-        ai_text = response.text or ""
+        full_text = response.text or ""
+        
+        # Парсим <thought> если он есть
+        import re
+        thought_match = re.search(r"<thought>(.*?)</thought>", full_text, re.DOTALL)
+        if thought_match:
+            hidden_thought = thought_match.group(1).strip()
+            ai_text = re.sub(r"<thought>.*?</thought>", "", full_text, flags=re.DOTALL).strip()
+        else:
+            ai_text = full_text.strip()
+            
     except Exception as e:
         print(f"[Gemini] Error: {e}")
         ai_text = "(System Error: Neural network unavailable)"
@@ -206,6 +187,7 @@ async def send_message(
         chat_id=chat.id,
         role="assistant",
         content=ai_text,
+        hidden_thought=hidden_thought,
         parent_id=user_msg.id,
     )
     db.add(ai_msg)
