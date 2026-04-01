@@ -1,0 +1,244 @@
+from uuid import UUID
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.api import deps
+from app.core import prompt_builder
+from app.core.config import settings
+from google import genai
+from google.genai import types
+from app.models.chat import Chat
+from app.models.character import Character
+from app.models.user_persona import UserPersona
+from app.models.scenario import Scenario
+from app.models.message import Message
+from app.schemas.chat import ChatCreate, Chat as ChatSchema
+from app.schemas.message import MessageCreate, Message as MessageSchema
+
+router = APIRouter()
+
+# Gemini client (одиночный экземпляр на всё приложение)
+_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+
+# ─── Создание чата (сессии) ──────────────────────────────────────────────── #
+
+@router.post("/", response_model=ChatSchema, status_code=status.HTTP_201_CREATED)
+async def create_chat(
+    chat_in: ChatCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Создать новый чат с AI-персонажем."""
+    character = await db.get(Character, chat_in.character_id)
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
+    persona = await db.get(UserPersona, chat_in.user_persona_id)
+    if not persona:
+        raise HTTPException(status_code=404, detail="Persona not found")
+
+    if str(persona.owner_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="You can only use your own personas")
+
+    scenario = None
+    if chat_in.scenario_id:
+        scenario = await db.get(Scenario, chat_in.scenario_id)
+        if not scenario:
+            raise HTTPException(status_code=404, detail="Scenario not found")
+
+    chat = Chat(
+        user_id=current_user.id,
+        character_id=character.id,
+        user_persona_id=persona.id,
+        scenario_id=scenario.id if scenario else None,
+        mode="scenario" if scenario else "sandbox",
+        is_acquainted=chat_in.is_acquainted,
+        relationship_dynamic=chat_in.relationship_dynamic,
+        language=chat_in.language,
+        narrative_voice=chat_in.narrative_voice,
+    )
+
+    db.add(chat)
+    await db.commit()
+    await db.refresh(chat)
+    return chat
+
+
+# ─── Список чатов пользователя ───────────────────────────────────────────── #
+
+@router.get("/", response_model=List[ChatSchema])
+async def list_chats(
+    skip: int = 0,
+    limit: int = 20,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    query = (
+        select(Chat)
+        .where(Chat.user_id == current_user.id)
+        .order_by(Chat.updated_at.desc().nulls_last())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+# ─── Получить чат по ID ───────────────────────────────────────────────────── #
+
+@router.get("/{chat_id}", response_model=ChatSchema)
+async def get_chat(
+    chat_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    chat = await db.get(Chat, chat_id)
+    if not chat or str(chat.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return chat
+
+
+# ─── Удалить чат ─────────────────────────────────────────────────────────── #
+
+@router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat(
+    chat_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    chat = await db.get(Chat, chat_id)
+    if not chat or str(chat.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    await db.delete(chat)
+    await db.commit()
+
+
+# ─── Отправить сообщение (основной endpoint) ─────────────────────────────── #
+
+@router.post("/{chat_id}/messages", response_model=MessageSchema)
+async def send_message(
+    chat_id: UUID,
+    message_in: MessageCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """
+    Отправить сообщение и получить ответ AI.
+    Поддерживает parent_id для ветвления (swipe).
+    TODO: заменить на SSE-стриминг в следующих блоках.
+    """
+    chat = await db.get(Chat, chat_id)
+    if not chat or str(chat.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # Загружаем связанные объекты для системного промпта
+    character = await db.get(Character, chat.character_id)
+    persona = await db.get(UserPersona, chat.user_persona_id)
+    scenario = await db.get(Scenario, chat.scenario_id) if chat.scenario_id else None
+
+    # Сохраняем сообщение пользователя
+    user_msg = Message(
+        chat_id=chat.id,
+        role="user",
+        content=message_in.content,
+        parent_id=message_in.parent_id,
+    )
+    db.add(user_msg)
+    await db.commit()
+    await db.refresh(user_msg)
+
+    # Строим системный промпт
+    system_prompt = prompt_builder.build_system_prompt(
+        character=character,
+        persona=persona,
+        scenario=scenario,
+        relationship_context=chat.relationship_dynamic or "",
+        narrative_voice=chat.narrative_voice,
+        language=chat.language,
+    )
+
+    # TODO (Block RAG): Добавить поиск по EpisodicMemory через pgvector
+
+    # Загружаем историю (последние 20 сообщений активной ветки)
+    history_q = (
+        select(Message)
+        .where(Message.chat_id == chat.id)
+        .order_by(Message.created_at.desc())
+        .limit(20)
+    )
+    history_result = await db.execute(history_q)
+    db_messages = list(reversed(history_result.scalars().all()))
+
+    gemini_history = []
+    for msg in db_messages:
+        if msg.id == user_msg.id:
+            continue
+        role = "user" if msg.role == "user" else "model"
+        gemini_history.append(
+            types.Content(role=role, parts=[types.Part(text=msg.content)])
+        )
+    gemini_history.append(
+        types.Content(role="user", parts=[types.Part(text=message_in.content)])
+    )
+
+    # Вызов Gemini
+    ai_text = ""
+    try:
+        response = _client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=gemini_history,
+            config={
+                "system_instruction": system_prompt,
+                "temperature": 1.15,
+                "max_output_tokens": 8192,
+            }
+        )
+        ai_text = response.text or ""
+    except Exception as e:
+        print(f"[Gemini] Error: {e}")
+        ai_text = "(System Error: Neural network unavailable)"
+
+    # Сохраняем ответ AI
+    ai_msg = Message(
+        chat_id=chat.id,
+        role="assistant",
+        content=ai_text,
+        parent_id=user_msg.id,
+    )
+    db.add(ai_msg)
+
+    # Обновляем active_leaf_id чата
+    chat.active_leaf_id = ai_msg.id
+    db.add(chat)
+
+    await db.commit()
+    await db.refresh(ai_msg)
+    return ai_msg
+
+
+# ─── Получить историю сообщений ──────────────────────────────────────────── #
+
+@router.get("/{chat_id}/messages", response_model=List[MessageSchema])
+async def get_messages(
+    chat_id: UUID,
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    chat = await db.get(Chat, chat_id)
+    if not chat or str(chat.user_id) != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    query = (
+        select(Message)
+        .where(Message.chat_id == chat_id)
+        .order_by(Message.created_at.asc())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
