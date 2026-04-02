@@ -98,6 +98,9 @@ class PromptPipeline:
 
     async def _stage_2_lorebook(self, user_text: str):
         """Этап 2: Поиск ключевых слов в тексте пользователя через Aho-Corasick."""
+        if not self.character:
+            return
+            
         # 1. Получаем все лорбуки, связанные с персонажем или фандомом
         query = select(LorebookEntry).join(Lorebook).where(
             (Lorebook.character_id == self.character.id) | 
@@ -187,9 +190,14 @@ class PromptPipeline:
                     f"ТЕКУЩАЯ СЦЕНАРНАЯ ЦЕЛЬ: {base_goal}. "
                     "Незаметно направляй диалог к достижению этой цели."
                 )
+        else:
+            self.scenario_directive = "None. Narrative is driven by sandbox interactions."
 
     async def _stage_5_history(self):
         """Этап 5: Реконструкция истории сообщений (последние N)."""
+        if not self.chat:
+            return
+            
         # Если указан parent_id (Swipe/Branch), начинаем от него, иначе от active_leaf_id
         current_id = self.parent_id or self.chat.active_leaf_id
         messages = []
@@ -219,7 +227,9 @@ class PromptPipeline:
 
     async def _stage_6_assemble(self, user_text: str) -> Dict[str, Any]:
         """Этап 6: Финальная склейка сложного системного промпта и Context Caching."""
-        
+        if not self.chat or not self.character or not self.persona:
+            raise ValueError("Required data for assembly (chat, character, persona) is missing.")
+            
         # Логика отношений
         relationship = (
             self.chat.relationship_dynamic 
