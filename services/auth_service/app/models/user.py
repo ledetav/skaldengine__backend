@@ -18,7 +18,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String, unique=True, index=True)
     login: Mapped[str] = mapped_column(String, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String)
-    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    role: Mapped[str] = mapped_column(String, default="user")  # "admin" | "moderator" | "user"
 
     # Профиль пользователя
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)

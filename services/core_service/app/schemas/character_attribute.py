@@ -10,12 +10,34 @@ class CharacterAttributeBase(BaseModel):
 
 
 class CharacterAttributeCreate(CharacterAttributeBase):
+    character_id: UUID
+    
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
+                    "character_id": "c138fbd8-8250-48e0-bb15-123456789abc",
                     "category": "fact",
                     "content": "The character has a severe allergy to moon dust."
+                }
+            ]
+        }
+    }
+
+
+class CharacterAttributeBulkCreate(BaseModel):
+    character_id: UUID
+    attributes: list[CharacterAttributeBase]
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "character_id": "c138fbd8-8250-48e0-bb15-123456789abc",
+                    "attributes": [
+                        {"category": "fact", "content": "Fact 1"},
+                        {"category": "fact", "content": "Fact 2"}
+                    ]
                 }
             ]
         }
