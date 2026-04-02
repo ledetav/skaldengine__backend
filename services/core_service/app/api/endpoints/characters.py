@@ -7,8 +7,6 @@ from sqlalchemy import select
 from app.api import deps
 from app.models.character import Character
 from app.schemas.character import CharacterCreate, CharacterUpdate, Character as CharacterSchema
-from app.core.kafka import send_entity_event
-
 router = APIRouter()
 
 @router.get("/", response_model=List[CharacterSchema])
@@ -16,7 +14,6 @@ async def read_characters(
     skip: int = 0,
     limit: int = 20,
     db: AsyncSession = Depends(deps.get_db),
-    # Юзер может быть не авторизован для просмотра списка? Если да, можно убрать deps
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     query = select(Character).offset(skip).limit(limit)
@@ -33,13 +30,6 @@ async def create_character(
     db.add(character)
     await db.commit()
     await db.refresh(character)
-
-    await send_entity_event(
-        event_type="Created",
-        entity_type="Character",
-        entity_id=str(character.id),
-        payload={"name": character.name}
-    )
 
     return character
 
@@ -72,13 +62,6 @@ async def update_character(
     db.add(character)
     await db.commit()
     await db.refresh(character)
-
-    await send_entity_event(
-        event_type="Updated",
-        entity_type="Character",
-        entity_id=str(character.id),
-        payload={"updated_fields": list(update_data.keys())}
-    )
     
     return character
 
@@ -95,11 +78,4 @@ async def delete_character(
     await db.delete(character)
     await db.commit()
     
-    await send_entity_event(
-        event_type="Deleted",
-        entity_type="Character",
-        entity_id=str(character_id),
-        payload={"name": character.name}
-    )
-    
-    return None
+    return None

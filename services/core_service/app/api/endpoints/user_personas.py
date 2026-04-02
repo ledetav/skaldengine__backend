@@ -7,7 +7,6 @@ from sqlalchemy import select, func, delete
 from app.api import deps
 from app.models.user_persona import UserPersona
 from app.schemas.user_persona import UserPersonaCreate, UserPersonaUpdate, UserPersona as UserPersonaSchema
-from app.core.kafka import send_entity_event
 
 router = APIRouter()
 
@@ -53,13 +52,6 @@ async def create_persona(
     await db.commit()
     await db.refresh(new_persona)
     
-    await send_entity_event(
-        event_type="Created",
-        entity_type="Persona",
-        entity_id=str(new_persona.id),
-        payload={"name": new_persona.name}
-    )
-    
     return new_persona
 
 @router.get("/{persona_id}", response_model=UserPersonaSchema)
@@ -104,13 +96,6 @@ async def update_persona(
     await db.commit()
     await db.refresh(persona)
     
-    await send_entity_event(
-        event_type="Updated",
-        entity_type="Persona",
-        entity_id=str(persona.id),
-        payload={"updated_fields": list(update_data.keys())}
-    )
-    
     return persona
 
 @router.delete("/{persona_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -132,13 +117,6 @@ async def delete_persona(
     await db.delete(persona)
     await db.commit()
     
-    await send_entity_event(
-        event_type="Deleted",
-        entity_type="Persona",
-        entity_id=str(persona_id),
-        payload={"name": persona.name}
-    )
-    
     return None
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
@@ -146,20 +124,8 @@ async def delete_all_personas(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    query = select(UserPersona).where(UserPersona.owner_id == current_user.id)
-    result = await db.execute(query)
-    personas = result.scalars().all()
-    
     delete_query = delete(UserPersona).where(UserPersona.owner_id == current_user.id)
     await db.execute(delete_query)
     await db.commit()
-    
-    for persona in personas:
-        await send_entity_event(
-            event_type="Deleted",
-            entity_type="Persona",
-            entity_id=str(persona.id),
-            payload={"name": persona.name}
-        )
     
     return None
