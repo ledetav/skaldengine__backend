@@ -73,15 +73,9 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
         db.add(ai_msg)
         await db.commit()
         
-        # 1. RAG Memory
+        # 1. RAG Memory (Sliding Window Ingestion)
         try:
-            if ai_msg.parent_id:
-                user_msg = await db.get(Message, ai_msg.parent_id)
-                if user_msg:
-                    # add_to_memory signature in earlier code implied it took db, chat_id, user_content, ai_content
-                    # We'll just run it with our db session
-                    await rag.add_to_memory(db, chat_id, user_msg.content, ai_text)
-                    await db.commit()
+            await rag.process_sliding_window(db, chat_id, ai_msg_id)
         except Exception as e:
             print(f"[RAG] Error adding to memory: {e}")
             

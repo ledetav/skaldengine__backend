@@ -144,21 +144,54 @@ class PromptPipeline:
             self.lore_fragments.append(entry.content)
 
     async def _stage_3_rag(self, user_text: str):
-        """Этап 3: Поиск по эпизодической памяти через pgvector."""
+        """Этап 3: Поиск по эпизодической памяти через pgvector (с Hybrid Scoring)."""
         # Генерируем эмбеддинг для запроса
         query_vector = await rag.get_query_embedding(user_text)
+        if not query_vector:
+            return
+            
+        from sqlalchemy import and_
+        from app.models.message import Message
+        import datetime
         
-        # Поиск ближайших соседей в базе
+        distance = EpisodicMemory.embedding.cosine_distance(query_vector)
+        
+        # 1. Запрашиваем 10 кандидатов с порогом < 0.25 и джоиним с Message
         query = (
-            select(EpisodicMemory)
-            .where(EpisodicMemory.chat_id == self.chat_id)
-            .order_by(EpisodicMemory.embedding.cosine_distance(query_vector))
-            .limit(3)
+            select(EpisodicMemory, distance.label('distance'), Message.created_at)
+            .join(Message, EpisodicMemory.message_id == Message.id)
+            .where(
+                and_(
+                    EpisodicMemory.chat_id == self.chat_id,
+                    distance < 0.25
+                )
+            )
+            .limit(10)
         )
         result = await self.db.execute(query)
-        memories = result.scalars().all()
+        candidates = result.all()
         
-        for m in memories:
+        if not candidates:
+            return
+            
+        # 2. Hybrid Scoring (Косинусная дистанция + Возраст)
+        FORGET_COEF = 0.0001
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        scored_candidates = []
+        
+        for mem, dist_val, created_at in candidates:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=datetime.timezone.utc)
+            age_seconds = max(0, (now_utc - created_at).total_seconds())
+            
+            score = dist_val + (age_seconds * FORGET_COEF)
+            scored_candidates.append((score, mem))
+            
+        # 3. Сортировка по score ASC (меньше = лучше: ближе вектор и новые воспоминания)
+        scored_candidates.sort(key=lambda x: x[0])
+        best_memories = scored_candidates[:3]
+        
+        for _, m in best_memories:
             self.memories.append(m.summary)
 
     async def _stage_4_scenario(self):
