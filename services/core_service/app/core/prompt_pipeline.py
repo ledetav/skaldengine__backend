@@ -15,6 +15,7 @@ from app.models.message import Message
 from app.models.lorebook import Lorebook, LorebookEntry
 from app.models.chat_checkpoint import ChatCheckpoint
 from app.models.episodic_memory import EpisodicMemory
+from app.models.character_attribute import CharacterAttribute
 from app.core import rag
 
 
@@ -85,7 +86,6 @@ class PromptPipeline:
             self.scenario = await self.db.get(Scenario, self.chat.scenario_id)
 
         # Загружаем атрибуты персонажа (Блок 8)
-        from app.models.character_attribute import CharacterAttribute
         attr_query = select(CharacterAttribute).where(CharacterAttribute.character_id == self.character.id)
         attr_result = await self.db.execute(attr_query)
         attributes = attr_result.scalars().all()
@@ -309,38 +309,15 @@ Current Situation: Review the latest interactions in the chat history.
 
 Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pacing, ensure you are not acting as a sycophant, prepare a proactive hook if necessary, and pass the Validation Gate. Then, output your highly sensory, perfectly proportioned Russian response."""
 
-        # Stage 6 Logic: Context Caching (Block 9)
-        cache_name = None
-        if hasattr(self.client, 'caches'):
-            try:
-                # Хэшируем инструкцию для идентификации (в проде лучше использовать Redis)
-                import hashlib
-                instruction_hash = hashlib.md5(core_template.encode()).hexdigest()
-                # Мы создаем кэш для системной инструкции (TTL 1 час)
-                # Google GenAI SDK требует модель для кэша
-                cache = await self.client.aio.caches.create(
-                    model=settings.GEMINI_MODEL,
-                    config=types.CachedContentConfig(
-                        system_instruction=core_template,
-                        ttl_seconds=3600,
-                    )
-                )
-                cache_name = cache.name
-            except Exception as e:
-                # В случае ошибки логируем и идем без кэша
-                pass
-
         # Формируем Payload
         payload = {
             "contents": self.history + [types.Content(role="user", parts=[types.Part(text=user_text)])],
             "config": types.GenerateContentConfig(
                 temperature=settings.GEMINI_TEMPERATURE,
-                top_p=0.9,
+                top_p=1.0,
                 top_k=40,
                 max_output_tokens=settings.GEMINI_MAX_TOKENS,
-                cached_content=cache_name,
-                # Если кэш не создался, передаем инструкцию напрямую
-                system_instruction=core_template if not cache_name else None,
+                system_instruction=core_template,
                 safety_settings=[
                     types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
                     types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
