@@ -34,7 +34,8 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
              raise HTTPException(status_code=403, detail="Invalid token")
         
         user_id = UUID(token_data)
-        return CurrentUser(id=user_id, is_admin=False)
+        is_admin = payload.get("is_admin", False)
+        return CurrentUser(id=user_id, is_admin=is_admin)
         
     except (JWTError, ValueError): 
         raise HTTPException(status_code=403, detail="Could not validate credentials")
@@ -42,5 +43,9 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
 def get_current_active_superuser(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> CurrentUser:
-    # Здесь можно добавить проверку прав, если в токене будут роли
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user doesn't have enough privileges"
+        )
     return current_user
