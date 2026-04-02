@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
-from app.models.session import Session
+from app.models.chat import Chat
 from app.models.message import Message
 
 logger = logging.getLogger("projector")
@@ -38,31 +38,28 @@ async def process_event(event_data: dict, db: AsyncSession):
 
     entity_id = to_uuid(entity_id_str)
 
-    # 1. Обработка создания сессии
-    if event_type == "SessionCreated":
-        existing = await db.execute(select(Session).where(Session.id == entity_id))
+    # 1. Обработка создания чата (сессии)
+    if event_type == "ChatCreated":
+        existing = await db.execute(select(Chat).where(Chat.id == entity_id))
         if existing.scalar_one_or_none():
             return 
             
-        new_session = Session(
+        new_chat = Chat(
             id=entity_id,
             user_id=to_uuid(event_data.get("user_id")),
             character_id=to_uuid(event_data.get("character_id")),
-            persona_id=to_uuid(event_data.get("persona_id")),
+            user_persona_id=to_uuid(event_data.get("user_persona_id")),
             scenario_id=to_uuid(event_data.get("scenario_id")),
             mode=event_data.get("mode"),
             language=event_data.get("language"),
-            speech_style=event_data.get("speech_style"),
-            character_name_snapshot=event_data.get("character_name_snapshot"),
-            persona_name_snapshot=event_data.get("persona_name_snapshot"),
-            relationship_context=event_data.get("relationship_context"),
-            cached_system_prompt=event_data.get("cached_system_prompt"),
-            current_step=0,
+            is_acquainted=event_data.get("is_acquainted", False),
+            relationship_dynamic=event_data.get("relationship_dynamic"),
+            narrative_voice=event_data.get("narrative_voice", "third"),
             created_at=to_datetime(event_data.get("timestamp"))
         )
-        db.add(new_session)
+        db.add(new_chat)
         await db.commit()
-        logger.info(f"[Projector] Session {entity_id} saved to Read Model.")
+        logger.info(f"[Projector] Chat {entity_id} saved to Read Model.")
 
     # 2. Обработка добавления сообщения
     elif event_type == "MessageAdded":
@@ -72,7 +69,7 @@ async def process_event(event_data: dict, db: AsyncSession):
             
         new_msg = Message(
             id=entity_id,
-            session_id=to_uuid(event_data.get("session_id")),
+            chat_id=to_uuid(event_data.get("chat_id")),
             parent_id=to_uuid(event_data.get("parent_id")),
             role=event_data.get("role"),
             content=event_data.get("content"),
@@ -81,10 +78,10 @@ async def process_event(event_data: dict, db: AsyncSession):
         )
         db.add(new_msg)
         
-        session = await db.get(Session, to_uuid(event_data.get("session_id")))
-        if session:
-            session.updated_at = to_datetime(event_data.get("timestamp"))
-            db.add(session)
+        chat = await db.get(Chat, to_uuid(event_data.get("chat_id")))
+        if chat:
+            chat.updated_at = to_datetime(event_data.get("timestamp"))
+            db.add(chat)
             
         await db.commit()
         logger.info(f"[Projector] Message {entity_id} saved to Read Model.")

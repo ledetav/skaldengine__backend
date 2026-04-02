@@ -10,32 +10,30 @@ class BaseEvent(BaseModel):
     entity_id: UUID  # ID сессии или сообщения
     event_type: str
 
-class SessionCreatedEvent(BaseEvent):
-    event_type: str = "SessionCreated"
+class ChatCreatedEvent(BaseEvent):
+    event_type: str = "ChatCreated"
     user_id: UUID
     character_id: UUID
-    persona_id: UUID
+    user_persona_id: UUID
     scenario_id: Optional[UUID]
     mode: str
     language: str
-    speech_style: str
-    character_name_snapshot: str
-    persona_name_snapshot: str
-    relationship_context: Optional[str]
-    cached_system_prompt: str
+    is_acquainted: bool
+    relationship_dynamic: Optional[str]
+    narrative_voice: str
 
 class MessageAddedEvent(BaseEvent):
     event_type: str = "MessageAdded"
-    session_id: UUID
-    parent_id: Optional[UUID] # Для реализации ветвления
+    chat_id: UUID
+    parent_id: Optional[UUID] 
     role: str
     content: str
 
 class MessageDeactivatedEvent(BaseEvent):
     event_type: str = "MessageDeactivated"
-    session_id: UUID
+    chat_id: UUID
 
 class MessageEditedEvent(BaseEvent):
     event_type: str = "MessageEdited"
-    session_id: UUID
+    chat_id: UUID
     new_content: str

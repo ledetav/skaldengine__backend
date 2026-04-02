@@ -16,6 +16,8 @@ from app.models.scenario import Scenario
 from app.models.message import Message
 from app.schemas.chat import ChatCreate, Chat as ChatSchema
 from app.schemas.message import MessageCreate, Message as MessageSchema
+from app.core.kafka import publish_domain_event
+from app.schemas.events import ChatCreatedEvent, MessageAddedEvent
 
 router = APIRouter()
 
@@ -65,6 +67,21 @@ async def create_chat(
     db.add(chat)
     await db.commit()
     await db.refresh(chat)
+    
+    # [Event Sourcing] Публикуем событие создания чата
+    event = ChatCreatedEvent(
+        entity_id=chat.id,
+        user_id=chat.user_id,
+        character_id=chat.character_id,
+        user_persona_id=chat.user_persona_id,
+        scenario_id=chat.scenario_id,
+        mode=chat.mode,
+        language=chat.language,
+        is_acquainted=chat.is_acquainted,
+        relationship_dynamic=chat.relationship_dynamic,
+        narrative_voice=chat.narrative_voice
+    )
+    await publish_domain_event(event)
     
     # [Блок 10] Инициализация сценария (Генерация маршрута)
     if chat.mode == "scenario":
@@ -160,6 +177,16 @@ async def send_message(
     await db.commit()
     await db.refresh(user_msg)
 
+    # [Event Sourcing] Событие сообщения пользователя
+    user_event = MessageAddedEvent(
+        entity_id=user_msg.id,
+        chat_id=chat.id,
+        parent_id=user_msg.parent_id,
+        role=user_msg.role,
+        content=user_msg.content
+    )
+    await publish_domain_event(user_event)
+
     # ─── Сборка промпта через конвейер (Block 7) ─────────────────────────── #
     from app.core.prompt_pipeline import PromptPipeline
     pipeline = PromptPipeline(db, chat_id)
@@ -226,6 +253,17 @@ async def send_message(
 
     await db.commit()
     await db.refresh(ai_msg)
+
+    # [Event Sourcing] Событие ответа AI
+    ai_event = MessageAddedEvent(
+        entity_id=ai_msg.id,
+        chat_id=chat.id,
+        parent_id=ai_msg.parent_id,
+        role=ai_msg.role,
+        content=ai_msg.content
+    )
+    await publish_domain_event(ai_event)
+
     return ai_msg
 
 

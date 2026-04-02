@@ -17,9 +17,9 @@ async def replay_all_events():
     # Удаляем только проекции Event Sourcing. Юзеров, персонажей и лор не трогаем!
     async with AsyncSessionLocal() as db:
         await db.execute(text("TRUNCATE TABLE messages CASCADE;"))
-        await db.execute(text("TRUNCATE TABLE sessions CASCADE;"))
+        await db.execute(text("TRUNCATE TABLE chats CASCADE;"))
         await db.commit()
-        logger.info("🧹 Read Model (PostgreSQL tables) truncated successfully.")
+        logger.info("🧹 Read Model (PostgreSQL tables: chats, messages) truncated successfully.")
  
     # НЕ указываем group_id, чтобы консьюмер был анонимным и читал всё с самого начала
     # НЕ указываем топик в конструкторе, т.к. будем использовать assign() вручную
@@ -83,7 +83,7 @@ async def replay_all_events():
                     for msg in messages:
                         # Пропускаем события, которые не относятся к сессиям/сообщениям 
                         # (вдруг там есть события Characters или Personas)
-                        if msg.value.get("event_type") in ["SessionCreated", "MessageAdded", "MessageDeactivated", "MessageEdited"]:
+                        if msg.value.get("event_type") in ["ChatCreated", "MessageAdded", "MessageDeactivated", "MessageEdited"]:
                             await process_event(msg.value, db)
                             events_processed += 1
                 await db.commit()
