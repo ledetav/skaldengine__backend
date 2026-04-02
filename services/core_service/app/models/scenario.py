@@ -19,6 +19,7 @@ class Scenario(Base):
     )
 
     title: Mapped[str] = mapped_column(String)
+    location: Mapped[str | None] = mapped_column(String, nullable=True) # Добавлено для Блока 9
     description: Mapped[str] = mapped_column(Text)  # Публичное описание завязки
 
     start_point: Mapped[str] = mapped_column(Text)  # Точка А

@@ -31,7 +31,9 @@ async def login_access_token(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(
-            user.id, expires_delta=access_token_expires
+            user.id, 
+            is_admin=user.is_admin,
+            expires_delta=access_token_expires
         ),
         "token_type": "bearer",
     }
@@ -53,6 +55,8 @@ async def register_user(
     # Создание
     user = User(
         email=user_in.email,
+        username=user_in.username,
+        login=user_in.login,
         password_hash=security.get_password_hash(user_in.password),
         is_admin=False
     )

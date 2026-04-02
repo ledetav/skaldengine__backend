@@ -13,7 +13,20 @@ class UserPersonaBase(BaseModel):
 
 
 class UserPersonaCreate(UserPersonaBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Aragor",
+                    "avatar_url": "https://example.com/aragor.jpg",
+                    "age": 35,
+                    "appearance": "Tall, dark hair, scarred face",
+                    "personality": "Stoic and brave",
+                    "facts": "Exiled from his homeland"
+                }
+            ]
+        }
+    }
 
 
 class UserPersonaUpdate(BaseModel):
@@ -23,6 +36,21 @@ class UserPersonaUpdate(BaseModel):
     appearance: str | None = None
     personality: str | None = None
     facts: str | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Aragor the King",
+                    "avatar_url": "https://example.com/aragor_king.jpg",
+                    "age": 40,
+                    "appearance": "Regal presence, graying hair",
+                    "personality": "Wise and just",
+                    "facts": "Reclaimed the throne"
+                }
+            ]
+        }
+    }
 
 
 class UserPersona(UserPersonaBase):

@@ -1,11 +1,10 @@
 from uuid import UUID
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.api import deps
-from app.core import prompt_builder
 from app.core.config import settings
 from google import genai
 from google.genai import types
@@ -28,6 +27,7 @@ _client = genai.Client(api_key=settings.GEMINI_API_KEY)
 @router.post("/", response_model=ChatSchema, status_code=status.HTTP_201_CREATED)
 async def create_chat(
     chat_in: ChatCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
@@ -64,6 +64,15 @@ async def create_chat(
     db.add(chat)
     await db.commit()
     await db.refresh(chat)
+    
+    
+    # [Блок 10] Инициализация сценария (Генерация маршрута)
+    if chat.mode == "scenario":
+        from app.core.director_service import DirectorService
+        director = DirectorService()
+        # В фоне, чтобы не тормозить создание чата
+        background_tasks.add_task(director.initialize_scenario, chat.id)
+
     return chat
 
 
@@ -122,6 +131,7 @@ async def delete_chat(
 async def send_message(
     chat_id: UUID,
     message_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
@@ -150,53 +160,53 @@ async def send_message(
     await db.commit()
     await db.refresh(user_msg)
 
-    # Строим системный промпт
-    system_prompt = prompt_builder.build_system_prompt(
-        character=character,
-        persona=persona,
-        scenario=scenario,
-        relationship_context=chat.relationship_dynamic or "",
-        narrative_voice=chat.narrative_voice,
-        language=chat.language,
+
+    # ─── Сборка промпта через конвейер (Block 7) ─────────────────────────── #
+    from app.core.prompt_pipeline import PromptPipeline
+    pipeline = PromptPipeline(db, chat_id, parent_id=message_in.parent_id)
+    payload = await pipeline.build_payload(message_in.content)
+    
+    # [Блок 10] Обновление счетчика текущего чекпоинта
+    # Мы берем текущую невыполненную задачу и инкрементируем счетчик
+    from app.models.chat_checkpoint import ChatCheckpoint
+    res = await db.execute(
+        select(ChatCheckpoint)
+        .where(ChatCheckpoint.chat_id == chat_id, ChatCheckpoint.is_completed == False)
+        .order_by(ChatCheckpoint.order_num)
     )
+    checkpoint = res.scalars().first()
+    if checkpoint:
+        checkpoint.messages_spent += 1
+        db.add(checkpoint)
+        await db.commit()
 
-    # TODO (Block RAG): Добавить поиск по EpisodicMemory через pgvector
-
-    # Загружаем историю (последние 20 сообщений активной ветки)
-    history_q = (
-        select(Message)
-        .where(Message.chat_id == chat.id)
-        .order_by(Message.created_at.desc())
-        .limit(20)
-    )
-    history_result = await db.execute(history_q)
-    db_messages = list(reversed(history_result.scalars().all()))
-
-    gemini_history = []
-    for msg in db_messages:
-        if msg.id == user_msg.id:
-            continue
-        role = "user" if msg.role == "user" else "model"
-        gemini_history.append(
-            types.Content(role=role, parts=[types.Part(text=msg.content)])
-        )
-    gemini_history.append(
-        types.Content(role="user", parts=[types.Part(text=message_in.content)])
-    )
-
+        # Фоновый мониторинг (Watcher Loop) - запускаем раз в 3 сообщения
+        if checkpoint.messages_spent % 3 == 0:
+            from app.core.director_service import DirectorService
+            director = DirectorService()
+            background_tasks.add_task(director.check_progress, chat_id)
+    
     # Вызов Gemini
     ai_text = ""
+    hidden_thought = ""
     try:
+        # Используем параметры из пайплайна
         response = _client.models.generate_content(
             model="gemini-2.0-flash",
-            contents=gemini_history,
-            config={
-                "system_instruction": system_prompt,
-                "temperature": 1.15,
-                "max_output_tokens": 8192,
-            }
+            contents=payload["contents"],
+            config=payload["config"]
         )
-        ai_text = response.text or ""
+        full_text = response.text or ""
+        
+        # Парсим <Internal_Analysis> если он есть
+        import re
+        thought_match = re.search(r"<Internal_Analysis>(.*?)</Internal_Analysis>", full_text, re.DOTALL)
+        if thought_match:
+            hidden_thought = thought_match.group(1).strip()
+            ai_text = re.sub(r"<Internal_Analysis>.*?</Internal_Analysis>", "", full_text, flags=re.DOTALL).strip()
+        else:
+            ai_text = full_text.strip()
+            
     except Exception as e:
         print(f"[Gemini] Error: {e}")
         ai_text = "(System Error: Neural network unavailable)"
@@ -206,6 +216,7 @@ async def send_message(
         chat_id=chat.id,
         role="assistant",
         content=ai_text,
+        hidden_thought=hidden_thought,
         parent_id=user_msg.id,
     )
     db.add(ai_msg)
@@ -216,6 +227,7 @@ async def send_message(
 
     await db.commit()
     await db.refresh(ai_msg)
+
     return ai_msg
 
 

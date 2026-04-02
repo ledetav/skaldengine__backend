@@ -14,10 +14,31 @@ class MessageCreate(BaseModel):
     content: str
     parent_id: UUID | None = None  # Для ветвления (swipe)
 
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "content": "Hello there! How are you doing today?",
+                    "parent_id": "123e4567-e89b-12d3-a456-426614174000"
+                }
+            ]
+        }
+    }
+
 
 class MessageRegenerate(BaseModel):
     """Запрос на перегенерацию ответа."""
     message_id: UUID
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "message_id": "123e4567-e89b-12d3-a456-426614174000"
+                }
+            ]
+        }
+    }
 
 
 class Message(MessageBase):
