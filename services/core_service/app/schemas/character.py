@@ -14,7 +14,22 @@ class CharacterBase(BaseModel):
 
 
 class CharacterCreate(CharacterBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Eldritch",
+                    "description": "An ancient being of cosmic horror.",
+                    "fandom": "Cthulhu Mythos",
+                    "avatar_url": "https://example.com/avatar.jpg",
+                    "card_image_url": "https://example.com/card.jpg",
+                    "appearance": "Tentacles forming a spectral mass",
+                    "personality": "Unfathomable, cold, indifferent",
+                    "is_public": True
+                }
+            ]
+        }
+    }
 
 
 class CharacterUpdate(BaseModel):
@@ -26,6 +41,23 @@ class CharacterUpdate(BaseModel):
     appearance: str | None = None
     personality: str | None = None
     is_public: bool | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Eldritch (Updated)",
+                    "description": "Updated description",
+                    "fandom": "Updated Fandom",
+                    "avatar_url": "https://example.com/avatar_new.jpg",
+                    "card_image_url": "https://example.com/card_new.jpg",
+                    "appearance": "More tentacles",
+                    "personality": "Even more indifferent",
+                    "is_public": False
+                }
+            ]
+        }
+    }
 
 
 class Character(CharacterBase):

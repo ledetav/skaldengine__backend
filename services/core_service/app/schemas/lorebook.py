@@ -11,13 +11,35 @@ class LorebookEntryBase(BaseModel):
 
 
 class LorebookEntryCreate(LorebookEntryBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "keywords": ["magic", "spell", "wizard"],
+                    "content": "Magic is drawn from the aether around the caster.",
+                    "priority": 10
+                }
+            ]
+        }
+    }
 
 
 class LorebookEntryUpdate(BaseModel):
     keywords: list[str] | None = None
     content: str | None = None
     priority: int | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "keywords": ["magic", "spell", "wizard", "sorcerer"],
+                    "content": "Magic is drawn from the aether. It requires extreme focus.",
+                    "priority": 20
+                }
+            ]
+        }
+    }
 
 
 class LorebookEntry(LorebookEntryBase):
@@ -37,12 +59,33 @@ class LorebookBase(BaseModel):
 
 
 class LorebookCreate(LorebookBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Chronicles of Magic",
+                    "character_id": "aa3e4567-e89b-12d3-a456-426614174003",
+                    "fandom": "Fantasy Realm"
+                }
+            ]
+        }
+    }
 
 
 class LorebookUpdate(BaseModel):
     name: str | None = None
     fandom: str | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Chronicles of Magic: Extended Version",
+                    "fandom": "High Fantasy Realm"
+                }
+            ]
+        }
+    }
 
 
 class Lorebook(LorebookBase):

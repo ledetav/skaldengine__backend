@@ -14,7 +14,21 @@ class ChatBase(BaseModel):
 
 
 class ChatCreate(ChatBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "character_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "user_persona_id": "123e4567-e89b-12d3-a456-426614174001",
+                    "scenario_id": "123e4567-e89b-12d3-a456-426614174002",
+                    "is_acquainted": True,
+                    "relationship_dynamic": "Rivals forced to work together",
+                    "language": "ru",
+                    "narrative_voice": "third"
+                }
+            ]
+        }
+    }
 
 
 class Chat(ChatBase):

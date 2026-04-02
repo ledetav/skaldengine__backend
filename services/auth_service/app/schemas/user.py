@@ -5,10 +5,25 @@ from datetime import date, datetime
 
 class UserBase(BaseModel):
     email: EmailStr
+    username: str
+    login: str
 
 
 class UserCreate(UserBase):
     password: str
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "email": "user@example.com",
+                    "username": "SuperPlayer2000",
+                    "login": "super_player",
+                    "password": "strongpassword123"
+                }
+            ]
+        }
+    }
 
 
 class UserLogin(BaseModel):

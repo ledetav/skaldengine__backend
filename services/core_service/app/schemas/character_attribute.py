@@ -10,12 +10,32 @@ class CharacterAttributeBase(BaseModel):
 
 
 class CharacterAttributeCreate(CharacterAttributeBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "category": "fact",
+                    "content": "The character has a severe allergy to moon dust."
+                }
+            ]
+        }
+    }
 
 
 class CharacterAttributeUpdate(BaseModel):
     category: str | None = None
     content: str | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "category": "bio",
+                    "content": "Born in 1980 in a small village."
+                }
+            ]
+        }
+    }
 
 
 class CharacterAttribute(CharacterAttributeBase):

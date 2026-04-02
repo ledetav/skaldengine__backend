@@ -55,6 +55,8 @@ async def register_user(
     # Создание
     user = User(
         email=user_in.email,
+        username=user_in.username,
+        login=user_in.login,
         password_hash=security.get_password_hash(user_in.password),
         is_admin=False
     )

@@ -9,12 +9,34 @@ class ChatCheckpointBase(BaseModel):
 
 
 class ChatCheckpointCreate(ChatCheckpointBase):
-    pass
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "order_num": 1,
+                    "goal_description": "User must figure out the code to the vault.",
+                    "is_completed": False
+                }
+            ]
+        }
+    }
 
 
 class ChatCheckpointUpdate(BaseModel):
     is_completed: bool | None = None
     goal_description: str | None = None
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "order_num": 2,
+                    "goal_description": "User has figured out the code.",
+                    "is_completed": True
+                }
+            ]
+        }
+    }
 
 
 class ChatCheckpoint(ChatCheckpointBase):
