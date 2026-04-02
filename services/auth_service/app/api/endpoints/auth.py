@@ -33,7 +33,8 @@ async def login_access_token(
         "access_token": security.create_access_token(
             user.id, 
             role=user.role,
-            expires_delta=access_token_expires
+            expires_delta=access_token_expires,
+            birth_date=user.birth_date
         ),
         "token_type": "bearer",
     }

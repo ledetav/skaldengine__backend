@@ -9,9 +9,12 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
 
+from datetime import date
+
 class CurrentUser(BaseModel):
     id: UUID
     role: str = "user"
+    birth_date: date | None = None
 
 # Используем HTTPBearer вместо OAuth2PasswordBearer.
 # Это создаст в Swagger поле для ручной вставки токена, вместо формы логина.
@@ -35,7 +38,17 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
         
         user_id = UUID(token_data)
         role = payload.get("role", "user")
-        return CurrentUser(id=user_id, role=role)
+        
+        # Parse birth_date
+        birth_date_str = payload.get("birth_date")
+        birth_date_val = None
+        if birth_date_str:
+            try:
+                birth_date_val = date.fromisoformat(birth_date_str)
+            except ValueError:
+                pass
+
+        return CurrentUser(id=user_id, role=role, birth_date=birth_date_val)
         
     except (JWTError, ValueError): 
         raise HTTPException(status_code=403, detail="Could not validate credentials")

@@ -159,7 +159,7 @@ async def send_message_stream(
 
     # ─── Сборка промпта через конвейер ─────────────────────────────────────── #
     from app.core.prompt_pipeline import PromptPipeline
-    pipeline = PromptPipeline(db, chat_id, parent_id=message_in.parent_id)
+    pipeline = PromptPipeline(db, chat_id, current_user=current_user, parent_id=message_in.parent_id)
     payload = await pipeline.build_payload(message_in.content)
     
     # [Блок 10] Обновление счетчика текущего чекпоинта происходит в stream_utils.process_post_generation
