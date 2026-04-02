@@ -6,3 +6,4 @@ uploads/
 chroma_db/
 DIPLOMA.session.sql
 .vscode/
+.venv/
