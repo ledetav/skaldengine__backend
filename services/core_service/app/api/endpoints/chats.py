@@ -127,8 +127,8 @@ async def delete_chat(
 
 # ─── Отправить сообщение (основной endpoint) ─────────────────────────────── #
 
-@router.post("/{chat_id}/messages", response_model=MessageSchema)
-async def send_message(
+@router.post("/{chat_id}/messages/stream")
+async def send_message_stream(
     chat_id: UUID,
     message_in: MessageCreate,
     background_tasks: BackgroundTasks,
@@ -136,15 +136,12 @@ async def send_message(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """
-    Отправить сообщение и получить ответ AI.
-    Поддерживает parent_id для ветвления (swipe).
-    TODO: заменить на SSE-стриминг в следующих блоках.
+    Отправить сообщение и получить ответ AI SSE.
     """
     chat = await db.get(Chat, chat_id)
     if not chat or str(chat.user_id) != str(current_user.id):
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    # Загружаем связанные объекты для системного промпта
     character = await db.get(Character, chat.character_id)
     persona = await db.get(UserPersona, chat.user_persona_id)
     scenario = await db.get(Scenario, chat.scenario_id) if chat.scenario_id else None
@@ -160,67 +157,22 @@ async def send_message(
     await db.commit()
     await db.refresh(user_msg)
 
-
-    # ─── Сборка промпта через конвейер (Block 7) ─────────────────────────── #
+    # ─── Сборка промпта через конвейер ─────────────────────────────────────── #
     from app.core.prompt_pipeline import PromptPipeline
     pipeline = PromptPipeline(db, chat_id, parent_id=message_in.parent_id)
     payload = await pipeline.build_payload(message_in.content)
     
-    # [Блок 10] Обновление счетчика текущего чекпоинта
-    # Мы берем текущую невыполненную задачу и инкрементируем счетчик
-    from app.models.chat_checkpoint import ChatCheckpoint
-    res = await db.execute(
-        select(ChatCheckpoint)
-        .where(ChatCheckpoint.chat_id == chat_id, ChatCheckpoint.is_completed == False)
-        .order_by(ChatCheckpoint.order_num)
-    )
-    checkpoint = res.scalars().first()
-    if checkpoint:
-        checkpoint.messages_spent += 1
-        db.add(checkpoint)
-        await db.commit()
-
-        # Фоновый мониторинг (Watcher Loop) - запускаем раз в 3 сообщения
-        if checkpoint.messages_spent % 3 == 0:
-            from app.core.director_service import DirectorService
-            director = DirectorService()
-            background_tasks.add_task(director.check_progress, chat_id)
+    # [Блок 10] Обновление счетчика текущего чекпоинта происходит в stream_utils.process_post_generation
     
-    # Вызов Gemini
-    ai_text = ""
-    hidden_thought = ""
-    try:
-        # Используем параметры из пайплайна
-        response = _client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=payload["contents"],
-            config=payload["config"]
-        )
-        full_text = response.text or ""
-        
-        # Парсим <Internal_Analysis> если он есть
-        import re
-        thought_match = re.search(r"<Internal_Analysis>(.*?)</Internal_Analysis>", full_text, re.DOTALL)
-        if thought_match:
-            hidden_thought = thought_match.group(1).strip()
-            ai_text = re.sub(r"<Internal_Analysis>.*?</Internal_Analysis>", "", full_text, flags=re.DOTALL).strip()
-        else:
-            ai_text = full_text.strip()
-            
-    except Exception as e:
-        print(f"[Gemini] Error: {e}")
-        ai_text = "(System Error: Neural network unavailable)"
-
-    # Сохраняем ответ AI
+    # Создаем "пустое" сообщение ИИ
     ai_msg = Message(
         chat_id=chat.id,
         role="assistant",
-        content=ai_text,
-        hidden_thought=hidden_thought,
+        content="",
         parent_id=user_msg.id,
     )
     db.add(ai_msg)
-
+    
     # Обновляем active_leaf_id чата
     chat.active_leaf_id = ai_msg.id
     db.add(chat)
@@ -228,29 +180,80 @@ async def send_message(
     await db.commit()
     await db.refresh(ai_msg)
 
-    return ai_msg
+    # ─── Стрим ответа ──────────────────────────────────────────────────────── #
+    from app.api.endpoints.stream_utils import generate_chat_stream, process_post_generation
+    from fastapi.responses import StreamingResponse
+    
+    state = {}
+    generator = generate_chat_stream(ai_msg.id, payload, state)
+    
+    background_tasks.add_task(process_post_generation, chat.id, ai_msg.id, state)
+
+    return StreamingResponse(generator, media_type="text/event-stream")
 
 
 # ─── Получить историю сообщений ──────────────────────────────────────────── #
 
-@router.get("/{chat_id}/messages", response_model=List[MessageSchema])
-async def get_messages(
+@router.get("/{chat_id}/history")
+async def get_chat_history(
     chat_id: UUID,
-    skip: int = 0,
-    limit: int = 50,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
+    """
+    Получение активной ветки с информацией о братьях (для свайпов).
+    """
     chat = await db.get(Chat, chat_id)
     if not chat or str(chat.user_id) != str(current_user.id):
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    query = (
-        select(Message)
-        .where(Message.chat_id == chat_id)
-        .order_by(Message.created_at.asc())
-        .offset(skip)
-        .limit(limit)
-    )
-    result = await db.execute(query)
-    return result.scalars().all()
+    if not chat.active_leaf_id:
+        return {"active_branch": []}
+
+    # Грузим всю историю этого чата чтобы просчитать братьев без кучи запросов
+    query = select(Message).where(Message.chat_id == chat_id)
+    res = await db.execute(query)
+    all_msgs = res.scalars().all()
+    
+    # Строим карту parent_id -> list of brothers
+    from collections import defaultdict
+    children_map = defaultdict(list)
+    msg_dict = {}
+    for m in all_msgs:
+        children_map[m.parent_id].append(m)
+        msg_dict[m.id] = m
+        
+    for brothers in children_map.values():
+        brothers.sort(key=lambda x: x.created_at)
+
+    # Восстанавливаем активную ветку
+    current_id = chat.active_leaf_id
+    branch = []
+    
+    while current_id:
+        msg = msg_dict.get(current_id)
+        if not msg:
+            break
+            
+        brothers = children_map.get(msg.parent_id, [])
+        try:
+            current_index = brothers.index(msg) + 1
+        except ValueError:
+            current_index = 1
+            
+        branch.append({
+            "id": msg.id,
+            "role": msg.role,
+            "content": msg.content,
+            "hidden_thought": msg.hidden_thought if msg.role == "assistant" else None,
+            "is_edited": msg.is_edited,
+            "parent_id": msg.parent_id,
+            "created_at": msg.created_at,
+            "siblings_count": len(brothers),
+            "current_sibling_index": current_index
+        })
+        current_id = msg.parent_id
+
+    # Разворачиваем для естественного порядка
+    branch.reverse()
+    return {"active_branch": branch}

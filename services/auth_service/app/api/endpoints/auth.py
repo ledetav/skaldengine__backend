@@ -32,7 +32,7 @@ async def login_access_token(
     return {
         "access_token": security.create_access_token(
             user.id, 
-            is_admin=user.is_admin,
+            role=user.role,
             expires_delta=access_token_expires
         ),
         "token_type": "bearer",
@@ -58,7 +58,7 @@ async def register_user(
         username=user_in.username,
         login=user_in.login,
         password_hash=security.get_password_hash(user_in.password),
-        is_admin=False
+        role="user"
     )
     db.add(user)
     await db.commit()

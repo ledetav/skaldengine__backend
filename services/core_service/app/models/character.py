@@ -31,6 +31,7 @@ class Character(Base):
 
     # Доступность
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Связи
     attributes: Mapped[list["CharacterAttribute"]] = relationship(

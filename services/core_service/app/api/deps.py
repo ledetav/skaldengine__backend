@@ -11,7 +11,7 @@ from app.db.base import AsyncSessionLocal
 
 class CurrentUser(BaseModel):
     id: UUID
-    is_admin: bool = False
+    role: str = "user"
 
 # Используем HTTPBearer вместо OAuth2PasswordBearer.
 # Это создаст в Swagger поле для ручной вставки токена, вместо формы логина.
@@ -34,18 +34,18 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
              raise HTTPException(status_code=403, detail="Invalid token")
         
         user_id = UUID(token_data)
-        is_admin = payload.get("is_admin", False)
-        return CurrentUser(id=user_id, is_admin=is_admin)
+        role = payload.get("role", "user")
+        return CurrentUser(id=user_id, role=role)
         
     except (JWTError, ValueError): 
         raise HTTPException(status_code=403, detail="Could not validate credentials")
 
-def get_current_active_superuser(
+def verify_admin_role(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> CurrentUser:
-    if not current_user.is_admin:
+    if current_user.role not in ["admin", "moderator"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="The user doesn't have enough privileges"
+            detail="The user doesn't have enough privileges (requires admin or moderator role)"
         )
     return current_user

@@ -6,6 +6,12 @@ from app.api.endpoints import (
     lorebooks,
     scenarios,
     upload,
+    messages,
+)
+from app.api.endpoints.admin import (
+    characters as admin_characters,
+    attributes as admin_attributes,
+    lorebooks as admin_lorebooks,
 )
 
 api_router = APIRouter()
@@ -16,3 +22,9 @@ api_router.include_router(chats.router,         prefix="/chats",       tags=["Ch
 api_router.include_router(lorebooks.router,     prefix="/lorebooks",   tags=["Lorebooks"])
 api_router.include_router(scenarios.router,     prefix="/scenarios",   tags=["Scenarios"])
 api_router.include_router(upload.router,        prefix="/upload",      tags=["Files"])
+api_router.include_router(messages.router,      prefix="/messages",    tags=["Messages"])
+
+# Admin Endpoints (Require valid JWT with admin/moderator role)
+api_router.include_router(admin_characters.router, prefix="/admin/characters", tags=["Admin Characters"])
+api_router.include_router(admin_attributes.router, prefix="/admin/attributes", tags=["Admin Attributes"])
+api_router.include_router(admin_lorebooks.router, prefix="/admin/lorebooks",   tags=["Admin Lorebooks"])

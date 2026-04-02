@@ -33,7 +33,7 @@ class UserLogin(BaseModel):
 
 class UserResponse(UserBase):
     id: UUID
-    is_admin: bool
+    role: str
     avatar_url: str | None = None
     birth_date: date | None = None
     created_at: datetime
