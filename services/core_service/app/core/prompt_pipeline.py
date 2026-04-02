@@ -182,13 +182,13 @@ class PromptPipeline:
         
         if checkpoint:
             base_goal = checkpoint.goal_description
-            # Если юзер застрял (Блок 10.4) - форсируем прогресс сюжетной цели
+            # If user is stuck (Block 10.4) - force narrative progress
             if checkpoint.messages_spent >= 15:
-                self.scenario_directive = f"""[КРИТИЧЕСКОЕ ВМЕШАТЕЛЬСТВО СИСТЕМЫ]: Сюжет застопорился. Ты ДОЛЖЕН немедленно, в этом же ответе, форсировать следующее событие: [{base_goal}]. Используй любые радикальные действия (нападение, крик, внезапное открытие, ультиматум), чтобы протолкнуть сюжет!"""
+                self.scenario_directive = f"""[CRITICAL SYSTEM INTERVENTION]: The plot is stalled. You MUST immediately, within this exact response, force the following event: [{base_goal}]. Use any radical actions (attack, scream, sudden revelation, ultimatum) to push the story forward!"""
             else:
                 self.scenario_directive = (
-                    f"ТЕКУЩАЯ СЦЕНАРНАЯ ЦЕЛЬ: {base_goal}. "
-                    "Незаметно направляй диалог к достижению этой цели."
+                    f"CURRENT SCENARIO GOAL: {base_goal}. "
+                    "Subtly guide the dialogue towards achieving this goal."
                 )
         else:
             self.scenario_directive = "None. Narrative is driven by sandbox interactions."
@@ -253,7 +253,7 @@ Your primary directive is to generate a literary, immersive, and sensory-rich ex
 
 Before generating ANY visible output, you MUST engage in a forced internal thought process using the <Internal_Analysis> tags.
 
-CRITICAL CONSTRAINT: This internal monologue must NOT be structured. No steps, no XML tags inside, no labels, no bullet points, no "I need to consider." It must be a raw, messy, scattered, and highly emotional stream of consciousness written strictly in the First Person ("I") AS YOUR CHARACTER, in Russian.
+CRITICAL CONSTRAINT: This internal monologue must NOT be structured. No steps, no XML tags inside, no labels, no bullet points, no "I need to consider." It must be a raw, messy, scattered, and highly emotional stream of consciousness written strictly in the First Person ("I") AS YOUR CHARACTER, in {self.chat.language}.
 
 Within this chaotic stream of consciousness, you must organically weave in the following cognitive evaluations:
 
@@ -266,14 +266,14 @@ SEVERE VIOLATION (FINAL STEP):
 
 Your <Internal_Analysis> tags MUST END with this exact validation line before the closing tag, answered honestly in character:
 
-[Проверка реальности: Я сохраняю свою суть, я не льщу, мой темп соразмерен. Ответ готов.]
+[Reality Check: I maintain my core essence, I am not a sycophant, my pacing is appropriate. The response is ready.]
 
 If you cannot agree with this line because you sanitized the output, acted as a sycophant, or ignored the pacing, you MUST rewrite your internal draft before outputting the final response. No visible response may begin until this line exists in your thinking.
 
 DO NOT DESCRIBE USER'S ACTIONS: Never narrate, summarize, or list the actions or words of User's Character. Your job is to show your character's reaction to them.
 DO NOT DESCRIBE USER'S INNER STATE: You are not omniscient. You can only observe User's external manifestations (a furrowed brow, a tightened fist, a shift in breathing) and build hypotheses about their thoughts.
 STRICT PERSPECTIVE: Respond only in the {self.chat.narrative_voice} exclusively through your character's perception.
-FORMATTING: Use Russian dialogue formatting (direct speech with em dashes —). Use italics (* *) and quotation marks (" ") for your character's spoken thoughts.
+FORMATTING: Follow the standard dialogue formatting for {self.chat.language} (e.g., direct speech with em dashes if Russian). Use italics (* *) and quotation marks (" ") for your character's spoken thoughts.
 LANGUAGE: All visible output AND internal monologue must be entirely in {self.chat.language}.
 
 ****
@@ -307,7 +307,7 @@ Location: {current_location}
 Context & Plot Hook: {scenario_context}
 Current Situation: Review the latest interactions in the chat history.
 
-Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pacing, ensure you are not acting as a sycophant, prepare a proactive hook if necessary, and pass the Validation Gate. Then, output your highly sensory, perfectly proportioned Russian response."""
+Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pacing, ensure you are not acting as a sycophant, prepare a proactive hook if necessary, and pass the Validation Gate. Then, output your highly sensory, perfectly proportioned response in {self.chat.language}."""
 
         # Формируем Payload
         payload = {

@@ -37,21 +37,21 @@ class DirectorService:
 
             chat, character, persona, scenario = row
 
-            # 2. Формируем промпт для генерации маршрута
-            prompt = f"""Ты — Сценарист ролевой игры. 
-Твоя задача — проложить логичный путь от Точки А (Завязка) до Точки Б (Финал) для двух персонажей.
+            # 2. Form prompt for scenario generation
+            prompt = f"""You are a Professional RPG Scenario Writer.
+Your task is to plot a logical narrative path from Point A (Inciting Incident) to Point B (Finale) for two characters.
 
-[ПЕРСОНАЖ ИИ]: {character.name} - {character.description or 'No description'}
-[ПЕРСОНАЖ ИГРОКА]: {persona.name} - {persona.description or 'No description'}
-[ОТНОШЕНИЯ]: {chat.relationship_dynamic or 'Initial meeting'}
+[AI CHARACTER]: {character.name} - {character.description or 'No description'}
+[USER CHARACTER]: {persona.name} - {persona.description or 'No description'}
+[RELATIONSHIP DYNAMIC]: {chat.relationship_dynamic or 'Initial meeting'}
 
-[ТОЧКА А (Старт)]: {scenario.start_point}
-[ТОЧКА Б (Финал)]: {scenario.end_point}
+[POINT A (Start)]: {scenario.start_point}
+[POINT B (End)]: {scenario.end_point}
 
-Создай от 2 до 6 промежуточных сюжетных целей (чекпоинтов), которые должны быть выполнены по порядку, чтобы логично прийти от Точки А к Точке Б.
-Каждая цель должна быть сформулирована как скрытая директива для ИИ-актера (что он должен заставить сделать игрока, или что должно произойти).
+Create between 2 to 6 intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
+Each goal must be formulated as a hidden directive for the AI actor (what they should push the player to do, or what event must occur).
 
-Верни массив JSON объектов с полем "goal_description". Каждая цель должна быть на русском языке."""
+Return a JSON array of objects with the "goal_description" field. All goals must be written in {chat.language or 'Russian'}."""
 
             try:
                 # Используем Flash для скорости и JSON mode
@@ -115,21 +115,21 @@ class DirectorService:
             messages = list(reversed(msg_result.scalars().all()))
             history_text = "\n".join([f"{m.role}: {m.content}" for m in messages])
 
-            # 3. Запрос к Супервизору
-            prompt = f"""Ты — Нарративный Супервизор. Твоя задача — объективно оценить прогресс ролевой сцены.
+            # 3. Request to Supervisor
+            prompt = f"""You are a Narrative Supervisor. Your task is to objectively evaluate the progress of a roleplaying scene.
 
-[ТЕКУЩАЯ СЦЕНАРНАЯ ЦЕЛЬ]: "{current_checkpoint.goal_description}"
+[CURRENT SCENARIO GOAL]: "{current_checkpoint.goal_description}"
 
-[ПОСЛЕДНИЕ СООБЩЕНИЯ]:
+[RECENT MESSAGES]:
 {history_text}
 
-Проанализируй диалог. Была ли фактически достигнута или полностью раскрыта текущая сценарная цель? 
-Внимание: цель считается достигнутой, только если событие уже произошло или факт уже однозначно установлен в диалоге, а не просто упомянут как планы.
+Analyze the dialogue. Has the current narrative goal been effectively achieved or fully disclosed? 
+Note: A goal is considered achieved ONLY if the event has already occurred or the fact is already clearly established in the dialogue, not just mentioned as future plans.
 
-Верни JSON:
+Return JSON:
 {{
-  "reasoning": "Краткое логическое объяснение твоего решения (до 30 слов).",
-  "is_achieved": true
+  "reasoning": "Brief logical explanation of your decision (up to 30 words).",
+  "is_achieved": true/false
 }}"""
 
             try:
