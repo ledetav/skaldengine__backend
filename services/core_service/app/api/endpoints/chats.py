@@ -5,7 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.api import deps
-from app.core import prompt_builder
 from app.core.config import settings
 from google import genai
 from google.genai import types
