@@ -24,9 +24,10 @@ class PromptPipeline:
     Реализует 6 этапов формирования Payload.
     """
 
-    def __init__(self, db: AsyncSession, chat_id: uuid.UUID):
+    def __init__(self, db: AsyncSession, chat_id: uuid.UUID, parent_id: Optional[uuid.UUID] = None):
         self.db = db
         self.chat_id = chat_id
+        self.parent_id = parent_id
         self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
         
         # Данные, которые будут собраны в процессе
@@ -37,27 +38,14 @@ class PromptPipeline:
         
         self.lore_fragments: List[str] = []
         self.memories: List[str] = []
-        # [Блок 10] Получаем текущую сценарную цель супервизора
-        checkpoint_res = await self.db.execute(
-            select(ChatCheckpoint)
-            .where(ChatCheckpoint.chat_id == self.chat_id, ChatCheckpoint.is_completed == False)
-            .order_by(ChatCheckpoint.order_num)
-        )
-        checkpoint = checkpoint_res.scalars().first()
-        if checkpoint:
-            base_goal = checkpoint.goal_description
-            # Если юзер застрял (Блок 10.4)
-            if checkpoint.messages_spent >= 15:
-                self.scenario_directive = f"""[КРИТИЧЕСКОЕ ВМЕШАТЕЛЬСТВО СИСТЕМЫ]: Сюжет застопорился. Ты ДОЛЖЕН немедленно, в этом же ответе, форсировать следующее событие: [{base_goal}]. Используй любые радикальные действия (нападение, крик, внезапное открытие, ультиматум), чтобы протолкнуть сюжет!"""
-            else:
-                self.scenario_directive = f"Текущая сценарная цель: {base_goal}"
-        else:
-            self.scenario_directive = "None. Narrative is driven by sandbox interactions."
         self.history: List[types.Content] = []
         
         # Дополнительные атрибуты для Блока 8
         self.character_motivations: List[str] = []
         self.character_behavioral_cues: List[str] = []
+        
+        # Сценарная директива (заполняется в _stage_4_scenario)
+        self.scenario_directive: str = "None. Narrative is driven by sandbox interactions."
 
     async def build_payload(self, user_text: str) -> Dict[str, Any]:
         """
@@ -171,7 +159,7 @@ class PromptPipeline:
             self.memories.append(m.summary)
 
     async def _stage_4_scenario(self):
-        """Этап 4: Получение текущей сценарной цели."""
+        """Этап 4: Получение текущей сценарной цели (Supervisor)."""
         if not self.chat or self.chat.mode != "scenario":
             return
             
@@ -190,15 +178,20 @@ class PromptPipeline:
         checkpoint = result.scalar_one_or_none()
         
         if checkpoint:
-            self.scenario_directive = (
-                f"ТЕКУЩАЯ СЦЕНАРНАЯ ЦЕЛЬ: {checkpoint.goal_description}. "
-                "Незаметно направляй диалог к достижению этой цели."
-            )
+            base_goal = checkpoint.goal_description
+            # Если юзер застрял (Блок 10.4) - форсируем прогресс сюжетной цели
+            if checkpoint.messages_spent >= 15:
+                self.scenario_directive = f"""[КРИТИЧЕСКОЕ ВМЕШАТЕЛЬСТВО СИСТЕМЫ]: Сюжет застопорился. Ты ДОЛЖЕН немедленно, в этом же ответе, форсировать следующее событие: [{base_goal}]. Используй любые радикальные действия (нападение, крик, внезапное открытие, ультиматум), чтобы протолкнуть сюжет!"""
+            else:
+                self.scenario_directive = (
+                    f"ТЕКУЩАЯ СЦЕНАРНАЯ ЦЕЛЬ: {base_goal}. "
+                    "Незаметно направляй диалог к достижению этой цели."
+                )
 
     async def _stage_5_history(self):
         """Этап 5: Реконструкция истории сообщений (последние N)."""
-        # Начинаем с active_leaf_id и идем вверх
-        current_id = self.chat.active_leaf_id
+        # Если указан parent_id (Swipe/Branch), начинаем от него, иначе от active_leaf_id
+        current_id = self.parent_id or self.chat.active_leaf_id
         messages = []
         limit = 20
         
