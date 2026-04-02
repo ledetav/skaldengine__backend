@@ -86,7 +86,7 @@ async def create_chat(
     # [Блок 10] Инициализация сценария (Генерация маршрута)
     if chat.mode == "scenario":
         from app.core.director_service import DirectorService
-        director = DirectorService(db)
+        director = DirectorService()
         # В фоне, чтобы не тормозить создание чата
         background_tasks.add_task(director.initialize_scenario, chat.id)
 
@@ -209,7 +209,7 @@ async def send_message(
         # Фоновый мониторинг (Watcher Loop) - запускаем раз в 3 сообщения
         if checkpoint.messages_spent % 3 == 0:
             from app.core.director_service import DirectorService
-            director = DirectorService(db)
+            director = DirectorService()
             background_tasks.add_task(director.check_progress, chat_id)
     
     # Вызов Gemini
