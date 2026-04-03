@@ -54,6 +54,29 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UsernameUpdate(BaseModel):
+    new_username: str
+
+    @field_validator("new_username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        return UserBase.validate_username(v)
+
+
+class EmailUpdate(BaseModel):
+    new_email: EmailStr
+
+
+class PasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        return UserCreate.validate_password(v)
+
+
 class UserResponse(UserBase):
     id: UUID
     role: str
@@ -66,4 +89,4 @@ class UserResponse(UserBase):
 
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    token_type: str

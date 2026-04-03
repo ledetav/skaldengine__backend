@@ -47,16 +47,69 @@ pip install -r requirements.txt
 `uvicorn app.main:app --reload --port 8001`
 
 
-## API Эндпоинты
+## Подробная документация API
 
-Документация Swagger UI доступна по адресу: `http://localhost:8001/docs`
+Все запросы должны иметь заголовок `Content-Type: application/json`. Эндпоинты, помеченные как **[Auth]**, требуют заголовок `Authorization: Bearer <token>`.
 
-### Auth (`/api/v1/auth`)
+### 1. Аутентификация (`/api/v1/auth`)
 
-POST `/login` — Вход в систему (OAuth2 Password Flow). Возвращает `access_token`.
+#### `POST /register`
+**Назначение:** Регистрация нового пользователя.
+- **Принимает:** `UserCreate` (JSON)
+  - `email`: string (валидный email)
+  - `username`: string (без пробелов по краям, только латиница, цифры, `-` и `_`)
+  - `birth_date`: date (обязательно)
+  - `password`: string (мин 8 символов, 1 цифра, 1 заглавная, 1 спецсимвол)
+- **Возвращает:** Объект пользователя (без пароля).
+- **Пример ввода:**
+  ```json
+  {
+    "email": "user@example.com",
+    "username": "Skald_Player",
+    "birth_date": "1995-04-03",
+    "password": "StrongPassword123!"
+  }
+  ```
 
-POST `/register` — Регистрация нового пользователя.
 
-### Users (`/api/v1/users`)
 
-GET `/me` — Получение информации о текущем пользователе (требует `Header Authorization: Bearer <token>`).
+#### `POST /login`
+**Назначение:** Получение JWT токена доступа.
+- **Принимает:** `form-data` (application/x-www-form-urlencoded)
+  - `username`: (email или username пользователя)
+  - `password`: пароль
+- **Возвращает:** JSON с токеном.
+  - `access_token`: JWT строка.
+  - `token_type`: "bearer"
+- **Пример ответа:**
+  ```json
+  {
+    "access_token": "eyJhbG...",
+    "token_type": "bearer"
+  }
+  ```
+
+### 2. Пользователи (`/api/v1/users`)
+
+#### `GET /me` [Auth]
+**Назначение:** Получение полного профиля пользователя.
+
+#### `GET /me/username` [Auth]
+**Назначение:** Получить только никнейм.
+- **Ответ:** `{"username": "CurrentName"}`
+
+#### `PATCH /me/username` [Auth]
+**Назначение:** Изменить никнейм.
+- **Тело:** `{"new_username": "NewName"}`
+
+#### `PATCH /me/email` [Auth]
+**Назначение:** Изменить почту.
+- **Тело:** `{"new_email": "new@example.com"}`
+
+#### `POST /me/password` [Auth]
+**Назначение:** Смена пароля.
+- **Тело:** `{"old_password": "...", "new_password": "..."}`
+
+#### `DELETE /me` [Auth]
+**Назначение:** Удаление аккаунта. Требует статус 204 при успехе.
+
