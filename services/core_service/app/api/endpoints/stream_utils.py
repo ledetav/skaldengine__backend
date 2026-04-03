@@ -16,7 +16,7 @@ async def generate_chat_stream(
     state - словарь для передачи полного текста в фоновую задачу.
     """
     # Yield ID сообщения
-    yield f"event: message_id\ncontent-type: application/json\ndata: {json.dumps({'id': str(ai_msg_id)})}\n\n"
+    yield f"event: message_id\ndata: {json.dumps({'id': str(ai_msg_id)})}\n\n"
 
     full_text = ""
     is_thinking = False
