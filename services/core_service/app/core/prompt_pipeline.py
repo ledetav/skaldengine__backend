@@ -47,6 +47,7 @@ class PromptPipeline:
         # Дополнительные атрибуты для Блока 8
         self.character_motivations: List[str] = []
         self.character_behavioral_cues: List[str] = []
+        self.character_facts: List[str] = []
         
         # Сценарная директива (заполняется в _stage_4_scenario)
         self.scenario_directive: str = "None. Narrative is driven by sandbox interactions."
@@ -98,6 +99,8 @@ class PromptPipeline:
                 self.character_motivations.append(attr.content)
             elif attr.category in ["speech_example", "behavior"]:
                 self.character_behavioral_cues.append(attr.content)
+            elif attr.category in ["fact", "bio", "appearance_detail"]:
+                self.character_facts.append(attr.content)
 
     async def _stage_2_lorebook(self, user_text: str):
         """Этап 2: Поиск ключевых слов в тексте пользователя через Aho-Corasick."""
@@ -276,6 +279,7 @@ class PromptPipeline:
         # Формируем блоки данных (с лимитами из ТЗ)
         motivations = "\n".join([f"- {m}" for m in self.character_motivations]) or "Not specified"
         behavioral_cues = "\n".join([f"- {b}" for b in self.character_behavioral_cues]) or "Not specified"
+        biography_facts = "\n".join([f"- {f}" for f in self.character_facts]) or "Not specified"
         lore_section = "\n".join([f"- {f}" for f in self.lore_fragments[:3]]) or "No active lore facts."
         memory_section = "\n".join([f"- {m}" for m in self.memories[:5]]) or "No previous records."
         
@@ -334,6 +338,8 @@ Inner World & Motivations:
 {motivations}
 Specific Behavioral Cues:
 {behavioral_cues}
+Character Facts & Biography:
+{biography_facts}
 ****
 [USER CHARACTER PROFILE]
 Name: {self.persona.name}
