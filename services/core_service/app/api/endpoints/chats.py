@@ -2,7 +2,7 @@ from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 
 from app.api import deps
 from app.core.config import settings
@@ -149,6 +149,7 @@ async def send_message_stream(
     db.add(user_msg)
     await db.commit()
     await db.refresh(user_msg)
+    print(f"[DEBUG] user_msg saved: id={user_msg.id}, parent_id={user_msg.parent_id}")
 
     # ─── Сборка промпта через конвейер ─────────────────────────────────────── #
     from app.core.prompt_pipeline import PromptPipeline
@@ -166,12 +167,20 @@ async def send_message_stream(
     )
     db.add(ai_msg)
     
-    # Обновляем active_leaf_id чата
-    chat.active_leaf_id = ai_msg.id
-    db.add(chat)
-
+    # Обновляем active_leaf_id чата напрямую через атрибут колонки (минуя relationship)
+    await db.flush()  # Получаем id для ai_msg до commit
+    await db.execute(
+        sa_update(Chat)
+        .where(Chat.id == chat.id)
+        .values(active_leaf_id=ai_msg.id)
+    )
     await db.commit()
     await db.refresh(ai_msg)
+    print(f"[DEBUG] ai_msg saved: id={ai_msg.id}, parent_id={ai_msg.parent_id}")
+
+    # Перечитываем chat чтобы убедиться что active_leaf_id сохранён
+    await db.refresh(chat)
+    print(f"[DEBUG] chat.active_leaf_id after commit={chat.active_leaf_id}")
 
     # ─── Стрим ответа ──────────────────────────────────────────────────────── #
     from app.api.endpoints.stream_utils import generate_chat_stream, process_post_generation
