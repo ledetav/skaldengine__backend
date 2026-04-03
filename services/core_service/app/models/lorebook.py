@@ -18,6 +18,11 @@ class Lorebook(Base):
     character_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("characters.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    
+    # Привязка к персоне пользователя (опционально — для биографии игрока)
+    user_persona_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("user_personas.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     # Фандом (для подтягивания ко всем персонажам вселенной)
     fandom: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
@@ -26,6 +31,7 @@ class Lorebook(Base):
 
     # Связи
     character: Mapped["Character | None"] = relationship("Character", back_populates="lorebooks")
+    user_persona: Mapped["UserPersona | None"] = relationship("UserPersona")
     entries: Mapped[list["LorebookEntry"]] = relationship(
         "LorebookEntry", back_populates="lorebook", cascade="all, delete-orphan"
     )

@@ -42,6 +42,11 @@ class Chat(Base):
         ForeignKey("messages.id", use_alter=True, name="fk_chats_active_leaf_id"),
         nullable=True
     )
+    
+    # Опциональный лорбук персоны игрока (привязанный к сессии)
+    persona_lorebook_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lorebooks.id"), nullable=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, onupdate=func.now())

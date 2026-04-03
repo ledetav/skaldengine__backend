@@ -11,6 +11,7 @@ class ChatBase(BaseModel):
     relationship_dynamic: str | None = None
     language: str = "ru"
     narrative_voice: str = "third"  # "first" | "second" | "third"
+    persona_lorebook_id: UUID | None = None
 
 
 class ChatCreate(ChatBase):

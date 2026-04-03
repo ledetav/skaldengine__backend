@@ -3,7 +3,7 @@ import ahocorasick
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 from openai import AsyncOpenAI
 
 from app.api.deps import CurrentUser
@@ -47,13 +47,21 @@ class PromptPipeline:
         self.memories: List[str] = []
         self.history: List[Dict[str, str]] = []
         
-        # Дополнительные атрибуты для Блока 8
+        # Дополнительные атрибуты для Блока 8 (Character)
         self.character_motivations: List[str] = []
         self.character_behavioral_cues: List[str] = []
         self.character_facts: List[str] = []
         
-        # Сценарная директива (заполняется в _stage_4_scenario)
+        # Раздел "Relevant Facts & Traits" для Блока [USER CHARACTER PROFILE]
+        self.persona_facts: List[str] = []
+        
         self.scenario_directive: str = "None. Narrative is driven by sandbox interactions."
+        
+        # Временные контейнеры для атрибутов
+        self.all_attributes: List[CharacterAttribute] = []
+        self.persona_attributes: List[CharacterAttribute] = []
+        self.char_attributes_query = None
+        self.persona_attributes_query = None
 
     async def build_payload(self, user_text: str) -> Dict[str, Any]:
         """
@@ -92,10 +100,16 @@ class PromptPipeline:
         if self.chat.scenario_id:
             self.scenario = await self.db.get(Scenario, self.chat.scenario_id)
 
-        # Атрибуты теперь подгружаются ситуативно в _stage_2 (или остаются перманентными, если нет тегов)
-        self.all_attributes_query = select(CharacterAttribute).where(CharacterAttribute.character_id == self.character.id)
-        result = await self.db.execute(self.all_attributes_query)
-        self.all_attributes = result.scalars().all()
+        # Атрибуты теперь подгружаются ситуативно в _stage_2
+        # Загружаем атрибуты как персонажа, так и персоны пользователя
+        self.char_attributes_query = select(CharacterAttribute).where(CharacterAttribute.character_id == self.character.id)
+        self.persona_attributes_query = select(CharacterAttribute).where(CharacterAttribute.user_persona_id == self.persona.id)
+        
+        c_res = await self.db.execute(self.char_attributes_query)
+        self.all_attributes = list(c_res.scalars().all())
+        
+        p_res = await self.db.execute(self.persona_attributes_query)
+        self.persona_attributes = list(p_res.scalars().all())
 
     def _get_stems(self, text: str) -> List[str]:
         """Упрощенное стеммирование для русского и английского: берем корни слов."""
@@ -117,34 +131,49 @@ class PromptPipeline:
         if not self.character:
             return
             
-        # --- 1. Обработка АТРИБУТОВ (Ситуативные + Перманентные) ---
+        # --- 1. Подготовка атрибутов (Character + Persona) ---
         found_stems = set()
+        char_attr_keyword_stems = []
+        persona_attr_keyword_stems = []
         automaton = ahocorasick.Automaton()
         all_stems = set()
         
-        # Разделяем атрибуты на перманентные и ситуативные
-        attr_keyword_stems = []
+        # Обработка атрибутов персонажа
         for attr in self.all_attributes:
             if not attr.keywords:
-                # Перманентный атрибут (нет тегов)
-                self._add_attribute_to_collections(attr)
+                self._add_attribute_to_collections(attr, is_persona=False)
             else:
-                # Ситуативный атрибут
-                kw_sets = []
-                for kw in attr.keywords:
-                    stems = self._get_stems(kw)
-                    if stems:
-                        kw_sets.append(set(stems))
-                        for s in stems:
-                            if s not in all_stems:
-                                automaton.add_word(s, s)
-                                all_stems.add(s)
-                attr_keyword_stems.append((attr, kw_sets))
+                kw_sets = [set(self._get_stems(kw)) for kw in attr.keywords if kw]
+                for s_set in kw_sets:
+                    for s in s_set:
+                        if s not in all_stems:
+                            automaton.add_word(s, s)
+                            all_stems.add(s)
+                char_attr_keyword_stems.append((attr, kw_sets))
+                
+        # Обработка атрибутов персоны пользователя
+        for attr in self.persona_attributes:
+            if not attr.keywords:
+                self._add_attribute_to_collections(attr, is_persona=True)
+            else:
+                kw_sets = [set(self._get_stems(kw)) for kw in attr.keywords if kw]
+                for s_set in kw_sets:
+                    for s in s_set:
+                        if s not in all_stems:
+                            automaton.add_word(s, s)
+                            all_stems.add(s)
+                persona_attr_keyword_stems.append((attr, kw_sets))
 
-        # --- 2. Обработка ЛОРБУКА ---
+        # --- 2. Обработка ЛОРБУКА (Character + Fandom + Persona Override) ---
+        lore_filters = [
+            Lorebook.character_id == self.character.id,
+            Lorebook.fandom == self.character.fandom
+        ]
+        if hasattr(self.chat, 'persona_lorebook_id') and self.chat.persona_lorebook_id:
+            lore_filters.append(Lorebook.id == self.chat.persona_lorebook_id)
+            
         query = select(LorebookEntry).join(Lorebook).where(
-            (Lorebook.character_id == self.character.id) | 
-            (Lorebook.fandom == self.character.fandom)
+            or_(*lore_filters)
         )
         result = await self.db.execute(query)
         entries = result.scalars().all()
@@ -171,11 +200,18 @@ class PromptPipeline:
         for idx, stem in automaton.iter(user_text.lower()):
             found_stems.add(stem)
 
-        # Проверка триггеров атрибутов
-        for attr, kw_sets in attr_keyword_stems:
+        # Проверка триггеров атрибутов персонажа
+        for attr, kw_sets in char_attr_keyword_stems:
             for stems_required in kw_sets:
                 if stems_required.issubset(found_stems):
-                    self._add_attribute_to_collections(attr)
+                    self._add_attribute_to_collections(attr, is_persona=False)
+                    break
+                    
+        # Проверка триггеров атрибутов персоны
+        for attr, kw_sets in persona_attr_keyword_stems:
+            for stems_required in kw_sets:
+                if stems_required.issubset(found_stems):
+                    self._add_attribute_to_collections(attr, is_persona=True)
                     break
 
         # Проверка триггеров лорбука
@@ -191,8 +227,13 @@ class PromptPipeline:
         for entry in sorted_entries[:5]:
             self.lore_fragments.append(entry.content)
 
-    def _add_attribute_to_collections(self, attr: CharacterAttribute):
+    def _add_attribute_to_collections(self, attr: CharacterAttribute, is_persona: bool = False):
         """Вспомогательный метод распределения атрибута по спискам."""
+        if is_persona:
+            # Для персоны пользователя мы всё пишем в один список фактов
+            self.persona_facts.append(attr.content)
+            return
+
         if attr.category in ["mindset", "motivation"]:
             self.character_motivations.append(attr.content)
         elif attr.category in ["speech_example", "behavior"]:
@@ -347,6 +388,7 @@ class PromptPipeline:
         motivations = "\n".join([f"- {m}" for m in self.character_motivations]) or "Not specified"
         behavioral_cues = "\n".join([f"- {b}" for b in self.character_behavioral_cues]) or "Not specified"
         biography_facts = "\n".join([f"- {f}" for f in self.character_facts]) or "Not specified"
+        persona_relevant_facts = "\n".join([f"- {f}" for f in self.persona_facts]) or "No additional situational records."
         lore_section = "\n".join([f"- {f}" for f in self.lore_fragments[:3]]) or "No active lore facts."
         memory_section = "\n".join([f"- {m}" for m in self.memories[:5]]) or "No previous records."
         
@@ -412,6 +454,8 @@ Character Facts & Biography:
 Name: {self.persona.name}
 Appearance & Personality: {self.persona.appearance or 'Not specified'}. {self.persona.personality or ''}
 Relationship with AI's Character: {relationship}
+Relevant Facts & Traits (Situational):
+{persona_relevant_facts}
 ****
 
 [SYSTEM INJECTIONS: DYNAMIC CONTEXT]
