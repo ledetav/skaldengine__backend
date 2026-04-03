@@ -244,6 +244,21 @@ async def get_chat_history(
     if not chat or str(chat.user_id) != str(current_user.id):
         raise HTTPException(status_code=404, detail="Chat not found")
 
+    # ── Чекпоинты (для сценария) ────────────────────────────────────────────── #
+    cp_res = await db.execute(
+        select(ChatCheckpoint)
+        .where(ChatCheckpoint.chat_id == chat_id)
+        .order_by(ChatCheckpoint.order_num)
+    )
+    checkpoints_list = [
+        {
+            "id": cp.id,
+            "order_num": cp.order_num,
+            "goal_description": cp.goal_description,
+            "is_completed": cp.is_completed
+        } for cp in cp_res.scalars().all()
+    ]
+
     # Грузим все сообщения одним запросом
     res = await db.execute(
         select(Message).where(Message.chat_id == chat_id).order_by(Message.created_at)
@@ -251,7 +266,12 @@ async def get_chat_history(
     all_msgs = res.scalars().all()
 
     if not all_msgs:
-        return {"active_leaf_id": None, "active_branch": [], "tree": []}
+        return {
+            "active_leaf_id": None, 
+            "active_branch": [], 
+            "tree": [],
+            "checkpoints": checkpoints_list
+        }
 
     # Строим карту parent_id -> [дети] для расчёта братьев и детей
     children_map: dict = defaultdict(list)
@@ -284,24 +304,9 @@ async def get_chat_history(
 
     branch.reverse()
 
-    # ── Чекпоинты (для сценария) ────────────────────────────────────────────── #
-    cp_res = await db.execute(
-        select(ChatCheckpoint)
-        .where(ChatCheckpoint.chat_id == chat_id)
-        .order_by(ChatCheckpoint.order_num)
-    )
-    checkpoints = cp_res.scalars().all()
-
     return {
         "active_leaf_id": leaf_id,
         "active_branch": branch,
         "tree": tree,
-        "checkpoints": [
-            {
-                "id": cp.id,
-                "order_num": cp.order_num,
-                "goal_description": cp.goal_description,
-                "is_completed": cp.is_completed
-            } for cp in checkpoints
-        ]
+        "checkpoints": checkpoints_list
     }

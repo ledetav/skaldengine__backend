@@ -41,7 +41,7 @@ class DirectorService:
 Your task is to plot a logical narrative path from Point A (Inciting Incident) to Point B (Finale) for two characters.
 
 [AI CHARACTER]: {character.name} - {character.description or 'No description'}
-[USER CHARACTER]: {persona.name} - {persona.description or 'No description'}
+[USER CHARACTER]: {persona.name} - {persona.facts or 'No facts provided'}
 [RELATIONSHIP DYNAMIC]: {chat.relationship_dynamic or 'Initial meeting'}
 
 [POINT A (Start)]: {scenario.start_point}
