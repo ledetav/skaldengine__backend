@@ -11,7 +11,7 @@ client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_
 
 async def get_embedding(text: str) -> list[float]:
     """
-    Асинхронная генерация эмбеддинга (768-dim) через text-embedding-004.
+    Асинхронная генерация эмбеддинга (1536-dim) через text-embedding-3-small.
     Используется для сохранения воспоминаний.
     """
     try:

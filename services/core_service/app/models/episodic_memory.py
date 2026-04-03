@@ -5,8 +5,8 @@ from pgvector.sqlalchemy import Vector
 
 from app.db.base import Base
 
-# Размерность эмбеддингов gemini-embedding-001
-EMBEDDING_DIM = 768
+# Размерность эмбеддингов OpenAI text-embedding-3-small
+EMBEDDING_DIM = 1536
 
 
 class EpisodicMemory(Base):
