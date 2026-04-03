@@ -27,12 +27,20 @@ async def list_lorebooks(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    """Список лорбуков с фильтрацией по персонажу или фандому."""
+    """Список лорбуков."""
     query = select(Lorebook).options(selectinload(Lorebook.entries))
-    if character_id:
-        query = query.where(Lorebook.character_id == character_id)
-    if fandom:
-        query = query.where(Lorebook.fandom == fandom)
+    
+    if current_user.role not in ["admin", "moderator"]:
+        # Обычный пользователь видит ТОЛЬКО свои лорбуки (через свои персоны)
+        persona_ids_subquery = select(UserPersona.id).where(UserPersona.owner_id == current_user.id)
+        query = query.where(Lorebook.user_persona_id.in_(persona_ids_subquery))
+    else:
+        # Админ и модератор могут фильтровать глобальный лор
+        if character_id:
+            query = query.where(Lorebook.character_id == character_id)
+        if fandom:
+            query = query.where(Lorebook.fandom == fandom)
+
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().unique().all()
