@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 from app.api import deps
 from app.core import security
@@ -18,8 +18,10 @@ async def login_access_token(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    # Ищем пользователя
-    query = select(User).where(User.email == form_data.username)
+    # Ищем пользователя по email или username
+    query = select(User).where(
+        or_(User.email == form_data.username, User.username == form_data.username)
+    )
     result = await db.execute(query)
     user = result.scalars().first()
 
@@ -44,20 +46,25 @@ async def register_user(
     user_in: UserCreate,
     db: AsyncSession = Depends(deps.get_db),
 ) -> Any:
-    # Проверка на существование
-    query = select(User).where(User.email == user_in.email)
+    # Проверка на существование email или username
+    query = select(User).where(
+        or_(User.email == user_in.email, User.username == user_in.username)
+    )
     result = await db.execute(query)
-    if result.scalars().first():
+    existing_user = result.scalars().first()
+    
+    if existing_user:
+        detail = "User with this email already registered" if existing_user.email == user_in.email else "Username already taken"
         raise HTTPException(
             status_code=400,
-            detail="Email already registered",
+            detail=detail,
         )
     
     # Создание
     user = User(
         email=user_in.email,
         username=user_in.username,
-        login=user_in.login,
+        birth_date=user_in.birth_date,
         password_hash=security.get_password_hash(user_in.password),
         role="user"
     )
