@@ -16,7 +16,7 @@ async def generate_chat_stream(
     state - словарь для передачи полного текста в фоновую задачу.
     """
     # Yield ID сообщения
-    yield f"event: message_id\ndata: {json.dumps({'id': str(ai_msg_id)})}\n\n"
+    yield f"event: message_id\ndata: {json.dumps({'id': str(ai_msg_id)}, ensure_ascii=False)}\n\n"
 
     full_text = ""
     is_thinking = False
@@ -41,12 +41,12 @@ async def generate_chat_stream(
                             # Start thinking: send everything BEFORE the tag
                             pre_thought, post_tag = buffer.split("<Internal_Analysis>", 1)
                             if pre_thought:
-                                yield f"event: token\ndata: {json.dumps({'text': pre_thought})}\n\n"
+                                yield f"event: token\ndata: {json.dumps({'text': pre_thought}, ensure_ascii=False)}\n\n"
                             buffer = post_tag
                             is_thinking = True
                         else:
                             # Not thinking and no tag yet: send the whole buffer
-                            yield f"event: token\ndata: {json.dumps({'text': buffer})}\n\n"
+                            yield f"event: token\ndata: {json.dumps({'text': buffer}, ensure_ascii=False)}\n\n"
                             buffer = ""
                             break
                     else:
@@ -64,11 +64,11 @@ async def generate_chat_stream(
             
     except Exception as e:
         error_msg = "(System Error: Neural network unavailable)"
-        yield f"event: token\ndata: {json.dumps({'text': error_msg})}\n\n"
+        yield f"event: token\ndata: {json.dumps({'text': error_msg}, ensure_ascii=False)}\n\n"
         full_text += error_msg
 
     # Окончание стрима
-    yield f"event: done\ndata: {json.dumps({'status': 'success'})}\n\n"
+    yield f"event: done\ndata: {json.dumps({'status': 'success'}, ensure_ascii=False)}\n\n"
     
     # Сохраняем полный текст для фоновой задачи
     state["full_text"] = full_text
