@@ -125,7 +125,6 @@ async def delete_chat(
 async def send_message_stream(
     chat_id: UUID,
     message_in: MessageCreate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
@@ -179,9 +178,7 @@ async def send_message_stream(
     from fastapi.responses import StreamingResponse
     
     state = {}
-    generator = generate_chat_stream(ai_msg.id, payload, state)
-    
-    background_tasks.add_task(process_post_generation, chat.id, ai_msg.id, state)
+    generator = generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
     return StreamingResponse(generator, media_type="text/event-stream")
 
@@ -205,7 +202,7 @@ async def get_chat_history(
         return {"active_branch": []}
 
     # Грузим всю историю этого чата чтобы просчитать братьев без кучи запросов
-    query = select(Message).where(Message.chat_id == chat_id)
+    query = select(Message).where(Message.chat_id == chat_id).order_by(Message.created_at)
     res = await db.execute(query)
     all_msgs = res.scalars().all()
     

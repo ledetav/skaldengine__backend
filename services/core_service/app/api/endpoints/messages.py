@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,7 +11,7 @@ from app.models.message import Message
 from app.models.chat import Chat
 from app.schemas.message import Message as MessageSchema
 from app.core.prompt_pipeline import PromptPipeline
-from app.api.endpoints.stream_utils import generate_chat_stream, process_post_generation
+from app.api.endpoints.stream_utils import generate_chat_stream
 
 router = APIRouter()
 
@@ -21,7 +21,6 @@ class MessageEdit(BaseModel):
 @router.post("/{parent_id}/regenerate/stream")
 async def regenerate_message_stream(
     parent_id: UUID,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
@@ -38,7 +37,7 @@ async def regenerate_message_stream(
         raise HTTPException(status_code=404, detail="Chat not found")
 
     # Сборка промпта (передаем parent_id, чтобы история обрезалась по нему)
-    pipeline = PromptPipeline(db, chat.id, parent_id=parent_id)
+    pipeline = PromptPipeline(db, chat.id, current_user=current_user, parent_id=parent_id)
     payload = await pipeline.build_payload(parent_msg.content)
     
     # [Блок 10] Свайп тоже может считаться за сообщение, но обычно это не увеличивает счетчик.
@@ -62,11 +61,8 @@ async def regenerate_message_stream(
 
     # Запускаем стриминг
     state = {}
-    generator = generate_chat_stream(ai_msg.id, payload, state)
-    
-    # Добавляем фоновую задачу для окончания стрима
-    background_tasks.add_task(process_post_generation, chat.id, ai_msg.id, state)
-    
+    generator = generate_chat_stream(chat.id, ai_msg.id, payload, state)
+
     return StreamingResponse(generator, media_type="text/event-stream")
 
 
@@ -74,7 +70,6 @@ async def regenerate_message_stream(
 async def edit_message(
     message_id: UUID,
     message_in: MessageEdit,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):

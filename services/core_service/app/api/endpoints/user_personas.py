@@ -98,6 +98,15 @@ async def update_persona(
     
     return persona
 
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_all_personas(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    delete_query = delete(UserPersona).where(UserPersona.owner_id == current_user.id)
+    await db.execute(delete_query)
+    await db.commit()
+
 @router.delete("/{persona_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_persona(
     persona_id: UUID,
@@ -115,13 +124,4 @@ async def delete_persona(
         raise HTTPException(status_code=404, detail="Persona not found")
     
     await db.delete(persona)
-    await db.commit()
-
-@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_all_personas(
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_user)
-):
-    delete_query = delete(UserPersona).where(UserPersona.owner_id == current_user.id)
-    await db.execute(delete_query)
     await db.commit()

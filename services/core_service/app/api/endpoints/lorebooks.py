@@ -26,11 +26,12 @@ async def list_lorebooks(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Список лорбуков с фильтрацией по персонажу или фандому."""
-    query = select(Lorebook).offset(skip).limit(limit)
+    query = select(Lorebook)
     if character_id:
         query = query.where(Lorebook.character_id == character_id)
     if fandom:
         query = query.where(Lorebook.fandom == fandom)
+    query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -122,6 +123,28 @@ async def list_entries(
     query = select(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id)
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.put("/{lorebook_id}/entries/{entry_id}", response_model=LorebookEntrySchema)
+async def update_entry(
+    lorebook_id: UUID,
+    entry_id: UUID,
+    entry_update: LorebookEntryUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+):
+    lorebook = await db.get(Lorebook, lorebook_id)
+    if not lorebook:
+        raise HTTPException(status_code=404, detail="Lorebook not found")
+    entry = await db.get(LorebookEntry, entry_id)
+    if not entry or entry.lorebook_id != lorebook_id:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    for key, value in entry_update.model_dump(exclude_unset=True).items():
+        setattr(entry, key, value)
+    db.add(entry)
+    await db.commit()
+    await db.refresh(entry)
+    return entry
 
 
 @router.delete("/{lorebook_id}/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
