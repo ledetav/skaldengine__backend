@@ -21,6 +21,7 @@ class ChatCreate(ChatBase):
                 {
                     "character_id": "123e4567-e89b-12d3-a456-426614174000",
                     "user_persona_id": "123e4567-e89b-12d3-a456-426614174001",
+                    "persona_lorebook_id": "123e4567-e89b-12d3-a456-426614174005",
                     "scenario_id": "123e4567-e89b-12d3-a456-426614174002",
                     "is_acquainted": True,
                     "relationship_dynamic": "Rivals forced to work together",
