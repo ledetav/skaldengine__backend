@@ -19,6 +19,10 @@ class CharacterAttribute(Base):
     # Тип атрибута: "fact", "speech_example", "mindset", "bio", "appearance_detail"
     category: Mapped[str] = mapped_column(String, index=True, default="fact")
     content: Mapped[str] = mapped_column(Text)
+    
+    # Ключевые слова для ситуативного срабатывания (по аналогии с Lorebook)
+    from sqlalchemy.dialects.postgresql import ARRAY
+    keywords: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
 
     # Связи
     character: Mapped["Character"] = relationship("Character", back_populates="attributes")

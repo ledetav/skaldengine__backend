@@ -40,6 +40,9 @@ class PromptPipeline:
         self.persona: Optional[UserPersona] = None
         self.scenario: Optional[Scenario] = None
         
+        # Коллекции атрибутов и лора
+        self.all_attributes_query: Any = None
+        self.all_attributes: List[CharacterAttribute] = []
         self.lore_fragments: List[str] = []
         self.memories: List[str] = []
         self.history: List[Dict[str, str]] = []
@@ -89,25 +92,56 @@ class PromptPipeline:
         if self.chat.scenario_id:
             self.scenario = await self.db.get(Scenario, self.chat.scenario_id)
 
-        # Загружаем атрибуты персонажа (Блок 8)
-        attr_query = select(CharacterAttribute).where(CharacterAttribute.character_id == self.character.id)
-        attr_result = await self.db.execute(attr_query)
-        attributes = attr_result.scalars().all()
+        # Атрибуты теперь подгружаются ситуативно в _stage_2 (или остаются перманентными, если нет тегов)
+        self.all_attributes_query = select(CharacterAttribute).where(CharacterAttribute.character_id == self.character.id)
+        result = await self.db.execute(self.all_attributes_query)
+        self.all_attributes = result.scalars().all()
 
-        for attr in attributes:
-            if attr.category in ["mindset", "motivation"]:
-                self.character_motivations.append(attr.content)
-            elif attr.category in ["speech_example", "behavior"]:
-                self.character_behavioral_cues.append(attr.content)
-            elif attr.category in ["fact", "bio", "appearance_detail"]:
-                self.character_facts.append(attr.content)
+    def _get_stems(self, text: str) -> List[str]:
+        """Упрощенное стеммирование для русского и английского: берем корни слов."""
+        import re
+        words = re.findall(r'[a-zа-я0-9]{3,}', text.lower())
+        stems = []
+        for w in words:
+            # Для длинных слов обрезаем окончание (эвристика 4-5 символов)
+            if len(w) > 5:
+                stems.append(w[:5])
+            elif len(w) > 4:
+                stems.append(w[:4])
+            else:
+                stems.append(w)
+        return list(set(stems))
 
     async def _stage_2_lorebook(self, user_text: str):
-        """Этап 2: Поиск ключевых слов в тексте пользователя через Aho-Corasick."""
+        """Этап 2: Поиск по лорбуку и атрибутам с поддержкой склонений."""
         if not self.character:
             return
             
-        # 1. Получаем все лорбуки, связанные с персонажем или фандомом
+        # --- 1. Обработка АТРИБУТОВ (Ситуативные + Перманентные) ---
+        found_stems = set()
+        automaton = ahocorasick.Automaton()
+        all_stems = set()
+        
+        # Разделяем атрибуты на перманентные и ситуативные
+        attr_keyword_stems = []
+        for attr in self.all_attributes:
+            if not attr.keywords:
+                # Перманентный атрибут (нет тегов)
+                self._add_attribute_to_collections(attr)
+            else:
+                # Ситуативный атрибут
+                kw_sets = []
+                for kw in attr.keywords:
+                    stems = self._get_stems(kw)
+                    if stems:
+                        kw_sets.append(set(stems))
+                        for s in stems:
+                            if s not in all_stems:
+                                automaton.add_word(s, s)
+                                all_stems.add(s)
+                attr_keyword_stems.append((attr, kw_sets))
+
+        # --- 2. Обработка ЛОРБУКА ---
         query = select(LorebookEntry).join(Lorebook).where(
             (Lorebook.character_id == self.character.id) | 
             (Lorebook.fandom == self.character.fandom)
@@ -115,39 +149,56 @@ class PromptPipeline:
         result = await self.db.execute(query)
         entries = result.scalars().all()
 
-        if not entries:
-            return
-
-        # 2. Инициализация Aho-Corasick для быстрого поиска
-        automaton = ahocorasick.Automaton()
-        keyword_to_entry = {}
-
+        entry_keyword_stems = []
         for entry in entries:
+            kw_sets = []
             for kw in entry.keywords:
-                kw_lower = kw.lower()
-                automaton.add_word(kw_lower, kw_lower)
-                if kw_lower not in keyword_to_entry:
-                    keyword_to_entry[kw_lower] = []
-                keyword_to_entry[kw_lower].append(entry)
+                stems = self._get_stems(kw)
+                if stems:
+                    kw_sets.append(set(stems))
+                    for s in stems:
+                        if s not in all_stems:
+                            automaton.add_word(s, s)
+                            all_stems.add(s)
+            entry_keyword_stems.append((entry, kw_sets))
+
+        if not all_stems:
+            return
 
         automaton.make_automaton()
 
-        # 3. Поиск совпадений
-        found_keywords = set()
-        for idx, original_kw in automaton.iter(user_text.lower()):
-            found_keywords.add(original_kw)
+        # Поиск всех стемов в тексте
+        for idx, stem in automaton.iter(user_text.lower()):
+            found_stems.add(stem)
 
-        # 4. Сбор контента (с учетом приоритета)
+        # Проверка триггеров атрибутов
+        for attr, kw_sets in attr_keyword_stems:
+            for stems_required in kw_sets:
+                if stems_required.issubset(found_stems):
+                    self._add_attribute_to_collections(attr)
+                    break
+
+        # Проверка триггеров лорбука
         found_entries = []
-        for kw in found_keywords:
-            found_entries.extend(keyword_to_entry[kw])
+        for entry, kw_sets in entry_keyword_stems:
+            for stems_required in kw_sets:
+                if stems_required.issubset(found_stems):
+                    found_entries.append(entry)
+                    break
         
-        # Убираем дубликаты и сортируем по приоритету
         unique_entries = {e.id: e for e in found_entries}.values()
         sorted_entries = sorted(unique_entries, key=lambda x: x.priority, reverse=True)
-
-        for entry in sorted_entries[:5]:  # Берем топ-5 фактов, чтобы не раздувать промпт
+        for entry in sorted_entries[:5]:
             self.lore_fragments.append(entry.content)
+
+    def _add_attribute_to_collections(self, attr: CharacterAttribute):
+        """Вспомогательный метод распределения атрибута по спискам."""
+        if attr.category in ["mindset", "motivation"]:
+            self.character_motivations.append(attr.content)
+        elif attr.category in ["speech_example", "behavior"]:
+            self.character_behavioral_cues.append(attr.content)
+        elif attr.category in ["fact", "bio", "appearance_detail"]:
+            self.character_facts.append(attr.content)
 
     async def _stage_3_rag(self, user_text: str):
         """Этап 3: Поиск по эпизодической памяти через pgvector (с Hybrid Scoring)."""

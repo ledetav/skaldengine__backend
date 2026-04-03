@@ -49,7 +49,8 @@ async def create_attribute(
     db_obj = CharacterAttribute(
         character_id=attribute_in.character_id,
         category=attribute_in.category,
-        content=attribute_in.content
+        content=attribute_in.content,
+        keywords=attribute_in.keywords
     )
     db.add(db_obj)
     await db.commit()
@@ -72,7 +73,8 @@ async def create_attributes_bulk(
         db_obj = CharacterAttribute(
             character_id=bulk_in.character_id,
             category=attr.category,
-            content=attr.content
+            content=attr.content,
+            keywords=attr.keywords
         )
         db.add(db_obj)
         new_attrs.append(db_obj)
