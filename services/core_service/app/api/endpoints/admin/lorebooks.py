@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
+from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.models.lorebook import Lorebook, LorebookEntry
 from app.schemas.lorebook import (
@@ -30,8 +30,9 @@ async def create_lorebook(
     )
     db.add(db_obj)
     await db.commit()
-    await db.refresh(db_obj)
-    return db_obj
+    query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.id == db_obj.id)
+    result = await db.execute(query)
+    return result.scalars().first()
 
 
 @router.post("/{lorebook_id}/entries", response_model=LorebookEntrySchema, status_code=status.HTTP_201_CREATED)

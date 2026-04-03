@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
+from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.models.lorebook import Lorebook, LorebookEntry
 from app.schemas.lorebook import (
@@ -26,14 +26,14 @@ async def list_lorebooks(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Список лорбуков с фильтрацией по персонажу или фандому."""
-    query = select(Lorebook)
+    query = select(Lorebook).options(selectinload(Lorebook.entries))
     if character_id:
         query = query.where(Lorebook.character_id == character_id)
     if fandom:
         query = query.where(Lorebook.fandom == fandom)
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.scalars().unique().all()
 
 
 @router.post("/", response_model=LorebookSchema, status_code=status.HTTP_201_CREATED)
@@ -45,8 +45,9 @@ async def create_lorebook(
     lorebook = Lorebook(**lorebook_in.model_dump())
     db.add(lorebook)
     await db.commit()
-    await db.refresh(lorebook)
-    return lorebook
+    query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.id == lorebook.id)
+    result = await db.execute(query)
+    return result.scalars().first()
 
 
 @router.get("/{lorebook_id}", response_model=LorebookSchema)
@@ -55,7 +56,9 @@ async def get_lorebook(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    lorebook = await db.get(Lorebook, lorebook_id)
+    query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.id == lorebook_id)
+    result = await db.execute(query)
+    lorebook = result.scalars().first()
     if not lorebook:
         raise HTTPException(status_code=404, detail="Lorebook not found")
     return lorebook
@@ -68,15 +71,18 @@ async def update_lorebook(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
 ):
-    lorebook = await db.get(Lorebook, lorebook_id)
+    query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.id == lorebook_id)
+    result = await db.execute(query)
+    lorebook = result.scalars().first()
     if not lorebook:
         raise HTTPException(status_code=404, detail="Lorebook not found")
     for key, value in lorebook_update.model_dump(exclude_unset=True).items():
         setattr(lorebook, key, value)
     db.add(lorebook)
     await db.commit()
-    await db.refresh(lorebook)
-    return lorebook
+    query2 = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.id == lorebook.id)
+    result2 = await db.execute(query2)
+    return result2.scalars().first()
 
 
 @router.delete("/{lorebook_id}", status_code=status.HTTP_204_NO_CONTENT)
