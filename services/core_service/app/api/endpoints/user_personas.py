@@ -32,7 +32,7 @@ async def create_persona(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    if not current_user.is_admin:
+    if current_user.role not in ["admin", "moderator"]:
         query = select(func.count()).select_from(UserPersona).where(UserPersona.owner_id == current_user.id)
         result = await db.execute(query)
         count = result.scalar()
@@ -114,6 +114,7 @@ async def delete_persona(
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
     
+    await db.delete(persona)
     await db.commit()
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
