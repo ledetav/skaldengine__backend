@@ -18,10 +18,10 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "CREATE INDEX ix_episodic_memories_embedding_hnsw "
+        "CREATE INDEX IF NOT EXISTS ix_episodic_memories_embedding_hnsw "
         "ON episodic_memories USING hnsw (embedding vector_cosine_ops);"
     )
 
 
 def downgrade() -> None:
-    op.execute("DROP INDEX ix_episodic_memories_embedding_hnsw;")
+    op.execute("DROP INDEX IF EXISTS ix_episodic_memories_embedding_hnsw;")
