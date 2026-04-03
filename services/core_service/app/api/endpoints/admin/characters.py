@@ -69,7 +69,7 @@ async def delete_character(
     *,
     db: AsyncSession = Depends(deps.get_db),
     character_id: uuid.UUID,
-) -> Any:
+):
     """Soft deletes the character."""
     result = await db.execute(select(Character).where(Character.id == character_id))
     db_obj = result.scalars().first()

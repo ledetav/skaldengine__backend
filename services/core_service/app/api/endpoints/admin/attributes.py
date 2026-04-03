@@ -101,7 +101,7 @@ async def delete_attribute(
     *,
     db: AsyncSession = Depends(deps.get_db),
     attribute_id: uuid.UUID,
-) -> Any:
+):
     result = await db.execute(select(CharacterAttribute).where(CharacterAttribute.id == attribute_id))
     db_obj = result.scalars().first()
     if not db_obj:
@@ -116,7 +116,7 @@ async def delete_attributes_for_character(
     *,
     db: AsyncSession = Depends(deps.get_db),
     character_id: uuid.UUID = Query(..., description="Character ID to delete all attributes for"),
-) -> Any:
+):
     stmt = delete(CharacterAttribute).where(CharacterAttribute.character_id == character_id)
     await db.execute(stmt)
     await db.commit()

@@ -97,7 +97,7 @@ async def delete_lorebook_entry(
     *,
     db: AsyncSession = Depends(deps.get_db),
     entry_id: uuid.UUID,
-) -> Any:
+):
     result = await db.execute(select(LorebookEntry).where(LorebookEntry.id == entry_id))
     db_obj = result.scalars().first()
     if not db_obj:

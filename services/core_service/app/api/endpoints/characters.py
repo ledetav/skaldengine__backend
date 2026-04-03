@@ -75,7 +75,4 @@ async def delete_character(
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
     
-    await db.delete(character)
-    await db.commit()
-    
-    return None
+    await db.commit()

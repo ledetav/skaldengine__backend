@@ -114,10 +114,7 @@ async def delete_persona(
     if not persona:
         raise HTTPException(status_code=404, detail="Persona not found")
     
-    await db.delete(persona)
     await db.commit()
-    
-    return None
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_all_personas(
@@ -127,5 +124,3 @@ async def delete_all_personas(
     delete_query = delete(UserPersona).where(UserPersona.owner_id == current_user.id)
     await db.execute(delete_query)
     await db.commit()
-    
-    return None
