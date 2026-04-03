@@ -2,11 +2,12 @@ from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.models.lorebook import Lorebook, LorebookEntry
 from app.models.character import Character
+from app.models.user_persona import UserPersona
 from app.schemas.lorebook import (
     LorebookCreate, LorebookUpdate, Lorebook as LorebookSchema,
     LorebookEntryCreate, LorebookEntryUpdate, LorebookEntry as LorebookEntrySchema
@@ -41,8 +42,34 @@ async def list_lorebooks(
 async def create_lorebook(
     lorebook_in: LorebookCreate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
+    """Создать новый лорбук."""
+    # ── Проверка на создание глобального лора (только админ/модератор) ────────
+    is_global = lorebook_in.character_id is not None or lorebook_in.fandom is not None
+    if is_global and current_user.role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Only admins/moderators can create character or fandom lorebooks")
+
+    # ── Проверка лимитов для персоны ──────────────────────────────────────────
+    if lorebook_in.user_persona_id:
+        persona = await db.get(UserPersona, lorebook_in.user_persona_id)
+        if not persona or str(persona.owner_id) != str(current_user.id):
+            raise HTTPException(status_code=404, detail="User persona not found or you don't own it")
+
+        # Лимиты: admin(7), moderator(5), user(3)
+        role_limits = {"admin": 7, "moderator": 5, "user": 3}
+        limit = role_limits.get(current_user.role, 3)
+
+        count_query = select(func.count()).select_from(Lorebook).where(Lorebook.user_persona_id == persona.id)
+        count_res = await db.execute(count_query)
+        count = count_res.scalar() or 0
+        
+        if count >= limit:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Max lorebooks limit reached ({limit}) for persona."
+            )
+            
     if lorebook_in.character_id:
         character = await db.get(Character, lorebook_in.character_id)
         if not character:
@@ -111,11 +138,21 @@ async def create_entry(
     lorebook_id: UUID,
     entry_in: LorebookEntryCreate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
+    """Добавить новый факт в лорбук."""
     lorebook = await db.get(Lorebook, lorebook_id)
     if not lorebook:
         raise HTTPException(status_code=404, detail="Lorebook not found")
+        
+    # Проверка прав: если это персональный лорбук, проверяем владельца. Если глобальный — только админ.
+    if lorebook.user_persona_id:
+        persona = await db.get(UserPersona, lorebook.user_persona_id)
+        if not persona or str(persona.owner_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized to modify this lorebook")
+    elif current_user.role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Admins only for global lorebooks")
+
     entry = LorebookEntry(**entry_in.model_dump(), lorebook_id=lorebook_id)
     db.add(entry)
     await db.commit()
@@ -143,11 +180,20 @@ async def update_entry(
     entry_id: UUID,
     entry_update: LorebookEntryUpdate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
+    """Обновить существующий факт."""
     lorebook = await db.get(Lorebook, lorebook_id)
     if not lorebook:
         raise HTTPException(status_code=404, detail="Lorebook not found")
+
+    if lorebook.user_persona_id:
+        persona = await db.get(UserPersona, lorebook.user_persona_id)
+        if not persona or str(persona.owner_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized to modify this lorebook")
+    elif current_user.role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Admins only for global lorebooks")
+
     entry = await db.get(LorebookEntry, entry_id)
     if not entry or entry.lorebook_id != lorebook_id:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -164,8 +210,20 @@ async def delete_entry(
     lorebook_id: UUID,
     entry_id: UUID,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
+    """Удалить факт."""
+    lorebook = await db.get(Lorebook, lorebook_id)
+    if not lorebook:
+        raise HTTPException(status_code=404, detail="Lorebook not found")
+
+    if lorebook.user_persona_id:
+        persona = await db.get(UserPersona, lorebook.user_persona_id)
+        if not persona or str(persona.owner_id) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized to modify this lorebook")
+    elif current_user.role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="Admins only for global lorebooks")
+
     entry = await db.get(LorebookEntry, entry_id)
     if not entry or entry.lorebook_id != lorebook_id:
         raise HTTPException(status_code=404, detail="Entry not found")

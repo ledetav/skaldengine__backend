@@ -32,16 +32,19 @@ async def create_persona(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    if current_user.role not in ["admin", "moderator"]:
-        query = select(func.count()).select_from(UserPersona).where(UserPersona.owner_id == current_user.id)
-        result = await db.execute(query)
-        count = result.scalar()
-        
-        if count >= 5:
-            raise HTTPException(
-                status_code=400, 
-                detail="Max personas limit reached (5)."
-            )
+    # Лимиты: admin(15), moderator(10), user(5)
+    role_limits = {"admin": 15, "moderator": 10, "user": 5}
+    limit = role_limits.get(current_user.role, 5)
+
+    query = select(func.count()).select_from(UserPersona).where(UserPersona.owner_id == current_user.id)
+    result = await db.execute(query)
+    count = result.scalar() or 0
+    
+    if count >= limit:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Max personas limit reached ({limit}) for role {current_user.role}."
+        )
 
     new_persona = UserPersona(
         **persona_in.model_dump(),
