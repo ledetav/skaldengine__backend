@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 import json
 from pydantic import BaseModel
 
@@ -17,6 +17,20 @@ router = APIRouter()
 
 class MessageEdit(BaseModel):
     new_content: str
+
+
+# ─── Хелпер: атомарно обновляем active_leaf_id через прямой UPDATE ─────── #
+
+async def _set_active_leaf(db: AsyncSession, chat_id: UUID, msg_id: UUID) -> None:
+    """Надёжно выставляет active_leaf_id в обход ORM-кэша и post_update."""
+    await db.execute(
+        sa_update(Chat)
+        .where(Chat.id == chat_id)
+        .values(active_leaf_id=msg_id)
+    )
+
+
+# ─── Регенерация ответа (свайп) ──────────────────────────────────────────── #
 
 @router.post("/{parent_id}/regenerate/stream")
 async def regenerate_message_stream(
@@ -40,9 +54,6 @@ async def regenerate_message_stream(
     pipeline = PromptPipeline(db, chat.id, current_user=current_user, parent_id=parent_id)
     payload = await pipeline.build_payload(parent_msg.content)
     
-    # [Блок 10] Свайп тоже может считаться за сообщение, но обычно это не увеличивает счетчик.
-    # Если нужно увеличивать, раскомментируйте тут. Мы просто оставим как есть.
-    
     # Создаем "пустое" сообщение ИИ
     ai_msg = Message(
         chat_id=chat.id,
@@ -51,11 +62,10 @@ async def regenerate_message_stream(
         parent_id=parent_id,
     )
     db.add(ai_msg)
-    
-    # Обновляем active_leaf_id
-    chat.active_leaf_id = ai_msg.id
-    db.add(chat)
-    
+    await db.flush()  # Получаем ai_msg.id до commit
+
+    # Обновляем active_leaf_id напрямую через SQL (обходим post_update баг)
+    await _set_active_leaf(db, chat.id, ai_msg.id)
     await db.commit()
     await db.refresh(ai_msg)
 
@@ -65,6 +75,8 @@ async def regenerate_message_stream(
 
     return StreamingResponse(generator, media_type="text/event-stream")
 
+
+# ─── Редактирование сообщения (создание новой ветки) ─────────────────────── #
 
 @router.put("/{message_id}", response_model=MessageSchema)
 async def edit_message(
@@ -94,10 +106,10 @@ async def edit_message(
         is_edited=True
     )
     db.add(new_msg)
-    
-    chat.active_leaf_id = new_msg.id
-    db.add(chat)
-    
+    await db.flush()  # Получаем new_msg.id до commit
+
+    # Обновляем active_leaf_id напрямую через SQL
+    await _set_active_leaf(db, chat.id, new_msg.id)
     await db.commit()
     await db.refresh(new_msg)
     

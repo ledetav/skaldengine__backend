@@ -192,6 +192,29 @@ async def send_message_stream(
     return StreamingResponse(generator, media_type="text/event-stream")
 
 
+# ─── Вспомогательная функция построения узла дерева ─────────────────────── #
+
+def _build_msg_node(msg, children_map: dict) -> dict:
+    brothers = children_map.get(msg.parent_id, [])
+    try:
+        current_index = brothers.index(msg) + 1
+    except ValueError:
+        current_index = 1
+    return {
+        "id": msg.id,
+        "role": msg.role,
+        "content": msg.content,
+        "hidden_thought": msg.hidden_thought if msg.role == "assistant" else None,
+        "is_edited": msg.is_edited,
+        "parent_id": msg.parent_id,
+        "created_at": msg.created_at,
+        "siblings_count": len(brothers),
+        "current_sibling_index": current_index,
+        # Ids прямых детей — фронт может строить дерево без доп. запросов
+        "children_ids": [c.id for c in children_map.get(msg.id, [])],
+    }
+
+
 # ─── Получить историю сообщений ──────────────────────────────────────────── #
 
 @router.get("/{chat_id}/history")
@@ -201,59 +224,63 @@ async def get_chat_history(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """
-    Получение активной ветки с информацией о братьях (для свайпов).
+    Возвращает:
+    - active_leaf_id: ID текущего активного листа.
+    - active_branch: линейный список сообщений активной ветки (корень -> лист)
+      с siblings_count / current_sibling_index для свайп-UI.
+    - tree: плоский список ВСЕХ сообщений чата с теми же метаданными
+      (siblings, children_ids) — для построения дерева истории на фронте.
+
+    Один запрос — вся информация. Не нужны дополнительные вызовы API.
     """
+    from collections import defaultdict
+
     chat = await db.get(Chat, chat_id)
     if not chat or str(chat.user_id) != str(current_user.id):
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    if not chat.active_leaf_id:
-        return {"active_branch": []}
-
-    # Грузим всю историю этого чата чтобы просчитать братьев без кучи запросов
-    query = select(Message).where(Message.chat_id == chat_id).order_by(Message.created_at)
-    res = await db.execute(query)
+    # Грузим все сообщения одним запросом
+    res = await db.execute(
+        select(Message).where(Message.chat_id == chat_id).order_by(Message.created_at)
+    )
     all_msgs = res.scalars().all()
-    
-    # Строим карту parent_id -> list of brothers
-    from collections import defaultdict
-    children_map = defaultdict(list)
-    msg_dict = {}
+
+    if not all_msgs:
+        return {"active_leaf_id": None, "active_branch": [], "tree": []}
+
+    # Строим карту parent_id -> [дети] для расчёта братьев и детей
+    children_map: dict = defaultdict(list)
+    msg_dict: dict = {}
     for m in all_msgs:
         children_map[m.parent_id].append(m)
         msg_dict[m.id] = m
-        
-    for brothers in children_map.values():
-        brothers.sort(key=lambda x: x.created_at)
 
-    # Восстанавливаем активную ветку
-    current_id = chat.active_leaf_id
+    for siblings in children_map.values():
+        siblings.sort(key=lambda x: x.created_at)
+
+    # ── Полное дерево (flat) ────────────────────────────────────────────────── #
+    tree = [_build_msg_node(m, children_map) for m in all_msgs]
+
+    # ── Активная ветка ──────────────────────────────────────────────────────── #
+    # Если active_leaf_id не задан или устарел — авто-определяем последний лист
+    leaf_id = chat.active_leaf_id
+    if not leaf_id or leaf_id not in msg_dict:
+        leaves = [m for m in all_msgs if not children_map.get(m.id)]
+        leaf_id = leaves[-1].id if leaves else all_msgs[-1].id
+
     branch = []
-    
+    current_id = leaf_id
     while current_id:
         msg = msg_dict.get(current_id)
         if not msg:
             break
-            
-        brothers = children_map.get(msg.parent_id, [])
-        try:
-            current_index = brothers.index(msg) + 1
-        except ValueError:
-            current_index = 1
-            
-        branch.append({
-            "id": msg.id,
-            "role": msg.role,
-            "content": msg.content,
-            "hidden_thought": msg.hidden_thought if msg.role == "assistant" else None,
-            "is_edited": msg.is_edited,
-            "parent_id": msg.parent_id,
-            "created_at": msg.created_at,
-            "siblings_count": len(brothers),
-            "current_sibling_index": current_index
-        })
+        branch.append(_build_msg_node(msg, children_map))
         current_id = msg.parent_id
 
-    # Разворачиваем для естественного порядка
     branch.reverse()
-    return {"active_branch": branch}
+
+    return {
+        "active_leaf_id": leaf_id,
+        "active_branch": branch,
+        "tree": tree,
+    }
