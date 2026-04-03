@@ -419,6 +419,16 @@ Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pac
         messages.extend(self.history)
         messages.append({"role": "user", "content": user_text})
 
+        # Определяем возраст пользователя для фильтров безопасности
+        from datetime import date
+        user_age = 18 # По умолчанию считаем взрослым, если дата не указана
+        if self.current_user and self.current_user.birth_date:
+             today = date.today()
+             user_age = today.year - self.current_user.birth_date.year - ((today.month, today.day) < (self.current_user.birth_date.month, self.current_user.birth_date.day))
+        
+        is_minor = user_age < 18
+        safety_threshold = "BLOCK_NONE" if not is_minor else "BLOCK_MEDIUM_AND_ABOVE"
+
         # Формируем Payload
         payload = {
             "model": settings.POLZA_CHAT_MODEL,
@@ -429,10 +439,10 @@ Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pac
             "extra_body": {
                 "google": {
                     "safety_settings": [
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": safety_threshold},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": safety_threshold},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": safety_threshold},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": safety_threshold},
                     ]
                 }
             }
