@@ -50,7 +50,8 @@ Your task is to plot a logical narrative path from Point A (Inciting Incident) t
 Create EXACTLY {checkpoints_count} intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
 Each goal must be formulated as a hidden directive for the AI actor (what they should push the player to do, or what event must occur).
 
-Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written in {chat.language or 'Russian'}."""
+Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written strictly in English, regardless of the characters' primary language. Each goal should be a concise narrative milestone. Example: "Character A admits their secret to Character B." or "The group reaches the abandoned temple."
+"""
 
             try:
                 # Используем Flash для скорости и JSON mode
