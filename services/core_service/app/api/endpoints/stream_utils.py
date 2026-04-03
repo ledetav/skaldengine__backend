@@ -1,5 +1,6 @@
 import json
 import re
+import asyncio
 from uuid import UUID
 from openai import AsyncOpenAI
 from app.core.config import settings
@@ -7,6 +8,7 @@ from app.core.config import settings
 _client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
 async def generate_chat_stream(
+    chat_id: UUID,
     ai_msg_id: UUID, 
     payload: dict,
     state: dict
@@ -58,8 +60,8 @@ async def generate_chat_stream(
                         else:
                             # Still thinking: keep buffering, but we only need to keep 
                             # the last few characters to catch the tag if it's split.
-                            if len(buffer) > 30:
-                                buffer = buffer[-30:]
+                            if len(buffer) > 20:
+                                buffer = buffer[-20:]
                             break
             
     except Exception as e:
@@ -72,6 +74,7 @@ async def generate_chat_stream(
     
     # Сохраняем полный текст для фоновой задачи
     state["full_text"] = full_text
+    asyncio.create_task(process_post_generation(chat_id, ai_msg_id, state))
 
 async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
     from app.db.base import AsyncSessionLocal
