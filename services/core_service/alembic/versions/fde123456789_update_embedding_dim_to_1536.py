@@ -29,11 +29,11 @@ def upgrade() -> None:
     
     # 4. Re-create the HNSW index
     op.execute(
-        \"\"\"
+        """
         CREATE INDEX ix_episodic_memories_embedding_hnsw 
         ON episodic_memories USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64);
-        \"\"\"
+        """
     )
 
 
@@ -42,9 +42,9 @@ def downgrade() -> None:
     op.execute("DELETE FROM episodic_memories;")
     op.execute("ALTER TABLE episodic_memories ALTER COLUMN embedding TYPE vector(768);")
     op.execute(
-        \"\"\"
+        """
         CREATE INDEX ix_episodic_memories_embedding_hnsw 
         ON episodic_memories USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64);
-        \"\"\"
+        """
     )

@@ -19,15 +19,48 @@ async def generate_chat_stream(
     yield f"event: message_id\ncontent-type: application/json\ndata: {json.dumps({'id': str(ai_msg_id)})}\n\n"
 
     full_text = ""
+    is_thinking = False
+    buffer = ""
+
     try:
         response_stream = await _client.chat.completions.create(**payload)
         
         async for chunk in response_stream:
             if chunk.choices and len(chunk.choices) > 0:
                 text_chunk = chunk.choices[0].delta.content or ""
-                if text_chunk:
-                    full_text += text_chunk
-                    yield f"event: token\ndata: {json.dumps({'text': text_chunk})}\n\n"
+                if not text_chunk:
+                    continue
+                
+                full_text += text_chunk
+                buffer += text_chunk
+                
+                # Logic to hide everything between <Internal_Analysis> and </Internal_Analysis>
+                while True:
+                    if not is_thinking:
+                        if "<Internal_Analysis>" in buffer:
+                            # Start thinking: send everything BEFORE the tag
+                            pre_thought, post_tag = buffer.split("<Internal_Analysis>", 1)
+                            if pre_thought:
+                                yield f"event: token\ndata: {json.dumps({'text': pre_thought})}\n\n"
+                            buffer = post_tag
+                            is_thinking = True
+                        else:
+                            # Not thinking and no tag yet: send the whole buffer
+                            yield f"event: token\ndata: {json.dumps({'text': buffer})}\n\n"
+                            buffer = ""
+                            break
+                    else:
+                        if "</Internal_Analysis>" in buffer:
+                            # End thinking: discard everything until end tag, then continue
+                            _, post_thought = buffer.split("</Internal_Analysis>", 1)
+                            buffer = post_thought
+                            is_thinking = False
+                        else:
+                            # Still thinking: keep buffering, but we only need to keep 
+                            # the last few characters to catch the tag if it's split.
+                            if len(buffer) > 30:
+                                buffer = buffer[-30:]
+                            break
             
     except Exception as e:
         error_msg = "(System Error: Neural network unavailable)"
