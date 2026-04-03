@@ -4,8 +4,7 @@ import uuid
 from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, desc
-from google import genai
-from google.genai import types
+from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
@@ -18,9 +17,9 @@ from app.models.chat_checkpoint import ChatCheckpoint
 
 class DirectorService:
     def __init__(self):
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
-    async def initialize_scenario(self, chat_id: uuid.UUID):
+    async def initialize_scenario(self, chat_id: uuid.UUID, checkpoints_count: int = 3):
         """Фаза 1: Генерация маршрута (чекпоинтов) при создании чата."""
         async with AsyncSessionLocal() as db:
             # 1. Получаем данные чата
@@ -42,29 +41,29 @@ class DirectorService:
 Your task is to plot a logical narrative path from Point A (Inciting Incident) to Point B (Finale) for two characters.
 
 [AI CHARACTER]: {character.name} - {character.description or 'No description'}
-[USER CHARACTER]: {persona.name} - {persona.description or 'No description'}
+[USER CHARACTER]: {persona.name} - {persona.facts or 'No facts provided'}
 [RELATIONSHIP DYNAMIC]: {chat.relationship_dynamic or 'Initial meeting'}
 
 [POINT A (Start)]: {scenario.start_point}
 [POINT B (End)]: {scenario.end_point}
 
-Create between 2 to 6 intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
+Create EXACTLY {checkpoints_count} intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
 Each goal must be formulated as a hidden directive for the AI actor (what they should push the player to do, or what event must occur).
 
-Return a JSON array of objects with the "goal_description" field. All goals must be written in {chat.language or 'Russian'}."""
+Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written strictly in English, regardless of the characters' primary language. Each goal should be a concise narrative milestone. Example: "Character A admits their secret to Character B." or "The group reaches the abandoned temple."
+"""
 
             try:
                 # Используем Flash для скорости и JSON mode
-                response = await self.client.aio.models.generate_content(
-                    model=settings.GEMINI_MODEL,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.7
-                    )
+                response = await self.client.chat.completions.create(
+                    model=settings.POLZA_CHAT_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.8
                 )
                 
-                checkpoints_data = json.loads(response.text)
+                response_text = response.choices[0].message.content
+                checkpoints_data = json.loads(response_text)
                 if isinstance(checkpoints_data, dict) and "checkpoints" in checkpoints_data:
                     checkpoints_list = checkpoints_data["checkpoints"]
                 elif isinstance(checkpoints_data, list):
@@ -133,16 +132,15 @@ Return JSON:
 }}"""
 
             try:
-                response = await self.client.aio.models.generate_content(
-                    model=settings.GEMINI_MODEL,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.1
-                    )
+                response = await self.client.chat.completions.create(
+                    model=settings.POLZA_CHAT_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.1
                 )
                 
-                analysis = json.loads(response.text)
+                response_text = response.choices[0].message.content
+                analysis = json.loads(response_text)
                 if analysis.get("is_achieved"):
                     # 4. Мутация состояния
                     current_checkpoint.is_completed = True

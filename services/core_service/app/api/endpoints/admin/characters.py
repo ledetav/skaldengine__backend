@@ -30,7 +30,7 @@ async def create_character(
     *,
     db: AsyncSession = Depends(deps.get_db),
     character_in: CharacterCreate,
-    current_user: deps.CurrentUser = Depends(deps.get_current_user),
+    current_user: deps.CurrentUser = Depends(deps.verify_admin_role),
 ) -> Any:
     db_obj = Character(
         creator_id=current_user.id,
@@ -69,7 +69,7 @@ async def delete_character(
     *,
     db: AsyncSession = Depends(deps.get_db),
     character_id: uuid.UUID,
-) -> Any:
+):
     """Soft deletes the character."""
     result = await db.execute(select(Character).where(Character.id == character_id))
     db_obj = result.scalars().first()
@@ -124,5 +124,6 @@ async def upload_character_images(
     if response_urls:
         db.add(db_obj)
         await db.commit()
+        await db.refresh(db_obj)
 
     return response_urls

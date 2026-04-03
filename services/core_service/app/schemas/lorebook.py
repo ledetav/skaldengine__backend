@@ -55,6 +55,7 @@ class LorebookEntry(LorebookEntryBase):
 class LorebookBase(BaseModel):
     name: str
     character_id: UUID | None = None
+    user_persona_id: UUID | None = None
     fandom: str | None = None
 
 
@@ -66,6 +67,10 @@ class LorebookCreate(LorebookBase):
                     "name": "Chronicles of Magic",
                     "character_id": "aa3e4567-e89b-12d3-a456-426614174003",
                     "fandom": "Fantasy Realm"
+                },
+                {
+                    "name": "Personal Journal",
+                    "user_persona_id": "123e4567-e89b-12d3-a456-426614174001"
                 }
             ]
         }

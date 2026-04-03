@@ -11,6 +11,8 @@ class ChatBase(BaseModel):
     relationship_dynamic: str | None = None
     language: str = "ru"
     narrative_voice: str = "third"  # "first" | "second" | "third"
+    persona_lorebook_id: UUID | None = None
+    checkpoints_count: int = 3  # Кол-во точек сценария (от 2 до 6)
 
 
 class ChatCreate(ChatBase):
@@ -20,6 +22,7 @@ class ChatCreate(ChatBase):
                 {
                     "character_id": "123e4567-e89b-12d3-a456-426614174000",
                     "user_persona_id": "123e4567-e89b-12d3-a456-426614174001",
+                    "persona_lorebook_id": "123e4567-e89b-12d3-a456-426614174005",
                     "scenario_id": "123e4567-e89b-12d3-a456-426614174002",
                     "is_acquainted": True,
                     "relationship_dynamic": "Rivals forced to work together",

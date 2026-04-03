@@ -21,10 +21,10 @@
   - **PostgreSQL 15 + pgvector** — единое хранилище для данных, истории сообщений и векторных эмбеддингов.
   - **Redis 7** — брокер задач (ARQ) и кеширование.
 - **ORM / Миграции:** SQLAlchemy 2.0 (Async), Alembic.
-- **AI Models:**
-  - **Main LLM:** Google Gemini 2.0 Flash (генерация ответов).
-  - **Logic/Supervisor:** Google Gemini 1.5 Pro/Flash.
-  - **Embeddings:** Google Gemini `text-embedding-004` (768-dim).
+- **AI Models (Polza.ai / OpenAI Wrapper):**
+  - **Main LLM:** Gemini 3 Flash Preview.
+  - **Logic/Supervisor:** Gemini 3.1 Flsh Lite Preview.
+  - **Embeddings:** OpenAI `text-embedding-3-small`.
 
 ## 🏗 Архитектура сервисов
 
@@ -47,7 +47,15 @@ docker compose up -d
 
 ```bash
 cd services/auth_service
-# Создание venv, установка зависимостей, настройка .env...
+# Настройка окружения (Linux/macOS)
+python3 -m venv .venv && source .venv/bin/activate
+# Настройка окружения (Windows)
+# python -m venv .venv; .venv\Scripts\activate
+
+pip install -r requirements.txt
+cp .env.example .env  # copy .env.example .env для Windows
+# Отредактируйте .env и вставьте POLZA_API_KEY и SECRET_KEY
+
 python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 ```
@@ -57,7 +65,15 @@ uvicorn app.main:app --reload --port 8001
 
 ```bash
 cd services/core_service
-# Создание venv, установка зависимостей, настройка .env...
+# Настройка окружения (Linux/macOS)
+python3 -m venv .venv && source .venv/bin/activate
+# Настройка окружения (Windows)
+# python -m venv .venv; .venv\Scripts\activate
+
+pip install -r requirements.txt
+cp .env.example .env  # copy .env.example .env для Windows
+# Отредактируйте .env и вставьте POLZA_API_KEY и SECRET_KEY
+
 python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
@@ -72,4 +88,4 @@ uvicorn app.main:app --reload --port 8000
 2. Авторизация в Swagger (Authorize) с полученным JWT-токеном.
 3. Создание Персоны (`POST /personas`).
 4. Создание Чата с выбранным персонажем (`POST /chats`).
-5. Отправка сообщений (`POST /chats/{id}/messages`).
+5. Отправка сообщений (`POST /chats/{id}/messages`).

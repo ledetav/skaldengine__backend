@@ -1,8 +1,9 @@
 import uuid
 import aiofiles
 import os
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from app.core.config import settings
+from app.api import deps
 
 router = APIRouter()
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
@@ -18,7 +19,8 @@ def validate_image(filename: str):
 
 @router.post("/", response_model=dict)
 async def upload_file(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     ext = validate_image(file.filename)
     unique_filename = f"{uuid.uuid4()}.{ext}"

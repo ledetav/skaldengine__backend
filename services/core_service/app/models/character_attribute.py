@@ -14,19 +14,29 @@ class CharacterAttribute(Base):
     __tablename__ = "character_attributes"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    character_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"))
+    character_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), nullable=True)
+    user_persona_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("user_personas.id", ondelete="CASCADE"), nullable=True)
 
     # Тип атрибута: "fact", "speech_example", "mindset", "bio", "appearance_detail"
     category: Mapped[str] = mapped_column(String, index=True, default="fact")
     content: Mapped[str] = mapped_column(Text)
+    
+    # Ключевые слова для ситуативного срабатывания (по аналогии с Lorebook)
+    from sqlalchemy.dialects.postgresql import ARRAY
+    keywords: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
 
     # Связи
     character: Mapped["Character"] = relationship("Character", back_populates="attributes")
 
 
-# Составной индекс для быстрой выборки всех атрибутов конкретного типа по персонажу
+# Составной индекс для быстрой выборки всех атрибутов конкретного типа
 _idx_char_attr_char_category = Index(
     "ix_character_attributes_character_id_category",
     CharacterAttribute.character_id,
+    CharacterAttribute.category,
+)
+_idx_persona_attr_persona_category = Index(
+    "ix_character_attributes_persona_id_category",
+    CharacterAttribute.user_persona_id,
     CharacterAttribute.category,
 )

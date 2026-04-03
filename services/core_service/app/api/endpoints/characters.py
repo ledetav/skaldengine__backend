@@ -16,7 +16,10 @@ async def read_characters(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    query = select(Character).offset(skip).limit(limit)
+    query = select(Character).where(
+        Character.is_deleted == False,
+        Character.is_public == True
+    ).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -40,7 +43,7 @@ async def read_character(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     character = await db.get(Character, character_id)
-    if not character:
+    if not character or character.is_deleted or not character.is_public:
         raise HTTPException(status_code=404, detail="Character not found")
     return character
 
@@ -76,6 +79,4 @@ async def delete_character(
         raise HTTPException(status_code=404, detail="Character not found")
     
     await db.delete(character)
-    await db.commit()
-    
-    return None
+    await db.commit()

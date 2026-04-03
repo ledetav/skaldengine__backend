@@ -1,12 +1,14 @@
 import json
 import re
+import asyncio
 from uuid import UUID
-from google import genai
+from openai import AsyncOpenAI
 from app.core.config import settings
 
-_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+_client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
 async def generate_chat_stream(
+    chat_id: UUID,
     ai_msg_id: UUID, 
     payload: dict,
     state: dict
@@ -16,32 +18,63 @@ async def generate_chat_stream(
     state - словарь для передачи полного текста в фоновую задачу.
     """
     # Yield ID сообщения
-    yield f"event: message_id\ncontent-type: application/json\ndata: {json.dumps({'id': str(ai_msg_id)})}\n\n"
+    yield f"event: message_id\ndata: {json.dumps({'id': str(ai_msg_id)}, ensure_ascii=False)}\n\n"
 
     full_text = ""
+    is_thinking = False
+    buffer = ""
+
     try:
-        response_stream = await _client.aio.models.generate_content_stream(
-            model="gemini-2.0-flash",
-            contents=payload["contents"],
-            config=payload["config"]
-        )
+        response_stream = await _client.chat.completions.create(**payload)
         
         async for chunk in response_stream:
-            text_chunk = chunk.text or ""
-            if text_chunk:
+            if chunk.choices and len(chunk.choices) > 0:
+                text_chunk = chunk.choices[0].delta.content or ""
+                if not text_chunk:
+                    continue
+                
                 full_text += text_chunk
-                yield f"event: token\ndata: {json.dumps({'text': text_chunk})}\n\n"
+                buffer += text_chunk
+                
+                # Logic to hide everything between <Internal_Analysis> and </Internal_Analysis>
+                while True:
+                    if not is_thinking:
+                        if "<Internal_Analysis>" in buffer:
+                            # Start thinking: send everything BEFORE the tag
+                            pre_thought, post_tag = buffer.split("<Internal_Analysis>", 1)
+                            if pre_thought:
+                                yield f"event: token\ndata: {json.dumps({'text': pre_thought}, ensure_ascii=False)}\n\n"
+                            buffer = post_tag
+                            is_thinking = True
+                        else:
+                            # Not thinking and no tag yet: send the whole buffer
+                            yield f"event: token\ndata: {json.dumps({'text': buffer}, ensure_ascii=False)}\n\n"
+                            buffer = ""
+                            break
+                    else:
+                        if "</Internal_Analysis>" in buffer:
+                            # End thinking: discard everything until end tag, then continue
+                            _, post_thought = buffer.split("</Internal_Analysis>", 1)
+                            buffer = post_thought
+                            is_thinking = False
+                        else:
+                            # Still thinking: keep buffering, but we only need to keep 
+                            # the last few characters to catch the tag if it's split.
+                            if len(buffer) > 20:
+                                buffer = buffer[-20:]
+                            break
             
     except Exception as e:
         error_msg = "(System Error: Neural network unavailable)"
-        yield f"event: token\ndata: {json.dumps({'text': error_msg})}\n\n"
+        yield f"event: token\ndata: {json.dumps({'text': error_msg}, ensure_ascii=False)}\n\n"
         full_text += error_msg
 
     # Окончание стрима
-    yield f"event: done\ndata: {json.dumps({'status': 'success'})}\n\n"
+    yield f"event: done\ndata: {json.dumps({'status': 'success'}, ensure_ascii=False)}\n\n"
     
     # Сохраняем полный текст для фоновой задачи
     state["full_text"] = full_text
+    asyncio.create_task(process_post_generation(chat_id, ai_msg_id, state))
 
 async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
     from app.db.base import AsyncSessionLocal

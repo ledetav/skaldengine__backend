@@ -14,13 +14,13 @@ class Settings(BaseSettings):
     # Redis (ARQ broker + cache)
     REDIS_URL: str = "redis://localhost:6379"
 
-    # Google Gemini / Vertex AI
-    GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-1.5-flash-001"
-    GEMINI_TEMPERATURE: float = 1.0
-    GEMINI_MAX_TOKENS: int = 8000
-
-    GEMINI_MAX_TOKENS: int = 8000
+    # Polza.ai (OpenAI wrapper)
+    POLZA_API_KEY: str
+    POLZA_CHAT_MODEL: str = "openai/gpt-4o"
+    POLZA_EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
+    POLZA_SUMMARY_MODEL: str = "openai/gpt-4o-mini"
+    POLZA_TEMPERATURE: float = 1.0
+    POLZA_MAX_TOKENS: int = 8000
 
     # Uploads (аватарки, карточки)
     UPLOAD_DIR: str = "./uploads"

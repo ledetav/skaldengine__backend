@@ -6,6 +6,7 @@ from sqlalchemy import select, delete
 
 from app.api import deps
 from app.models.character_attribute import CharacterAttribute
+from app.models.character import Character
 from app.schemas.character_attribute import (
     CharacterAttributeCreate,
     CharacterAttributeUpdate,
@@ -41,10 +42,15 @@ async def create_attribute(
     db: AsyncSession = Depends(deps.get_db),
     attribute_in: CharacterAttributeCreate,
 ) -> Any:
+    character = await db.get(Character, attribute_in.character_id)
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
     db_obj = CharacterAttribute(
         character_id=attribute_in.character_id,
         category=attribute_in.category,
-        content=attribute_in.content
+        content=attribute_in.content,
+        keywords=attribute_in.keywords
     )
     db.add(db_obj)
     await db.commit()
@@ -58,12 +64,17 @@ async def create_attributes_bulk(
     db: AsyncSession = Depends(deps.get_db),
     bulk_in: CharacterAttributeBulkCreate,
 ) -> Any:
+    character = await db.get(Character, bulk_in.character_id)
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
     new_attrs = []
     for attr in bulk_in.attributes:
         db_obj = CharacterAttribute(
             character_id=bulk_in.character_id,
             category=attr.category,
-            content=attr.content
+            content=attr.content,
+            keywords=attr.keywords
         )
         db.add(db_obj)
         new_attrs.append(db_obj)
@@ -101,7 +112,7 @@ async def delete_attribute(
     *,
     db: AsyncSession = Depends(deps.get_db),
     attribute_id: uuid.UUID,
-) -> Any:
+):
     result = await db.execute(select(CharacterAttribute).where(CharacterAttribute.id == attribute_id))
     db_obj = result.scalars().first()
     if not db_obj:
@@ -116,7 +127,7 @@ async def delete_attributes_for_character(
     *,
     db: AsyncSession = Depends(deps.get_db),
     character_id: uuid.UUID = Query(..., description="Character ID to delete all attributes for"),
-) -> Any:
+):
     stmt = delete(CharacterAttribute).where(CharacterAttribute.character_id == character_id)
     await db.execute(stmt)
     await db.commit()

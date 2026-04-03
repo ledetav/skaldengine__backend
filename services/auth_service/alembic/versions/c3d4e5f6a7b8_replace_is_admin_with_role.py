@@ -24,8 +24,8 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column('role', sa.String(), server_default='user', nullable=False))
     
     # Data migration is difficult via batch_op when column is just added, but we can execute raw SQL safely
-    op.execute("UPDATE users SET role = 'admin' WHERE is_admin = true OR is_admin = 1")
-    op.execute("UPDATE users SET role = 'user' WHERE is_admin = false OR is_admin = 0")
+    op.execute("UPDATE users SET role = 'admin' WHERE is_admin = true")
+    op.execute("UPDATE users SET role = 'user' WHERE is_admin = false")
 
     with op.batch_alter_table('users') as batch_op:
         batch_op.drop_column('is_admin')
