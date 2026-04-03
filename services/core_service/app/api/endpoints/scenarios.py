@@ -7,12 +7,12 @@ from sqlalchemy import select
 from app.api import deps
 from app.models.scenario import Scenario
 from app.models.character import Character
-from app.schemas.scenario import ScenarioCreate, ScenarioUpdate, Scenario as ScenarioSchema
+from app.schemas.scenario import ScenarioCreate, ScenarioUpdate, Scenario as ScenarioSchema, ScenarioShort
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[ScenarioSchema])
+@router.get("/", response_model=List[ScenarioShort])
 async def list_scenarios(
     character_id: UUID | None = None,
     skip: int = 0,
@@ -20,6 +20,10 @@ async def list_scenarios(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
+    """
+    Список сценариев (краткий). Доступен всем.
+    Возвращает: id, character_id, title, description.
+    """
     query = select(Scenario).offset(skip).limit(limit)
     if character_id:
         query = query.where(Scenario.character_id == character_id)
@@ -31,7 +35,7 @@ async def list_scenarios(
 async def create_scenario(
     scenario_in: ScenarioCreate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.verify_admin_role)
 ):
     if scenario_in.character_id:
         character = await db.get(Character, scenario_in.character_id)
@@ -49,8 +53,12 @@ async def create_scenario(
 async def get_scenario(
     scenario_id: UUID,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+    current_user: deps.CurrentUser = Depends(deps.verify_admin_role)
 ):
+    """
+    Детальный сценарий. Доступен ТОЛЬКО админам и модераторам.
+    Возвращает все данные, включая start_point и end_point.
+    """
     scenario = await db.get(Scenario, scenario_id)
     if not scenario:
         raise HTTPException(status_code=404, detail="Scenario not found")

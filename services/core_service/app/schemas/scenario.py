@@ -4,6 +4,7 @@ from uuid import UUID
 
 class ScenarioBase(BaseModel):
     title: str
+    location: str | None = None
     description: str
     start_point: str
     end_point: str
@@ -44,6 +45,17 @@ class ScenarioUpdate(BaseModel):
             ]
         }
     }
+
+
+class ScenarioShort(BaseModel):
+    id: UUID
+    character_id: UUID | None = None
+    title: str
+    location: str | None = None
+    description: str
+
+    class Config:
+        from_attributes = True
 
 
 class Scenario(ScenarioBase):
