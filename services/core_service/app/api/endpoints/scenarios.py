@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.api import deps
 from app.models.scenario import Scenario
+from app.models.character import Character
 from app.schemas.scenario import ScenarioCreate, ScenarioUpdate, Scenario as ScenarioSchema
 
 router = APIRouter()
@@ -32,6 +33,11 @@ async def create_scenario(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
 ):
+    if scenario_in.character_id:
+        character = await db.get(Character, scenario_in.character_id)
+        if not character:
+            raise HTTPException(status_code=404, detail="Character not found")
+            
     scenario = Scenario(**scenario_in.model_dump())
     db.add(scenario)
     await db.commit()

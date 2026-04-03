@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.models.lorebook import Lorebook, LorebookEntry
+from app.models.character import Character
 from app.schemas.lorebook import (
     LorebookCreate,
     Lorebook as LorebookSchema,
@@ -23,6 +24,11 @@ async def create_lorebook(
     db: AsyncSession = Depends(deps.get_db),
     lorebook_in: LorebookCreate,
 ) -> Any:
+    if lorebook_in.character_id:
+        character = await db.get(Character, lorebook_in.character_id)
+        if not character:
+            raise HTTPException(status_code=404, detail="Character not found")
+            
     db_obj = Lorebook(
         name=lorebook_in.name,
         character_id=lorebook_in.character_id,
@@ -42,6 +48,10 @@ async def create_lorebook_entry(
     lorebook_id: uuid.UUID,
     entry_in: LorebookEntryCreate,
 ) -> Any:
+    lorebook = await db.get(Lorebook, lorebook_id)
+    if not lorebook:
+        raise HTTPException(status_code=404, detail="Lorebook not found")
+
     db_obj = LorebookEntry(
         lorebook_id=lorebook_id,
         keywords=entry_in.keywords,

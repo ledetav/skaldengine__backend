@@ -6,6 +6,7 @@ from sqlalchemy import select, delete
 
 from app.api import deps
 from app.models.character_attribute import CharacterAttribute
+from app.models.character import Character
 from app.schemas.character_attribute import (
     CharacterAttributeCreate,
     CharacterAttributeUpdate,
@@ -41,6 +42,10 @@ async def create_attribute(
     db: AsyncSession = Depends(deps.get_db),
     attribute_in: CharacterAttributeCreate,
 ) -> Any:
+    character = await db.get(Character, attribute_in.character_id)
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
     db_obj = CharacterAttribute(
         character_id=attribute_in.character_id,
         category=attribute_in.category,
@@ -58,6 +63,10 @@ async def create_attributes_bulk(
     db: AsyncSession = Depends(deps.get_db),
     bulk_in: CharacterAttributeBulkCreate,
 ) -> Any:
+    character = await db.get(Character, bulk_in.character_id)
+    if not character:
+        raise HTTPException(status_code=404, detail="Character not found")
+
     new_attrs = []
     for attr in bulk_in.attributes:
         db_obj = CharacterAttribute(
