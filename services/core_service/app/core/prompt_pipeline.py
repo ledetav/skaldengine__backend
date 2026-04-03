@@ -425,7 +425,17 @@ Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pac
             "messages": messages,
             "temperature": settings.POLZA_TEMPERATURE,
             "max_tokens": settings.POLZA_MAX_TOKENS,
-            "stream": True
+            "stream": True,
+            "extra_body": {
+                "google": {
+                    "safety_settings": [
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    ]
+                }
+            }
         }
         
         return payload
