@@ -62,3 +62,6 @@ def verify_admin_role(
             detail="The user doesn't have enough privileges (requires admin or moderator role)"
         )
     return current_user
+    
+# Alias for compatibility with some endpoints
+get_current_active_superuser = verify_admin_role
