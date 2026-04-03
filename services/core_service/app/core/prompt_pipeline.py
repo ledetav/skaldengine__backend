@@ -211,15 +211,31 @@ class PromptPipeline:
         from app.models.message import Message
         import datetime
         
+        # 1. Собираем все ID сообщений в текущей ветке (от текущего родителя до корня)
+        ancestor_ids = []
+        curr_id = self.parent_id
+        while curr_id:
+            ancestor_ids.append(curr_id)
+            # В идеале здесь нужен один запрос или кеширование, но для RAG-путей < 100 сообщений это допустимо
+            # Для оптимизации лучше было бы передавать дерево или использовать CTE, но пока сделаем просто
+            res = await self.db.get(Message, curr_id)
+            if not res:
+                break
+            curr_id = res.parent_id
+        
+        if not ancestor_ids:
+            return
+
         distance = EpisodicMemory.embedding.cosine_distance(query_vector)
         
-        # 1. Запрашиваем 10 кандидатов с порогом < 0.25 и джоиним с Message
+        # 2. Запрашиваем кандидатов только из ТЕКУЩЕЙ ветки (чтобы факты не пересекались при разветвлении)
         query = (
             select(EpisodicMemory, distance.label('distance'), Message.created_at)
             .join(Message, EpisodicMemory.message_id == Message.id)
             .where(
                 and_(
                     EpisodicMemory.chat_id == self.chat_id,
+                    EpisodicMemory.message_id.in_(ancestor_ids),
                     distance < 0.25
                 )
             )
