@@ -12,6 +12,7 @@ class ChatBase(BaseModel):
     language: str = "ru"
     narrative_voice: str = "third"  # "first" | "second" | "third"
     persona_lorebook_id: UUID | None = None
+    checkpoints_count: int = 3  # Кол-во точек сценария (от 2 до 6)
 
 
 class ChatCreate(ChatBase):

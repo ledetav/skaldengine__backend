@@ -19,7 +19,7 @@ class DirectorService:
     def __init__(self):
         self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
-    async def initialize_scenario(self, chat_id: uuid.UUID):
+    async def initialize_scenario(self, chat_id: uuid.UUID, checkpoints_count: int = 3):
         """Фаза 1: Генерация маршрута (чекпоинтов) при создании чата."""
         async with AsyncSessionLocal() as db:
             # 1. Получаем данные чата
@@ -47,10 +47,10 @@ Your task is to plot a logical narrative path from Point A (Inciting Incident) t
 [POINT A (Start)]: {scenario.start_point}
 [POINT B (End)]: {scenario.end_point}
 
-Create between 2 to 6 intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
+Create EXACTLY {checkpoints_count} intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
 Each goal must be formulated as a hidden directive for the AI actor (what they should push the player to do, or what event must occur).
 
-Return a JSON array of objects with the "goal_description" field. All goals must be written in {chat.language or 'Russian'}."""
+Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written in {chat.language or 'Russian'}."""
 
             try:
                 # Используем Flash для скорости и JSON mode
@@ -58,7 +58,7 @@ Return a JSON array of objects with the "goal_description" field. All goals must
                     model=settings.POLZA_CHAT_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
-                    temperature=0.7
+                    temperature=0.8
                 )
                 
                 response_text = response.choices[0].message.content

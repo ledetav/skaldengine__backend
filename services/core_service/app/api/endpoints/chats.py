@@ -11,6 +11,7 @@ from app.models.character import Character
 from app.models.user_persona import UserPersona
 from app.models.scenario import Scenario
 from app.models.message import Message
+from app.models.chat_checkpoint import ChatCheckpoint
 from app.schemas.chat import ChatCreate, Chat as ChatSchema
 from app.schemas.message import MessageCreate, Message as MessageSchema
 
@@ -64,8 +65,12 @@ async def create_chat(
     if chat.mode == "scenario":
         from app.core.director_service import DirectorService
         director = DirectorService()
+        
+        # Ограничиваем кол-во точек от 2 до 6
+        cp_count = max(2, min(6, chat_in.checkpoints_count))
+        
         # В фоне, чтобы не тормозить создание чата
-        background_tasks.add_task(director.initialize_scenario, chat.id)
+        background_tasks.add_task(director.initialize_scenario, chat.id, cp_count)
 
     return chat
 
@@ -279,8 +284,24 @@ async def get_chat_history(
 
     branch.reverse()
 
+    # ── Чекпоинты (для сценария) ────────────────────────────────────────────── #
+    cp_res = await db.execute(
+        select(ChatCheckpoint)
+        .where(ChatCheckpoint.chat_id == chat_id)
+        .order_by(ChatCheckpoint.order_num)
+    )
+    checkpoints = cp_res.scalars().all()
+
     return {
         "active_leaf_id": leaf_id,
         "active_branch": branch,
         "tree": tree,
+        "checkpoints": [
+            {
+                "id": cp.id,
+                "order_num": cp.order_num,
+                "goal_description": cp.goal_description,
+                "is_completed": cp.is_completed
+            } for cp in checkpoints
+        ]
     }
