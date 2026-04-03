@@ -14,7 +14,7 @@ passlib[bcrypt]
 bcrypt
 arq
 redis[hiredis]
-google-genai
+openai
 httpx
 Pillow
 pyahocorasick

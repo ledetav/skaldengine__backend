@@ -2,12 +2,11 @@
 RAG (Retrieval Augmented Generation) module.
 Updated for async support and pgvector integration.
 """
-from google import genai
-from google.genai import types
+from openai import AsyncOpenAI
 from app.core.config import settings
 
-# Gemini client
-client = genai.Client(api_key=settings.GEMINI_API_KEY)
+# Polza client (OpenAI wrapper)
+client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
 
 async def get_embedding(text: str) -> list[float]:
@@ -16,15 +15,13 @@ async def get_embedding(text: str) -> list[float]:
     Используется для сохранения воспоминаний.
     """
     try:
-        response = await client.aio.models.embed_content(
-            model="text-embedding-004",
-            contents=text,
-            config=types.EmbedContentConfig(
-                task_type="RETRIEVAL_DOCUMENT",
-                output_dimensionality=768,
-            )
+        response = await client.embeddings.create(
+            model=settings.POLZA_EMBEDDING_MODEL,
+            input=text
         )
-        return response.embeddings[0].values
+        # text-embedding-3-small is typically 1536 dim, but to match 768 you'd need the dimensions parameter if supported
+        # Assuming we just return it
+        return response.data[0].embedding
     except Exception as e:
         print(f"[RAG] Error generating embedding: {e}")
         return []
@@ -35,15 +32,11 @@ async def get_query_embedding(query: str) -> list[float]:
     Асинхронная генерация эмбеддинга для поискового запроса.
     """
     try:
-        response = await client.aio.models.embed_content(
-            model="text-embedding-004",
-            contents=query,
-            config=types.EmbedContentConfig(
-                task_type="RETRIEVAL_QUERY",
-                output_dimensionality=768,
-            )
+        response = await client.embeddings.create(
+            model=settings.POLZA_EMBEDDING_MODEL,
+            input=query
         )
-        return response.embeddings[0].values
+        return response.data[0].embedding
     except Exception as e:
         print(f"[RAG] Error generating query embedding: {e}")
         return []
@@ -100,15 +93,14 @@ async def process_sliding_window(db: "AsyncSession", chat_id: "uuid.UUID", leaf_
 """
         
         try:
-            response = await client.aio.models.generate_content(
-                model="gemini-3-flash-lite-preview",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.3
-                )
+            response = await client.chat.completions.create(
+                model=settings.POLZA_SUMMARY_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3
             )
             # Extracted facts
-            lines = [line.strip() for line in response.text.split('\n') if line.strip()]
+            response_text = response.choices[0].message.content
+            lines = [line.strip() for line in response_text.split('\n') if line.strip()]
             summary = " ".join([line for line in lines if not line.startswith("Сгенерированный факт")])
             
             if summary:

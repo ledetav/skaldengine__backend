@@ -1,10 +1,10 @@
 import json
 import re
 from uuid import UUID
-from google import genai
+from openai import AsyncOpenAI
 from app.core.config import settings
 
-_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+_client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
 async def generate_chat_stream(
     ai_msg_id: UUID, 
@@ -20,17 +20,14 @@ async def generate_chat_stream(
 
     full_text = ""
     try:
-        response_stream = await _client.aio.models.generate_content_stream(
-            model="gemini-2.0-flash",
-            contents=payload["contents"],
-            config=payload["config"]
-        )
+        response_stream = await _client.chat.completions.create(**payload)
         
         async for chunk in response_stream:
-            text_chunk = chunk.text or ""
-            if text_chunk:
-                full_text += text_chunk
-                yield f"event: token\ndata: {json.dumps({'text': text_chunk})}\n\n"
+            if chunk.choices and len(chunk.choices) > 0:
+                text_chunk = chunk.choices[0].delta.content or ""
+                if text_chunk:
+                    full_text += text_chunk
+                    yield f"event: token\ndata: {json.dumps({'text': text_chunk})}\n\n"
             
     except Exception as e:
         error_msg = "(System Error: Neural network unavailable)"

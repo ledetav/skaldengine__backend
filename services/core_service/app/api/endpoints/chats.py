@@ -6,8 +6,6 @@ from sqlalchemy import select
 
 from app.api import deps
 from app.core.config import settings
-from google import genai
-from google.genai import types
 from app.models.chat import Chat
 from app.models.character import Character
 from app.models.user_persona import UserPersona
@@ -17,10 +15,6 @@ from app.schemas.chat import ChatCreate, Chat as ChatSchema
 from app.schemas.message import MessageCreate, Message as MessageSchema
 
 router = APIRouter()
-
-# Gemini client (одиночный экземпляр на всё приложение)
-_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-
 
 # ─── Создание чата (сессии) ──────────────────────────────────────────────── #
 
