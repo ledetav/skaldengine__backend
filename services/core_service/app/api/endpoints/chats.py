@@ -57,6 +57,10 @@ async def create_chat(
     )
 
     db.add(chat)
+    
+    # Инкремент общего счетчика чатов персонажа
+    character.total_chats_count += 1
+    
     await db.commit()
     await db.refresh(chat)
     

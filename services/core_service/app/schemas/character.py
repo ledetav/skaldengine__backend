@@ -11,6 +11,9 @@ class CharacterBase(BaseModel):
     appearance: str | None = None
     personality: str | None = None
     is_public: bool = False
+    # Новые поля
+    gender: str | None = None
+    nsfw_allowed: bool = True
 
 
 class CharacterCreate(CharacterBase):
@@ -41,6 +44,8 @@ class CharacterUpdate(BaseModel):
     appearance: str | None = None
     personality: str | None = None
     is_public: bool | None = None
+    gender: str | None = None
+    nsfw_allowed: bool | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -63,6 +68,8 @@ class CharacterUpdate(BaseModel):
 class Character(CharacterBase):
     id: UUID
     creator_id: UUID | None = None
+    total_chats_count: int
+    monthly_chats_count: int
 
     class Config:
         from_attributes = True
