@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.api import deps
 from app.core import security
-from app.schemas.user import UserResponse, UsernameUpdate, EmailUpdate, PasswordUpdate
+from app.schemas.user import UserResponse, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate
 from app.models.user import User
 
 router = APIRouter()
@@ -39,6 +39,20 @@ async def update_username(
         raise HTTPException(status_code=400, detail="Username already taken")
     
     current_user.username = update_in.new_username
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/full-name", response_model=UserResponse)
+async def update_full_name(
+    update_in: FullNameUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Изменить имя пользователя."""
+    current_user.full_name = update_in.full_name
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)

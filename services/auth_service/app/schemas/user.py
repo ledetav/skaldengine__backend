@@ -7,6 +7,7 @@ from datetime import date, datetime
 class UserBase(BaseModel):
     email: EmailStr
     username: str
+    full_name: str | None = None
     birth_date: date
 
     @field_validator("username")
@@ -41,6 +42,7 @@ class UserCreate(UserBase):
                 {
                     "email": "user@example.com",
                     "username": "SuperPlayer2000",
+                    "full_name": "Ivan Ivanov",
                     "password": "StrongPassword123!",
                     "birth_date": "1995-04-03"
                 }
@@ -65,6 +67,10 @@ class UsernameUpdate(BaseModel):
 
 class EmailUpdate(BaseModel):
     new_email: EmailStr
+
+
+class FullNameUpdate(BaseModel):
+    full_name: str | None = None
 
 
 class PasswordUpdate(BaseModel):

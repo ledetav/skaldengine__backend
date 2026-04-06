@@ -35,6 +35,8 @@ async def login_access_token(
         "access_token": security.create_access_token(
             user.id, 
             role=user.role,
+            username=user.username,
+            full_name=user.full_name,
             expires_delta=access_token_expires,
             birth_date=user.birth_date
         ),
@@ -64,6 +66,7 @@ async def register_user(
     user = User(
         email=user_in.email,
         username=user_in.username,
+        full_name=user_in.full_name,
         birth_date=user_in.birth_date,
         password_hash=security.get_password_hash(user_in.password),
         role="user"
