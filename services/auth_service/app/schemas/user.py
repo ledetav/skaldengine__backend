@@ -6,16 +6,28 @@ from datetime import date, datetime
 
 class UserBase(BaseModel):
     email: EmailStr
+    login: str
     username: str
     full_name: str | None = None
     birth_date: date
+
+    @field_validator("login")
+    @classmethod
+    def validate_login(cls, v: str) -> str:
+        if v.strip() != v:
+            raise ValueError("Login cannot have leading or trailing spaces")
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+            raise ValueError("Login can only contain alphanumeric characters, hyphens, and underscores")
+        return v
 
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
         if v.strip() != v:
             raise ValueError("Username cannot have leading or trailing spaces")
-        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
+        if not v.startswith("@"):
+            v = "@" + v
+        if not re.match(r"^@[a-zA-Z0-9_-]+$", v):
             raise ValueError("Username can only contain alphanumeric characters, hyphens, and underscores")
         return v
 
@@ -41,7 +53,8 @@ class UserCreate(UserBase):
             "examples": [
                 {
                     "email": "user@example.com",
-                    "username": "SuperPlayer2000",
+                    "login": "SuperPlayer2000",
+                    "username": "@Skaldik",
                     "full_name": "Ivan Ivanov",
                     "password": "StrongPassword123!",
                     "birth_date": "1995-04-03"
@@ -52,8 +65,17 @@ class UserCreate(UserBase):
 
 
 class UserLogin(BaseModel):
-    username: str  # OAuth2PasswordRequestForm использует username, а не email
+    login: str  # OAuth2PasswordRequestForm использует username, а не email
     password: str
+
+
+class LoginUpdate(BaseModel):
+    new_login: str
+
+    @field_validator("new_login")
+    @classmethod
+    def validate_login(cls, v: str) -> str:
+        return UserBase.validate_login(v)
 
 
 class UsernameUpdate(BaseModel):

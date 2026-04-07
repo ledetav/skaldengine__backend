@@ -18,9 +18,9 @@ async def login_access_token(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    # Ищем пользователя по email или username
+    # Ищем пользователя по email или login
     query = select(User).where(
-        or_(User.email == form_data.username, User.username == form_data.username)
+        or_(User.email == form_data.username, User.login == form_data.username)
     )
     result = await db.execute(query)
     user = result.scalars().first()
@@ -35,6 +35,7 @@ async def login_access_token(
         "access_token": security.create_access_token(
             user.id, 
             role=user.role,
+            login=user.login,
             username=user.username,
             full_name=user.full_name,
             expires_delta=access_token_expires,
@@ -48,15 +49,25 @@ async def register_user(
     user_in: UserCreate,
     db: AsyncSession = Depends(deps.get_db),
 ) -> Any:
-    # Проверка на существование email или username
+    # Проверка на существование email, login или username (handle)
     query = select(User).where(
-        or_(User.email == user_in.email, User.username == user_in.username)
+        or_(
+            User.email == user_in.email, 
+            User.login == user_in.login,
+            User.username == user_in.username
+        )
     )
     result = await db.execute(query)
     existing_user = result.scalars().first()
     
     if existing_user:
-        detail = "User with this email already registered" if existing_user.email == user_in.email else "Username already taken"
+        if existing_user.email == user_in.email:
+            detail = "User with this email already registered"
+        elif existing_user.login == user_in.login:
+            detail = "Login already taken"
+        else:
+            detail = "Username (handle) already taken"
+            
         raise HTTPException(
             status_code=400,
             detail=detail,
@@ -65,6 +76,7 @@ async def register_user(
     # Создание
     user = User(
         email=user_in.email,
+        login=user_in.login,
         username=user_in.username,
         full_name=user_in.full_name,
         birth_date=user_in.birth_date,

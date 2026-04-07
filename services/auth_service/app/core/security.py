@@ -13,6 +13,7 @@ def get_password_hash(password: str) -> str:
 def create_access_token(
     subject: Union[str, Any], 
     role: str = "user", 
+    login: str | None = None,
     username: str | None = None,
     full_name: str | None = None,
     expires_delta: timedelta | None = None, 
@@ -24,6 +25,8 @@ def create_access_token(
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode = {"exp": expire, "sub": str(subject), "role": role}
+    if login:
+        to_encode["login"] = login
     if username:
         to_encode["username"] = username
     if full_name:
