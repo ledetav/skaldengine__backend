@@ -5,6 +5,7 @@ from datetime import datetime
 
 class UserPersonaBase(BaseModel):
     name: str
+    description: str | None = None
     avatar_url: str | None = None
     age: int | None = None
     appearance: str | None = None

@@ -61,6 +61,7 @@ UPLOAD_DIR="./uploads"
 **Назначение:** Создание новой персоны. Лимиты: 5 (User), 10 (Moderator), 15 (Admin).
 - **Принимает:** `UserPersonaCreate` (JSON)
   - `name`: string (имя персонажа, обязательно)
+  - `description`: string (краткое описание, опционально)
   - `avatar_url`: string (URL аватарки, опционально)
   - `age`: integer (возраст, опционально)
   - `appearance`: string (описание внешности, опционально)
@@ -72,6 +73,7 @@ UPLOAD_DIR="./uploads"
   ```json
   {
     "name": "Aragor",
+    "description": "The true king of Gondor",
     "avatar_url": "https://example.com/aragor.jpg",
     "age": 35,
     "appearance": "Tall, dark hair, scarred face",

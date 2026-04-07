@@ -18,6 +18,7 @@ class UserPersona(Base):
 
     # Основные поля
     name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True) # Краткое описание
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Игровые характеристики персоны
