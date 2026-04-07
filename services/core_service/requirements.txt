@@ -12,8 +12,6 @@ aiofiles
 pgvector
 passlib[bcrypt]
 bcrypt
-arq
-redis[hiredis]
 openai
 httpx
 Pillow
