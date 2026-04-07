@@ -21,17 +21,18 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Runtime dependencies
+# Runtime dependencies + nginx for routing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
+    nginx \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages and code from builder
 COPY --from=builder /root/.local /root/.local
-# Copy all services code
+# Copy all services and configurations
 COPY services/ ./services/
-# Copy the start script
 COPY start.sh /app/start.sh
+COPY nginx.conf /app/nginx.conf
 
 # Environment setup
 ENV PATH=/root/.local/bin:$PATH
@@ -43,8 +44,11 @@ RUN mkdir -p /app/services/core_service/uploads
 
 RUN chmod +x /app/start.sh
 
-# Expose ports for both services
+# Expose port 80 for Nginx (main entrypoint)
+# Also exposing 8000/8001 for internal/direct access if available
+EXPOSE 80
 EXPOSE 8000
 EXPOSE 8001
 
+# Run the unified start script
 CMD ["/app/start.sh"]
