@@ -28,7 +28,9 @@ class CharacterCreate(CharacterBase):
                     "card_image_url": "https://example.com/card.jpg",
                     "appearance": "Tentacles forming a spectral mass",
                     "personality": "Unfathomable, cold, indifferent",
-                    "is_public": True
+                    "is_public": True,
+                    "gender": "other",
+                    "nsfw_allowed": True
                 }
             ]
         }
@@ -58,7 +60,9 @@ class CharacterUpdate(BaseModel):
                     "card_image_url": "https://example.com/card_new.jpg",
                     "appearance": "More tentacles",
                     "personality": "Even more indifferent",
-                    "is_public": False
+                    "is_public": False,
+                    "gender": "other",
+                    "nsfw_allowed": False
                 }
             ]
         }

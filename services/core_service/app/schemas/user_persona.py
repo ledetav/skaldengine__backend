@@ -20,10 +20,12 @@ class UserPersonaCreate(UserPersonaBase):
             "examples": [
                 {
                     "name": "Aragor",
+                    "description": "Exiled ranger and heir to the throne.",
                     "avatar_url": "https://example.com/aragor.jpg",
                     "age": 35,
                     "appearance": "Tall, dark hair, scarred face",
                     "personality": "Stoic and brave",
+                    "gender": "male",
                     "facts": "Exiled from his homeland"
                 }
             ]
@@ -33,10 +35,12 @@ class UserPersonaCreate(UserPersonaBase):
 
 class UserPersonaUpdate(BaseModel):
     name: str | None = None
+    description: str | None = None
     avatar_url: str | None = None
     age: int | None = None
     appearance: str | None = None
     personality: str | None = None
+    gender: str | None = None
     facts: str | None = None
 
     model_config = {
@@ -44,10 +48,12 @@ class UserPersonaUpdate(BaseModel):
             "examples": [
                 {
                     "name": "Aragor the King",
+                    "description": "Crowned King of Gondor, leading his people to peace.",
                     "avatar_url": "https://example.com/aragor_king.jpg",
                     "age": 40,
                     "appearance": "Regal presence, graying hair",
                     "personality": "Wise and just",
+                    "gender": "male",
                     "facts": "Reclaimed the throne"
                 }
             ]
