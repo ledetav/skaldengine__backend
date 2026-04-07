@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from app.core.broadcast import manager
 
 from app.api import deps
 from app.models.character import Character
@@ -33,6 +34,24 @@ async def create_character(
     db.add(character)
     await db.commit()
     await db.refresh(character)
+
+    # Broadcast new character update
+    await manager.broadcast({
+        "type": "NEW_CHARACTER",
+        "data": {
+            "id": str(character.id),
+            "name": character.name,
+            "description": character.description,
+            "fandom": character.fandom,
+            "avatar_url": character.avatar_url,
+            "card_image_url": character.card_image_url,
+            "gender": character.gender,
+            "nsfw_allowed": character.nsfw_allowed,
+            "created_at": character.created_at.isoformat() if character.created_at else None,
+            "total_chats_count": 0,
+            "monthly_chats_count": 0
+        }
+    })
 
     return character
 
@@ -66,6 +85,23 @@ async def update_character(
     await db.commit()
     await db.refresh(character)
     
+    # Broadcast update
+    await manager.broadcast({
+        "type": "UPDATE_CHARACTER",
+        "data": {
+            "id": str(character.id),
+            "name": character.name,
+            "description": character.description,
+            "fandom": character.fandom,
+            "avatar_url": character.avatar_url,
+            "card_image_url": character.card_image_url,
+            "gender": character.gender,
+            "nsfw_allowed": character.nsfw_allowed,
+            "total_chats_count": character.total_chats_count,
+            "monthly_chats_count": character.monthly_chats_count
+        }
+    })
+    
     return character
 
 @router.delete("/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -79,4 +115,12 @@ async def delete_character(
         raise HTTPException(status_code=404, detail="Character not found")
     
     await db.delete(character)
-    await db.commit()
+    await db.commit()
+
+    # Broadcast deletion
+    await manager.broadcast({
+        "type": "DELETE_CHARACTER",
+        "data": {
+            "id": str(character_id)
+        }
+    })
