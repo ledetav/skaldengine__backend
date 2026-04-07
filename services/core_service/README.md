@@ -107,13 +107,30 @@ UPLOAD_DIR="./uploads"
     "card_image_url": "https://example.com/card.jpg",
     "appearance": "Tentacles forming a spectral mass",
     "personality": "Unfathomable, cold, indifferent",
+    "gender": "другое",
+    "nsfw_allowed": true,
+    "total_chats_count": 1250,
+    "monthly_chats_count": 450,
     "is_public": true
   }
   ```
 
 ---
 
-### 3. Лорбуки (`/api/v1/lorebooks`) [Auth]
+### 3. Реалтайм-обновления (Broadcast / WebSockets)
+
+Для получения мгновенных уведомлений об изменениях в мире (новые персонажи, обновления, удаления) используйте WebSocket-подключение.
+
+#### `WS /api/v1/ws/updates`
+**Назначение:** Стриминг системных событий.
+- **События (JSON):**
+  - `{"type": "NEW_CHARACTER", "data": {...}}` — создан новый персонаж.
+  - `{"type": "UPDATE_CHARACTER", "data": {...}}` — данные персонажа изменены (статистика, описание и т.д.).
+  - `{"type": "DELETE_CHARACTER", "data": {"id": "..."}}` — персонаж удален.
+
+---
+
+### 4. Лорбуки (`/api/v1/lorebooks`) [Auth]
 
 #### `GET /`
 **Назначение:** Список лорбуков (баз знаний мира).
@@ -148,7 +165,7 @@ UPLOAD_DIR="./uploads"
 
 ---
 
-### 4. Чаты (`/api/v1/chats`) [Auth]
+### 5. Чаты (`/api/v1/chats`) [Auth]
 
 #### `POST /`
 **Назначение:** Инициализация новой игровой сессии (чата).
@@ -209,7 +226,7 @@ UPLOAD_DIR="./uploads"
 
 ---
 
-### 5. Сообщения (`/api/v1/messages`) [Auth]
+### 6. Сообщения (`/api/v1/messages`) [Auth]
 
 #### `POST /chats/{chat_id}/messages/stream`
 **Назначение:** Отправка сообщения и стриминг ответа ИИ в реальном времени.
@@ -260,7 +277,19 @@ UPLOAD_DIR="./uploads"
 
 ---
 
-### 6. Сценарии (`/api/v1/scenarios`) [Auth]
+### 7. Пользовательские данные в контексте
+
+Благодаря интеграции с **Auth Service**, каждый запрос содержит расширенную информацию о пользователе. В любом месте кода через `current_user` доступны:
+- `current_user.id` (UUID)
+- `current_user.login` (Логин)
+- `current_user.username` (Публичный @handle)
+- `current_user.full_name` (ФИО/Имя пользователя)
+- `current_user.role` (Роль: admin, moderator, user)
+- `current_user.birth_date` (Дата рождения)
+
+---
+
+### 8. Сценарии (`/api/v1/scenarios`) [Auth]
 
 #### `GET /`
 **Назначение:** Получение списка доступных сценариев (краткий).
@@ -291,7 +320,19 @@ UPLOAD_DIR="./uploads"
     "title": "Ночная встреча в таверне",
     "location": "Таверна 'Гордый единорог'",
     "description": "...",
+    "gender": "male",
+    "nsfw": false,
+    "chats_count": 150,
     "start_point": "Вы сидите за дальним столом, когда вошедший рыцарь...",
     "end_point": "Вам необходимо выбраться из города до рассвета."
   }
   ```
+
+---
+
+### 9. Статистика и планировщики (Stats Service)
+
+В сервисе работает `StatsService`, который отвечает за:
+- Инкремент `total_chats_count` при каждом новом чате.
+- Сброс и сохранение `monthly_chats_count` первого числа каждого месяца.
+- Обеспечение актуальности данных для каталога персонажей.
