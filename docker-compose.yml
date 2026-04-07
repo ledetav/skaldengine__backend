@@ -23,16 +23,33 @@ services:
     volumes:
       - core_db_data:/var/lib/postgresql/data
 
-  # Redis — кеш и брокер задач (ARQ)
-  redis:
-    image: redis:7-alpine
+
+  auth-service:
+    build: .
     ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
+      - "8001:8001"
+    env_file:
+      - services/auth_service/.env
+    environment:
+      - SERVICE_NAME=auth
+      - DATABASE_URL=postgresql+asyncpg://auth_user:auth_password@auth-db:5432/auth_db
+      - PORT=8001
+    depends_on:
+      - auth-db
+
+  core-service:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - services/core_service/.env
+    environment:
+      - SERVICE_NAME=core
+      - DATABASE_URL=postgresql+asyncpg://core_user:core_password@core-db:5432/core_db
+      - PORT=8000
+    depends_on:
+      - core-db
 
 volumes:
   auth_db_data:
   core_db_data:
-  redis_data:

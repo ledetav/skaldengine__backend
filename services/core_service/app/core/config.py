@@ -11,8 +11,6 @@ class Settings(BaseSettings):
     # PostgreSQL (asyncpg)
     DATABASE_URL: str
 
-    # Redis (ARQ broker + cache)
-    REDIS_URL: str = "redis://localhost:6379"
 
     # Polza.ai (OpenAI wrapper)
     POLZA_API_KEY: str
