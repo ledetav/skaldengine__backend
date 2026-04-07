@@ -29,7 +29,7 @@ async def create_character(
     db: AsyncSession = Depends(deps.get_db),
     current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
 ):
-    character = Character(**character_in.model_dump())
+    character = Character(**character_in.model_dump(), creator_id=current_user.id)
     db.add(character)
     await db.commit()
     await db.refresh(character)
