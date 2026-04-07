@@ -10,13 +10,27 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-def create_access_token(subject: Union[str, Any], role: str = "user", expires_delta: timedelta | None = None, birth_date: Union[datetime, Any] = None) -> str:
+def create_access_token(
+    subject: Union[str, Any], 
+    role: str = "user", 
+    login: str | None = None,
+    username: str | None = None,
+    full_name: str | None = None,
+    expires_delta: timedelta | None = None, 
+    birth_date: Union[datetime, Any] = None
+) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode = {"exp": expire, "sub": str(subject), "role": role}
+    if login:
+        to_encode["login"] = login
+    if username:
+        to_encode["username"] = username
+    if full_name:
+        to_encode["full_name"] = full_name
     if birth_date:
         to_encode["birth_date"] = birth_date.isoformat() if hasattr(birth_date, 'isoformat') else str(birth_date)
         

@@ -14,6 +14,9 @@ from datetime import date
 class CurrentUser(BaseModel):
     id: UUID
     role: str = "user"
+    login: str | None = None
+    username: str | None = None
+    full_name: str | None = None
     birth_date: date | None = None
 
 # Используем HTTPBearer вместо OAuth2PasswordBearer.
@@ -38,6 +41,9 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
         
         user_id = UUID(token_data)
         role = payload.get("role", "user")
+        login = payload.get("login")
+        username = payload.get("username")
+        full_name = payload.get("full_name")
         
         # Parse birth_date
         birth_date_str = payload.get("birth_date")
@@ -48,7 +54,14 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
             except ValueError:
                 pass
 
-        return CurrentUser(id=user_id, role=role, birth_date=birth_date_val)
+        return CurrentUser(
+            id=user_id, 
+            role=role, 
+            login=login,
+            username=username, 
+            full_name=full_name, 
+            birth_date=birth_date_val
+        )
         
     except (JWTError, ValueError): 
         raise HTTPException(status_code=403, detail="Could not validate credentials")

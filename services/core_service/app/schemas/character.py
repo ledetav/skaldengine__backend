@@ -11,6 +11,9 @@ class CharacterBase(BaseModel):
     appearance: str | None = None
     personality: str | None = None
     is_public: bool = False
+    # Новые поля
+    gender: str | None = None
+    nsfw_allowed: bool = True
 
 
 class CharacterCreate(CharacterBase):
@@ -25,7 +28,9 @@ class CharacterCreate(CharacterBase):
                     "card_image_url": "https://example.com/card.jpg",
                     "appearance": "Tentacles forming a spectral mass",
                     "personality": "Unfathomable, cold, indifferent",
-                    "is_public": True
+                    "is_public": True,
+                    "gender": "other",
+                    "nsfw_allowed": True
                 }
             ]
         }
@@ -41,6 +46,8 @@ class CharacterUpdate(BaseModel):
     appearance: str | None = None
     personality: str | None = None
     is_public: bool | None = None
+    gender: str | None = None
+    nsfw_allowed: bool | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -53,7 +60,9 @@ class CharacterUpdate(BaseModel):
                     "card_image_url": "https://example.com/card_new.jpg",
                     "appearance": "More tentacles",
                     "personality": "Even more indifferent",
-                    "is_public": False
+                    "is_public": False,
+                    "gender": "other",
+                    "nsfw_allowed": False
                 }
             ]
         }
@@ -63,6 +72,10 @@ class CharacterUpdate(BaseModel):
 class Character(CharacterBase):
     id: UUID
     creator_id: UUID | None = None
+    total_chats_count: int
+    monthly_chats_count: int
+    scenarios_count: int = 0
+    scenario_chats_count: int = 0
 
     class Config:
         from_attributes = True

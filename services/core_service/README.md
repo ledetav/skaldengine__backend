@@ -61,16 +61,19 @@ UPLOAD_DIR="./uploads"
 **Назначение:** Создание новой персоны. Лимиты: 5 (User), 10 (Moderator), 15 (Admin).
 - **Принимает:** `UserPersonaCreate` (JSON)
   - `name`: string (имя персонажа, обязательно)
+  - `description`: string (краткое описание, опционально)
   - `avatar_url`: string (URL аватарки, опционально)
   - `age`: integer (возраст, опционально)
   - `appearance`: string (описание внешности, опционально)
   - `personality`: string (описание характера, опционально)
+  - `gender`: string (пол: мужской, женский, иной, опционально)
   - `facts`: string (биография, лор, род деятельности, опционально)
 - **Возвращает:** Созданную персону с ID.
 - **Пример ввода:**
   ```json
   {
     "name": "Aragor",
+    "description": "The true king of Gondor",
     "avatar_url": "https://example.com/aragor.jpg",
     "age": 35,
     "appearance": "Tall, dark hair, scarred face",
@@ -107,24 +110,44 @@ UPLOAD_DIR="./uploads"
     "card_image_url": "https://example.com/card.jpg",
     "appearance": "Tentacles forming a spectral mass",
     "personality": "Unfathomable, cold, indifferent",
+    "gender": "другое",
+    "nsfw_allowed": true,
+    "total_chats_count": 1250,
+    "monthly_chats_count": 450,
+    "scenarios_count": 8,
+    "scenario_chats_count": 420,
     "is_public": true
   }
   ```
 
 ---
 
-### 3. Лорбуки (`/api/v1/lorebooks`) [Auth]
+### 3. Реалтайм-обновления (Broadcast / WebSockets)
+
+Для получения мгновенных уведомлений об изменениях в мире (новые персонажи, обновления, удаления) используйте WebSocket-подключение.
+
+#### `WS /api/v1/ws/updates`
+**Назначение:** Стриминг системных событий.
+- **События (JSON):**
+  - `{"type": "NEW_CHARACTER", "data": {...}}` — создан новый персонаж.
+  - `{"type": "UPDATE_CHARACTER", "data": {...}}` — данные персонажа изменены (статистика, описание и т.д.).
+  - `{"type": "DELETE_CHARACTER", "data": {"id": "..."}}` — персонаж удален.
+
+---
+
+### 4. Лорбуки (`/api/v1/lorebooks`) [Auth]
 
 #### `GET /`
 **Назначение:** Список лорбуков (баз знаний мира).
 - **Доступ:** Обычным пользователям видны только их персональные лорбуки. Глобальный лор (персонажей/мира) доступен только админам/модераторам.
 - **Принимает:** Фильтры `character_id` (UUID), `fandom` (string) — только для админов/модераторов.
-- **Возвращает:** Список лорбуков со вложенными записями (`entries`).
+- **Возвращает:** Список лорбуков со вложенными записями (`entries`) и полем `entries_count` (количество фактов).
 
 #### `POST /`
 **Назначение:** Создание нового контейнера знаний. Лимиты на персону: 3 (User), 5 (Moderator), 7 (Admin).
 - **Принимает:** `LorebookCreate` (JSON)
   - `name`: string (название)
+  - `description`: string (описание, опционально)
   - `user_persona_id`: UUID (привязка к своей персоне)
   - `character_id`: UUID (для лорбука персонажа, только для админов)
   - `fandom`: string (глобальный лор фандома, только для админов)
@@ -148,7 +171,7 @@ UPLOAD_DIR="./uploads"
 
 ---
 
-### 4. Чаты (`/api/v1/chats`) [Auth]
+### 5. Чаты (`/api/v1/chats`) [Auth]
 
 #### `POST /`
 **Назначение:** Инициализация новой игровой сессии (чата).
@@ -209,7 +232,7 @@ UPLOAD_DIR="./uploads"
 
 ---
 
-### 5. Сообщения (`/api/v1/messages`) [Auth]
+### 6. Сообщения (`/api/v1/messages`) [Auth]
 
 #### `POST /chats/{chat_id}/messages/stream`
 **Назначение:** Отправка сообщения и стриминг ответа ИИ в реальном времени.
@@ -260,7 +283,19 @@ UPLOAD_DIR="./uploads"
 
 ---
 
-### 6. Сценарии (`/api/v1/scenarios`) [Auth]
+### 7. Пользовательские данные в контексте
+
+Благодаря интеграции с **Auth Service**, каждый запрос содержит расширенную информацию о пользователе. В любом месте кода через `current_user` доступны:
+- `current_user.id` (UUID)
+- `current_user.login` (Логин)
+- `current_user.username` (Публичный @handle)
+- `current_user.full_name` (ФИО/Имя пользователя)
+- `current_user.role` (Роль: admin, moderator, user)
+- `current_user.birth_date` (Дата рождения)
+
+---
+
+### 8. Сценарии (`/api/v1/scenarios`) [Auth]
 
 #### `GET /`
 **Назначение:** Получение списка доступных сценариев (краткий).
@@ -291,7 +326,19 @@ UPLOAD_DIR="./uploads"
     "title": "Ночная встреча в таверне",
     "location": "Таверна 'Гордый единорог'",
     "description": "...",
+    "gender": "male",
+    "nsfw": false,
+    "chats_count": 150,
     "start_point": "Вы сидите за дальним столом, когда вошедший рыцарь...",
     "end_point": "Вам необходимо выбраться из города до рассвета."
   }
   ```
+
+---
+
+### 9. Статистика и планировщики (Stats Service)
+
+В сервисе работает `StatsService`, который отвечает за:
+- Инкремент `total_chats_count` при каждом новом чате.
+- Сброс и сохранение `monthly_chats_count` первого числа каждого месяца.
+- Обеспечение актуальности данных для каталога персонажей.

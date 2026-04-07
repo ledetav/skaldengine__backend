@@ -57,6 +57,7 @@ class LorebookBase(BaseModel):
     character_id: UUID | None = None
     user_persona_id: UUID | None = None
     fandom: str | None = None
+    description: str | None = None
 
 
 class LorebookCreate(LorebookBase):
@@ -96,6 +97,7 @@ class LorebookUpdate(BaseModel):
 class Lorebook(LorebookBase):
     id: UUID
     entries: list[LorebookEntry] = []
+    entries_count: int = 0
 
     class Config:
         from_attributes = True

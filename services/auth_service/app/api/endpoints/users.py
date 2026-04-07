@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.api import deps
 from app.core import security
-from app.schemas.user import UserResponse, UsernameUpdate, EmailUpdate, PasswordUpdate
+from app.schemas.user import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate
 from app.models.user import User
 
 router = APIRouter()
@@ -17,12 +17,40 @@ async def read_user_me(
     return current_user
 
 
+@router.get("/me/login")
+async def get_my_login(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Вернуть только логин текущего пользователя."""
+    return {"login": current_user.login}
+
+
 @router.get("/me/username")
 async def get_my_username(
     current_user: User = Depends(deps.get_current_user),
 ):
-    """Вернуть только юзернейм текущего пользователя."""
+    """Вернуть только юзернейм (@handle) текущего пользователя."""
     return {"username": current_user.username}
+
+
+@router.patch("/me/login", response_model=UserResponse)
+async def update_login(
+    update_in: LoginUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Изменить логин пользователя."""
+    # Проверка на уникальность
+    query = select(User).where(User.login == update_in.new_login)
+    result = await db.execute(query)
+    if result.scalars().first():
+        raise HTTPException(status_code=400, detail="Login already taken")
+    
+    current_user.login = update_in.new_login
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
 
 
 @router.patch("/me/username", response_model=UserResponse)
@@ -31,7 +59,7 @@ async def update_username(
     db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
-    """Изменить юзернейм пользователя."""
+    """Изменить публичный юзернейм (@handle) пользователя."""
     # Проверка на уникальность
     query = select(User).where(User.username == update_in.new_username)
     result = await db.execute(query)
@@ -39,6 +67,20 @@ async def update_username(
         raise HTTPException(status_code=400, detail="Username already taken")
     
     current_user.username = update_in.new_username
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/full-name", response_model=UserResponse)
+async def update_full_name(
+    update_in: FullNameUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Изменить имя пользователя."""
+    current_user.full_name = update_in.full_name
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)

@@ -29,6 +29,14 @@ class Character(Base):
     appearance: Mapped[str | None] = mapped_column(Text, nullable=True)
     personality: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Статистика
+    total_chats_count: Mapped[int] = mapped_column(default=0)
+    monthly_chats_count: Mapped[int] = mapped_column(default=0) # Статистика за прошедший календарный месяц
+
+    # Среда и контент
+    gender: Mapped[str | None] = mapped_column(String(50), nullable=True) # мужской, женский, другой
+    nsfw_allowed: Mapped[bool] = mapped_column(Boolean, default=True)
+
     # Доступность
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)

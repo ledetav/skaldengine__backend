@@ -57,7 +57,9 @@ pip install -r requirements.txt
 **Назначение:** Регистрация нового пользователя.
 - **Принимает:** `UserCreate` (JSON)
   - `email`: string (валидный email)
-  - `username`: string (без пробелов по краям, только латиница, цифры, `-` и `_`)
+  - `login`: string (для входа, без пробелов по краям, только латиница, цифры, `-` и `_`)
+  - `username`: string (публичный хендл, автоматически форматируется через @)
+  - `full_name`: string (имя пользователя, опционально)
   - `birth_date`: date (обязательно)
   - `password`: string (мин 8 символов, 1 цифра, 1 заглавная, 1 спецсимвол)
 - **Возвращает:** Объект пользователя (без пароля).
@@ -65,7 +67,9 @@ pip install -r requirements.txt
   ```json
   {
     "email": "user@example.com",
-    "username": "Skald_Player",
+    "login": "SuperPlayer2000",
+    "username": "Skaldik",
+    "full_name": "Иван Иванов",
     "birth_date": "1995-04-03",
     "password": "StrongPassword123!"
   }
@@ -76,7 +80,7 @@ pip install -r requirements.txt
 #### `POST /login`
 **Назначение:** Получение JWT токена доступа.
 - **Принимает:** `form-data` (application/x-www-form-urlencoded)
-  - `username`: (email или username пользователя)
+  - `username`: (email или login пользователя)
   - `password`: пароль
 - **Возвращает:** JSON с токеном.
   - `access_token`: JWT строка.
@@ -98,9 +102,17 @@ pip install -r requirements.txt
 **Назначение:** Получить только никнейм.
 - **Ответ:** `{"username": "CurrentName"}`
 
+#### `PATCH /me/login` [Auth]
+**Назначение:** Изменить логин.
+- **Тело:** `{"new_login": "NewLogin"}`
+
 #### `PATCH /me/username` [Auth]
-**Назначение:** Изменить никнейм.
-- **Тело:** `{"new_username": "NewName"}`
+**Назначение:** Изменить публичный хендл.
+- **Тело:** `{"new_username": "@NewHandle"}`
+
+#### `PATCH /me/full-name` [Auth]
+**Назначение:** Изменить имя пользователя.
+- **Тело:** `{"full_name": "Новое Имя"}`
 
 #### `PATCH /me/email` [Auth]
 **Назначение:** Изменить почту.

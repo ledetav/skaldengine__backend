@@ -7,6 +7,7 @@ from app.api.endpoints import (
     scenarios,
     upload,
     messages,
+    ws,
 )
 from app.api.endpoints.admin import (
     characters as admin_characters,
@@ -23,6 +24,7 @@ api_router.include_router(lorebooks.router,     prefix="/lorebooks",   tags=["Lo
 api_router.include_router(scenarios.router,     prefix="/scenarios",   tags=["Scenarios"])
 api_router.include_router(upload.router,        prefix="/upload",      tags=["Files"])
 api_router.include_router(messages.router,      prefix="/messages",    tags=["Messages"])
+api_router.include_router(ws.router,            prefix="/ws",          tags=["Real-time Updates"])
 
 # Admin Endpoints (Require valid JWT with admin/moderator role)
 api_router.include_router(admin_characters.router, prefix="/admin/characters", tags=["Admin Characters"])
