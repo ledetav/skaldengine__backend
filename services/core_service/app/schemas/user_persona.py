@@ -9,6 +9,7 @@ class UserPersonaBase(BaseModel):
     age: int | None = None
     appearance: str | None = None
     personality: str | None = None
+    gender: str | None = None
     facts: str | None = None
 
 

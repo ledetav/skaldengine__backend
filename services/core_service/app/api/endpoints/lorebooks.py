@@ -43,7 +43,12 @@ async def list_lorebooks(
 
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().unique().all()
+    lorebooks = result.scalars().unique().all()
+    
+    for lb in lorebooks:
+        lb.entries_count = len(lb.entries)
+        
+    return lorebooks
 
 
 @router.post("/", response_model=LorebookSchema, status_code=status.HTTP_201_CREATED)
@@ -88,7 +93,10 @@ async def create_lorebook(
     await db.commit()
     query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.id == lorebook.id)
     result = await db.execute(query)
-    return result.scalars().first()
+    lorebook_obj = result.scalars().first()
+    if lorebook_obj:
+        lorebook_obj.entries_count = len(lorebook_obj.entries)
+    return lorebook_obj
 
 
 @router.get("/{lorebook_id}", response_model=LorebookSchema)
@@ -102,6 +110,7 @@ async def get_lorebook(
     lorebook = result.scalars().first()
     if not lorebook:
         raise HTTPException(status_code=404, detail="Lorebook not found")
+    lorebook.entries_count = len(lorebook.entries)
     return lorebook
 
 

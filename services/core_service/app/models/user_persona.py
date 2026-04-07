@@ -24,6 +24,7 @@ class UserPersona(Base):
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     appearance: Mapped[str | None] = mapped_column(Text, nullable=True)
     personality: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(50), nullable=True)  # мужской, женский, другой
     facts: Mapped[str | None] = mapped_column(Text, nullable=True)  # Лор, предыстория, род деятельности
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

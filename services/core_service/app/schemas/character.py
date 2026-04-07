@@ -70,6 +70,8 @@ class Character(CharacterBase):
     creator_id: UUID | None = None
     total_chats_count: int
     monthly_chats_count: int
+    scenarios_count: int = 0
+    scenario_chats_count: int = 0
 
     class Config:
         from_attributes = True

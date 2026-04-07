@@ -2,11 +2,13 @@ from uuid import UUID
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.core.broadcast import manager
 
 from app.api import deps
 from app.models.character import Character
+from app.models.chat import Chat
+from app.models.scenario import Scenario
 from app.schemas.character import CharacterCreate, CharacterUpdate, Character as CharacterSchema
 router = APIRouter()
 
@@ -22,7 +24,23 @@ async def read_characters(
         Character.is_public == True
     ).offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    characters = result.scalars().all()
+
+    for char in characters:
+        # Считаем количество сценариев
+        sc_count_query = select(func.count()).select_from(Scenario).where(Scenario.character_id == char.id)
+        sc_res = await db.execute(sc_count_query)
+        char.scenarios_count = sc_res.scalar() or 0
+
+        # Считаем количество чатов по сценариям
+        ch_count_query = select(func.count()).select_from(Chat).where(
+            Chat.character_id == char.id,
+            Chat.mode == "scenario"
+        )
+        ch_res = await db.execute(ch_count_query)
+        char.scenario_chats_count = ch_res.scalar() or 0
+
+    return characters
 
 @router.post("/", response_model=CharacterSchema, status_code=status.HTTP_201_CREATED)
 async def create_character(
@@ -64,6 +82,20 @@ async def read_character(
     character = await db.get(Character, character_id)
     if not character or character.is_deleted or not character.is_public:
         raise HTTPException(status_code=404, detail="Character not found")
+    
+    # Считаем количество сценариев
+    sc_count_query = select(func.count()).select_from(Scenario).where(Scenario.character_id == character.id)
+    sc_res = await db.execute(sc_count_query)
+    character.scenarios_count = sc_res.scalar() or 0
+
+    # Считаем количество чатов по сценариям
+    ch_count_query = select(func.count()).select_from(Chat).where(
+        Chat.character_id == character.id,
+        Chat.mode == "scenario"
+    )
+    ch_res = await db.execute(ch_count_query)
+    character.scenario_chats_count = ch_res.scalar() or 0
+
     return character
 
 @router.put("/{character_id}", response_model=CharacterSchema)
