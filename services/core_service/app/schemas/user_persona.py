@@ -64,6 +64,8 @@ class UserPersonaUpdate(BaseModel):
 class UserPersona(UserPersonaBase):
     id: UUID
     owner_id: UUID
+    lorebook_count: int = 0
+    chat_count: int = 0
     created_at: datetime
 
     class Config:

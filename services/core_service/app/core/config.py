@@ -17,8 +17,10 @@ class Settings(BaseSettings):
     POLZA_CHAT_MODEL: str = "openai/gpt-4o"
     POLZA_EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
     POLZA_SUMMARY_MODEL: str = "openai/gpt-4o-mini"
+    POLZA_TITLE_MODEL: str = "google/gemini-2.0-flash-lite-preview-02-05"
     POLZA_TEMPERATURE: float = 1.0
     POLZA_MAX_TOKENS: int = 8000
+    POLZA_TITLE_MAX_TOKENS: int = 50
 
     # Uploads (аватарки, карточки)
     UPLOAD_DIR: str = "./uploads"

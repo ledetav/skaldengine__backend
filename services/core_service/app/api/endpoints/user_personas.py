@@ -1,130 +1,66 @@
 from uuid import UUID
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete
+from fastapi import APIRouter, Depends, status
 
 from app.api import deps
-from app.models.user_persona import UserPersona
-from app.schemas.user_persona import UserPersonaCreate, UserPersonaUpdate, UserPersona as UserPersonaSchema
+from app.api.controllers.user_persona_controller import UserPersonaController
+from app.schemas.response import BaseResponse
+from app.schemas.user_persona import UserPersonaCreate, UserPersonaUpdate
 
 router = APIRouter()
 
-@router.get("/", response_model=List[UserPersonaSchema])
-async def read_personas(
-    skip: int = 0,
-    limit: int = 10,
-    db: AsyncSession = Depends(deps.get_db),
+@router.get("/", response_model=BaseResponse)
+async def list_my_personas(
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    query = select(UserPersona)\
-        .where(UserPersona.owner_id == current_user.id)\
-        .offset(skip)\
-        .limit(limit)
-        
-    result = await db.execute(query)
-    personas = result.scalars().all()
-    return personas
+    """Получить список всех персон текущего пользователя."""
+    return await controller.get_my_personas(current_user.id)
 
-@router.post("/", response_model=UserPersonaSchema, status_code=status.HTTP_201_CREATED)
+@router.get("/stats", response_model=BaseResponse)
+async def get_my_stats(
+    current_user: deps.CurrentUser = Depends(deps.get_current_user),
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller)
+):
+    """Получить агрегированную статистику пользователя (чаты, персоны, лорбуки)."""
+    return await controller.get_user_stats(current_user.id)
+
+
+@router.post("/", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_persona(
     persona_in: UserPersonaCreate,
-    db: AsyncSession = Depends(deps.get_db),
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    # Лимиты: admin(15), moderator(10), user(5)
-    role_limits = {"admin": 15, "moderator": 10, "user": 5}
-    limit = role_limits.get(current_user.role, 5)
+    """Создать новую игровую персону."""
+    return await controller.create_persona(persona_in, current_user.id)
 
-    query = select(func.count()).select_from(UserPersona).where(UserPersona.owner_id == current_user.id)
-    result = await db.execute(query)
-    count = result.scalar() or 0
-    
-    if count >= limit:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Max personas limit reached ({limit}) for role {current_user.role}."
-        )
 
-    new_persona = UserPersona(
-        **persona_in.model_dump(),
-        owner_id=current_user.id
-    )
-    
-    db.add(new_persona)
-    await db.commit()
-    await db.refresh(new_persona)
-    
-    return new_persona
-
-@router.get("/{persona_id}", response_model=UserPersonaSchema)
+@router.get("/{persona_id}", response_model=BaseResponse)
 async def read_persona(
     persona_id: UUID,
-    db: AsyncSession = Depends(deps.get_db),
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    query = select(UserPersona).where(
-        UserPersona.id == persona_id,
-        UserPersona.owner_id == current_user.id
-    )
-    result = await db.execute(query)
-    persona = result.scalars().first()
-    
-    if not persona:
-        raise HTTPException(status_code=404, detail="Persona not found")
-    return persona
+    """Получить детали конкретной персоны."""
+    return await controller.get_persona(persona_id, current_user.id)
 
-@router.put("/{persona_id}", response_model=UserPersonaSchema)
+
+@router.patch("/{persona_id}", response_model=BaseResponse)
 async def update_persona(
     persona_id: UUID,
-    persona_update: UserPersonaUpdate,
-    db: AsyncSession = Depends(deps.get_db),
+    persona_in: UserPersonaUpdate,
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    query = select(UserPersona).where(
-        UserPersona.id == persona_id,
-        UserPersona.owner_id == current_user.id
-    )
-    result = await db.execute(query)
-    persona = result.scalars().first()
-    
-    if not persona:
-        raise HTTPException(status_code=404, detail="Persona not found")
-    
-    update_data = persona_update.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(persona, key, value)
-    
-    db.add(persona)
-    await db.commit()
-    await db.refresh(persona)
-    
-    return persona
+    """Обновить данные персоны."""
+    return await controller.update_persona(persona_id, persona_in, current_user.id)
 
-@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_all_personas(
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.get_current_user)
-):
-    delete_query = delete(UserPersona).where(UserPersona.owner_id == current_user.id)
-    await db.execute(delete_query)
-    await db.commit()
 
-@router.delete("/{persona_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{persona_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_persona(
     persona_id: UUID,
-    db: AsyncSession = Depends(deps.get_db),
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    query = select(UserPersona).where(
-        UserPersona.id == persona_id,
-        UserPersona.owner_id == current_user.id
-    )
-    result = await db.execute(query)
-    persona = result.scalars().first()
-    
-    if not persona:
-        raise HTTPException(status_code=404, detail="Persona not found")
-    
-    await db.delete(persona)
-    await db.commit()
+    """Удалить персону."""
+    return await controller.delete_persona(persona_id, current_user.id)
