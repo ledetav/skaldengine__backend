@@ -17,7 +17,8 @@ def create_access_token(
     username: str | None = None,
     full_name: str | None = None,
     expires_delta: timedelta | None = None, 
-    birth_date: Union[datetime, Any] = None
+    birth_date: Union[datetime, Any] = None,
+    polza_api_key: str | None = None
 ) -> str:
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -33,6 +34,8 @@ def create_access_token(
         to_encode["full_name"] = full_name
     if birth_date:
         to_encode["birth_date"] = birth_date.isoformat() if hasattr(birth_date, 'isoformat') else str(birth_date)
+    if polza_api_key:
+        to_encode["polza_api_key"] = polza_api_key
         
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt

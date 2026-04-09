@@ -1,19 +1,20 @@
-"""
-RAG (Retrieval Augmented Generation) module.
-Updated for async support and pgvector integration.
-"""
+import uuid
+from typing import Optional, List
 from openai import AsyncOpenAI
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
-# Polza client (OpenAI wrapper)
-client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
+# Polza client (OpenAI wrapper) default instance
+_default_client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
 
-async def get_embedding(text: str) -> list[float]:
+async def get_embedding(text: str, api_key: Optional[str] = None) -> list[float]:
     """
     Асинхронная генерация эмбеддинга (1536-dim) через text-embedding-3-small.
     Используется для сохранения воспоминаний.
     """
+    client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else _default_client
     try:
         response = await client.embeddings.create(
             model=settings.POLZA_EMBEDDING_MODEL,
@@ -27,10 +28,11 @@ async def get_embedding(text: str) -> list[float]:
         return []
 
 
-async def get_query_embedding(query: str) -> list[float]:
+async def get_query_embedding(query: str, api_key: Optional[str] = None) -> list[float]:
     """
     Асинхронная генерация эмбеддинга для поискового запроса.
     """
+    client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else _default_client
     try:
         response = await client.embeddings.create(
             model=settings.POLZA_EMBEDDING_MODEL,
@@ -42,11 +44,9 @@ async def get_query_embedding(query: str) -> list[float]:
         return []
 
 
-async def process_sliding_window(db: "AsyncSession", chat_id: "uuid.UUID", leaf_id: "uuid.UUID"):
-    import uuid
+async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: uuid.UUID, api_key: Optional[str] = None):
     from app.models.message import Message
     from app.models.episodic_memory import EpisodicMemory
-    from sqlalchemy import select
     
     current_id = leaf_id
     branch = []
@@ -93,6 +93,7 @@ async def process_sliding_window(db: "AsyncSession", chat_id: "uuid.UUID", leaf_
 """
         
         try:
+            client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else _default_client
             response = await client.chat.completions.create(
                 model=settings.POLZA_SUMMARY_MODEL,
                 messages=[{"role": "user", "content": prompt}],
@@ -104,7 +105,7 @@ async def process_sliding_window(db: "AsyncSession", chat_id: "uuid.UUID", leaf_
             summary = " ".join([line for line in lines if not line.startswith("Сгенерированный факт")])
             
             if summary:
-                embedding = await get_embedding(summary)
+                embedding = await get_embedding(summary, api_key=api_key)
                 if embedding:
                     mem = EpisodicMemory(
                         chat_id=chat_id,

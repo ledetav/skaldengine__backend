@@ -32,7 +32,10 @@ class PromptPipeline:
         self.chat_id = chat_id
         self.current_user = current_user
         self.parent_id = parent_id
-        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
+        
+        # Use user's key if available, otherwise fallback to global secret
+        api_key = current_user.polza_api_key or settings.POLZA_API_KEY
+        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key)
         
         # Данные, которые будут собраны в процессе
         self.chat: Optional[Chat] = None
@@ -244,7 +247,8 @@ class PromptPipeline:
     async def _stage_3_rag(self, user_text: str):
         """Этап 3: Поиск по эпизодической памяти через pgvector (с Hybrid Scoring)."""
         # Генерируем эмбеддинг для запроса
-        query_vector = await rag.get_query_embedding(user_text)
+        api_key = self.current_user.polza_api_key or settings.POLZA_API_KEY
+        query_vector = await rag.get_query_embedding(user_text, api_key=api_key)
         if not query_vector:
             return
             

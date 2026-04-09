@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from uuid import UUID
 from fastapi import status, BackgroundTasks
 from shared.base.controller import BaseController
@@ -13,18 +13,18 @@ class MessageController(BaseController):
         self.message_service = message_service
 
     async def send_message_stream(
-        self, chat_id: UUID, user_id: UUID, message_in: MessageCreate, 
+        self, chat_id: UUID, current_user: Any, message_in: MessageCreate, 
         background_tasks: BackgroundTasks, db: AsyncSession
     ) -> StreamingResponse:
         try:
-            generator = await self.message_service.send_message_stream(chat_id, user_id, message_in, background_tasks, db)
+            generator = await self.message_service.send_message_stream(chat_id, current_user, message_in, background_tasks, db)
             return StreamingResponse(generator, media_type="text/event-stream")
         except ValueError as e:
             self.handle_error(str(e), status_code=status.HTTP_404_NOT_FOUND)
 
-    async def regenerate_stream(self, parent_id: UUID, user_id: UUID, db: AsyncSession) -> StreamingResponse:
+    async def regenerate_stream(self, parent_id: UUID, current_user: Any, db: AsyncSession) -> StreamingResponse:
         try:
-            generator = await self.message_service.regenerate_stream(parent_id, user_id, db)
+            generator = await self.message_service.regenerate_stream(parent_id, current_user, db)
             return StreamingResponse(generator, media_type="text/event-stream")
         except ValueError as e:
             self.handle_error(str(e), status_code=status.HTTP_404_NOT_FOUND)
