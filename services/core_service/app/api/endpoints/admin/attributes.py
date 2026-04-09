@@ -1,133 +1,74 @@
 import uuid
-from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, Query, status
 
 from app.api import deps
-from app.models.character_attribute import CharacterAttribute
-from app.models.character import Character
+from app.api.controllers.character_attribute_controller import CharacterAttributeController
 from app.schemas.character_attribute import (
     CharacterAttributeCreate,
     CharacterAttributeUpdate,
-    CharacterAttribute as CharacterAttributeSchema,
     CharacterAttributeBulkCreate
 )
+from app.schemas.response import BaseResponse
 
 router = APIRouter(dependencies=[Depends(deps.verify_admin_role)])
 
-
-@router.get("/", response_model=list[CharacterAttributeSchema])
+@router.get("/", response_model=BaseResponse)
 async def get_attributes(
     character_id: uuid.UUID = Query(None, description="Filter by character"),
     category: str = Query(None, description="Filter by category"),
-    skip: int = 0,
-    limit: int = 100,
-    db: AsyncSession = Depends(deps.get_db),
-) -> Any:
-    stmt = select(CharacterAttribute)
-    if character_id:
-        stmt = stmt.where(CharacterAttribute.character_id == character_id)
-    if category:
-        stmt = stmt.where(CharacterAttribute.category == category)
-        
-    stmt = stmt.offset(skip).limit(limit)
-    result = await db.execute(stmt)
-    return result.scalars().all()
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Получить список атрибутов (с фильтрацией)."""
+    return await controller.get_attributes(character_id, category)
 
 
-@router.post("/", response_model=CharacterAttributeSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_attribute(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
     attribute_in: CharacterAttributeCreate,
-) -> Any:
-    character = await db.get(Character, attribute_in.character_id)
-    if not character:
-        raise HTTPException(status_code=404, detail="Character not found")
-
-    db_obj = CharacterAttribute(
-        character_id=attribute_in.character_id,
-        category=attribute_in.category,
-        content=attribute_in.content,
-        keywords=attribute_in.keywords
-    )
-    db.add(db_obj)
-    await db.commit()
-    await db.refresh(db_obj)
-    return db_obj
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Создать новый атрибут."""
+    return await controller.create_attribute(attribute_in)
 
 
-@router.post("/bulk", response_model=list[CharacterAttributeSchema], status_code=status.HTTP_201_CREATED)
+@router.post("/bulk", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_attributes_bulk(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
     bulk_in: CharacterAttributeBulkCreate,
-) -> Any:
-    character = await db.get(Character, bulk_in.character_id)
-    if not character:
-        raise HTTPException(status_code=404, detail="Character not found")
-
-    new_attrs = []
-    for attr in bulk_in.attributes:
-        db_obj = CharacterAttribute(
-            character_id=bulk_in.character_id,
-            category=attr.category,
-            content=attr.content,
-            keywords=attr.keywords
-        )
-        db.add(db_obj)
-        new_attrs.append(db_obj)
-        
-    await db.commit()
-    for attr in new_attrs:
-        await db.refresh(attr)
-    return new_attrs
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Массовое создание атрибутов."""
+    return await controller.create_bulk(bulk_in)
 
 
-@router.put("/{attribute_id}", response_model=CharacterAttributeSchema)
+@router.patch("/{attribute_id}", response_model=BaseResponse)
 async def update_attribute(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
     attribute_id: uuid.UUID,
     attribute_in: CharacterAttributeUpdate,
-) -> Any:
-    result = await db.execute(select(CharacterAttribute).where(CharacterAttribute.id == attribute_id))
-    db_obj = result.scalars().first()
-    if not db_obj:
-        raise HTTPException(status_code=404, detail="Attribute not found")
-        
-    update_data = attribute_in.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_obj, field, value)
-        
-    db.add(db_obj)
-    await db.commit()
-    await db.refresh(db_obj)
-    return db_obj
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Обновить атрибут."""
+    return await controller.update_attribute(attribute_id, attribute_in)
 
 
-@router.delete("/{attribute_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{attribute_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_attribute(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
     attribute_id: uuid.UUID,
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    result = await db.execute(select(CharacterAttribute).where(CharacterAttribute.id == attribute_id))
-    db_obj = result.scalars().first()
-    if not db_obj:
-        raise HTTPException(status_code=404, detail="Attribute not found")
-        
-    await db.delete(db_obj)
-    await db.commit()
+    """Удалить атрибут."""
+    return await controller.delete_attribute(attribute_id)
 
 
-@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_attributes_for_character(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
     character_id: uuid.UUID = Query(..., description="Character ID to delete all attributes for"),
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    stmt = delete(CharacterAttribute).where(CharacterAttribute.character_id == character_id)
-    await db.execute(stmt)
-    await db.commit()
+    """Удалить все атрибуты персонажа."""
+    return await controller.delete_for_character(character_id)

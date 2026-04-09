@@ -1,134 +1,96 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from typing import Any
+from fastapi import APIRouter, Depends, status
 
 from app.api import deps
-from app.core import security
-from app.schemas.user import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate
+from app.api.controllers.user_controller import UserController
 from app.models.user import User
+from app.schemas.user import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate
+from app.schemas.response import BaseResponse
 
 router = APIRouter()
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=BaseResponse)
 async def read_user_me(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить информацию о текущем пользователе по токену."""
-    return current_user
+    return BaseResponse(success=True, data=current_user)
 
 
-@router.get("/me/login")
+@router.get("/me/login", response_model=BaseResponse)
 async def get_my_login(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Вернуть только логин текущего пользователя."""
-    return {"login": current_user.login}
+    return BaseResponse(success=True, data={"login": current_user.login})
 
 
-@router.get("/me/username")
+@router.get("/me/username", response_model=BaseResponse)
 async def get_my_username(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Вернуть только юзернейм (@handle) текущего пользователя."""
-    return {"username": current_user.username}
+    return BaseResponse(success=True, data={"username": current_user.username})
 
 
-@router.patch("/me/login", response_model=UserResponse)
+@router.patch("/me/login", response_model=BaseResponse)
 async def update_login(
     update_in: LoginUpdate,
-    db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
 ):
     """Изменить логин пользователя."""
-    # Проверка на уникальность
-    query = select(User).where(User.login == update_in.new_login)
-    result = await db.execute(query)
-    if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Login already taken")
-    
-    current_user.login = update_in.new_login
-    db.add(current_user)
-    await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    return await controller.update_login(current_user, update_in)
 
 
-@router.patch("/me/username", response_model=UserResponse)
+@router.patch("/me/username", response_model=BaseResponse)
 async def update_username(
     update_in: UsernameUpdate,
-    db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
 ):
     """Изменить публичный юзернейм (@handle) пользователя."""
-    # Проверка на уникальность
-    query = select(User).where(User.username == update_in.new_username)
-    result = await db.execute(query)
-    if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Username already taken")
-    
-    current_user.username = update_in.new_username
-    db.add(current_user)
-    await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    return await controller.update_username(current_user, update_in)
 
 
-@router.patch("/me/full-name", response_model=UserResponse)
+@router.patch("/me/full-name", response_model=BaseResponse)
 async def update_full_name(
     update_in: FullNameUpdate,
-    db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
 ):
     """Изменить имя пользователя."""
-    current_user.full_name = update_in.full_name
-    db.add(current_user)
-    await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    return await controller.update_full_name(current_user, update_in)
 
 
-@router.patch("/me/email", response_model=UserResponse)
+@router.patch("/me/email", response_model=BaseResponse)
 async def update_email(
     update_in: EmailUpdate,
-    db: AsyncSession = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
 ):
     """Изменить почту пользователя."""
-    # Проверка на уникальность
-    query = select(User).where(User.email == update_in.new_email)
-    result = await db.execute(query)
-    if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    current_user.email = update_in.new_email
-    db.add(current_user)
-    await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    return await controller.update_email(current_user, update_in)
 
 
-@router.post("/me/password")
-async def update_password(
-    update_in: PasswordUpdate,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-):
     """Изменить пароль пользователя."""
-    if not security.verify_password(update_in.old_password, current_user.password_hash):
-        raise HTTPException(status_code=400, detail="Incorrect old password")
-    
-    current_user.password_hash = security.get_password_hash(update_in.new_password)
-    db.add(current_user)
-    await db.commit()
-    return {"message": "Password updated successfully"}
+    return await controller.update_password(current_user, update_in)
 
 
-@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
-    db: AsyncSession = Depends(deps.get_db),
+@router.patch("/me/profile", response_model=BaseResponse)
+async def update_profile(
+    update_in: ProfileUpdate,
     current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Обновить аватар или обложку профиля."""
+    return await controller.update_profile(current_user, update_in)
+
+
+@router.delete("/me", response_model=BaseResponse, status_code=status.HTTP_200_OK)
+async def delete_user(
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
 ):
     """Удалить учетную запись текущего пользователя."""
-    await db.delete(current_user)
-    await db.commit()
-    return None
+    return await controller.delete_user(current_user)

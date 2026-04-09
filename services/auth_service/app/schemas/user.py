@@ -95,6 +95,11 @@ class FullNameUpdate(BaseModel):
     full_name: str | None = None
 
 
+class ProfileUpdate(BaseModel):
+    avatar_url: str | None = None
+    cover_url: str | None = None
+
+
 class PasswordUpdate(BaseModel):
     old_password: str
     new_password: str
@@ -109,6 +114,7 @@ class UserResponse(UserBase):
     id: UUID
     role: str
     avatar_url: str | None = None
+    cover_url: str | None = None
     created_at: datetime
 
     class Config:

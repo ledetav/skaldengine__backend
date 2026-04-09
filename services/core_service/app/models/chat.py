@@ -23,6 +23,7 @@ class Chat(Base):
     character_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("characters.id"))
 
     # Сценарий (NULL если sandbox)
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mode: Mapped[str] = mapped_column(String, default="sandbox")  # "sandbox" | "scenario"
     scenario_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scenarios.id"), nullable=True

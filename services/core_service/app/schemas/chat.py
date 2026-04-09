@@ -7,6 +7,7 @@ class ChatBase(BaseModel):
     character_id: UUID
     user_persona_id: UUID
     scenario_id: UUID | None = None
+    title: str | None = None
     is_acquainted: bool = False
     relationship_dynamic: str | None = None
     language: str = "ru"
@@ -32,6 +33,16 @@ class ChatCreate(ChatBase):
             ]
         }
     }
+
+
+class ChatUpdate(BaseModel):
+    title: str | None = None
+    language: str | None = None
+    narrative_voice: str | None = None
+    is_acquainted: bool | None = None
+    relationship_dynamic: str | None = None
+    persona_lorebook_id: UUID | None = None
+    active_leaf_id: UUID | None = None
 
 
 class Chat(ChatBase):

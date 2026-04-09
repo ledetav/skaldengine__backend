@@ -20,16 +20,18 @@ ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Create required directories
-RUN mkdir -p /app/services/core_service/uploads
+# Ensure permissions for Nginx to run as non-root if needed
+RUN mkdir -p /app/services/core_service/uploads && \
+    mkdir -p /var/cache/nginx /var/log/nginx /run && \
+    chmod -R 777 /var/cache/nginx /var/log/nginx /run
 
-# Inline Nginx configuration - routes to 8001 for Auth, 8000 for Core
+# Updated Nginx Config - Listening on 8000
 RUN echo 'server {\n\
-    listen 8080;\n\
+    listen 8000;\n\
     location /api/v1/auth { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }\n\
     location /api/v1/users { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }\n\
     location / { \n\
-        proxy_pass http://127.0.0.1:8000; \n\
+        proxy_pass http://127.0.0.1:8002; \n\
         proxy_set_header Host $host; \n\
         proxy_http_version 1.1; \n\
         proxy_set_header Upgrade $http_upgrade; \n\
@@ -37,10 +39,12 @@ RUN echo 'server {\n\
     }\n\
 }' > /etc/nginx/sites-available/default
 
-# Expose port (Nginx entry point)
-EXPOSE 8080
+# Primary Exposed Port
+EXPOSE 8000
 
-# Start Nginx and both services with Environment Variable mapping
-CMD service nginx start && \
+# Start command: Nginx in background, then Services.
+# Auth Service -> 8001
+# Core Service -> 8002 (matching Nginx config above)
+CMD nginx && \
     (cd services/auth_service && DATABASE_URL=$AUTH_DATABASE_URL SECRET_KEY=$SECRET_KEY uvicorn app.main:app --host 127.0.0.1 --port 8001 &) && \
-    (cd services/core_service && DATABASE_URL=$CORE_DATABASE_URL SECRET_KEY=$SECRET_KEY POLZA_API_KEY=$POLZA_API_KEY uvicorn app.main:app --host 127.0.0.1 --port 8000)
+    (cd services/core_service && DATABASE_URL=$CORE_DATABASE_URL SECRET_KEY=$SECRET_KEY POLZA_API_KEY=$POLZA_API_KEY uvicorn app.main:app --host 127.0.0.1 --port 8002)

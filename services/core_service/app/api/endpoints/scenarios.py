@@ -1,96 +1,59 @@
 from uuid import UUID
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, status
 
 from app.api import deps
-from app.models.scenario import Scenario
-from app.models.character import Character
-from app.schemas.scenario import ScenarioCreate, ScenarioUpdate, Scenario as ScenarioSchema, ScenarioShort
+from app.api.controllers.scenario_controller import ScenarioController
+from app.schemas.response import BaseResponse
+from app.schemas.scenario import ScenarioCreate, ScenarioUpdate
 
 router = APIRouter()
 
-
-@router.get("/", response_model=List[ScenarioShort])
+@router.get("/", response_model=BaseResponse)
 async def list_scenarios(
     character_id: UUID | None = None,
-    skip: int = 0,
-    limit: int = 50,
-    db: AsyncSession = Depends(deps.get_db),
+    controller: ScenarioController = Depends(deps.get_scenario_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    """
-    Список сценариев (краткий). Доступен всем.
-    Возвращает: id, character_id, title, description.
-    """
-    query = select(Scenario).offset(skip).limit(limit)
-    if character_id:
-        query = query.where(Scenario.character_id == character_id)
-    result = await db.execute(query)
-    return result.scalars().all()
+    """Получить список сценариев (с фильтром по персонажу)."""
+    return await controller.get_scenarios(character_id)
 
 
-@router.post("/", response_model=ScenarioSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_scenario(
     scenario_in: ScenarioCreate,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.verify_admin_role)
+    controller: ScenarioController = Depends(deps.get_scenario_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
 ):
-    if scenario_in.character_id:
-        character = await db.get(Character, scenario_in.character_id)
-        if not character:
-            raise HTTPException(status_code=404, detail="Character not found")
-            
-    scenario = Scenario(**scenario_in.model_dump())
-    db.add(scenario)
-    await db.commit()
-    await db.refresh(scenario)
-    return scenario
+    """Создать новый сценарий (Только для админов/модеров)."""
+    return await controller.create_scenario(scenario_in)
 
 
-@router.get("/{scenario_id}", response_model=ScenarioSchema)
-async def get_scenario(
+@router.get("/{scenario_id}", response_model=BaseResponse)
+async def read_scenario(
     scenario_id: UUID,
-    db: AsyncSession = Depends(deps.get_db),
-    current_user: deps.CurrentUser = Depends(deps.verify_admin_role)
+    controller: ScenarioController = Depends(deps.get_scenario_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    """
-    Детальный сценарий. Доступен ТОЛЬКО админам и модераторам.
-    Возвращает все данные, включая start_point и end_point.
-    """
-    scenario = await db.get(Scenario, scenario_id)
-    if not scenario:
-        raise HTTPException(status_code=404, detail="Scenario not found")
-    return scenario
+    """Получить информацию о сценарии."""
+    return await controller.get_scenario(scenario_id)
 
 
-@router.put("/{scenario_id}", response_model=ScenarioSchema)
+@router.patch("/{scenario_id}", response_model=BaseResponse)
 async def update_scenario(
     scenario_id: UUID,
-    scenario_update: ScenarioUpdate,
-    db: AsyncSession = Depends(deps.get_db),
+    scenario_in: ScenarioUpdate,
+    controller: ScenarioController = Depends(deps.get_scenario_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
 ):
-    scenario = await db.get(Scenario, scenario_id)
-    if not scenario:
-        raise HTTPException(status_code=404, detail="Scenario not found")
-    for key, value in scenario_update.model_dump(exclude_unset=True).items():
-        setattr(scenario, key, value)
-    db.add(scenario)
-    await db.commit()
-    await db.refresh(scenario)
-    return scenario
+    """Обновить сценарий (Только для админов)."""
+    return await controller.update_scenario(scenario_id, scenario_in)
 
 
-@router.delete("/{scenario_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{scenario_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_scenario(
     scenario_id: UUID,
-    db: AsyncSession = Depends(deps.get_db),
+    controller: ScenarioController = Depends(deps.get_scenario_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
 ):
-    scenario = await db.get(Scenario, scenario_id)
-    if not scenario:
-        raise HTTPException(status_code=404, detail="Scenario not found")
-    await db.delete(scenario)
-    await db.commit()
+    """Удалить сценарий (Только для админов)."""
+    return await controller.delete_scenario(scenario_id)

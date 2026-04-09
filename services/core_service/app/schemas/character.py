@@ -69,6 +69,32 @@ class CharacterUpdate(BaseModel):
     }
 
 
+class CharacterRead(BaseModel):
+    id: UUID
+    name: str
+    description: str | None = None
+    fandom: str | None = None
+    avatar_url: str | None = None
+    card_image_url: str | None = None
+    is_public: bool
+    gender: str | None = None
+    nsfw_allowed: bool
+    total_chats_count: int
+    monthly_chats_count: int
+    scenarios_count: int = 0
+    scenario_chats_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class CharacterAdminRead(CharacterRead):
+    appearance: str | None = None
+    personality: str | None = None
+    creator_id: UUID | None = None
+
+
+# Оставляем Character для обратной совместимости или как общий внутренний тип
 class Character(CharacterBase):
     id: UUID
     creator_id: UUID | None = None

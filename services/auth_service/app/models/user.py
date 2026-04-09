@@ -23,6 +23,7 @@ class User(Base):
 
     # Профиль пользователя
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
