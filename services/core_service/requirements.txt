@@ -10,8 +10,6 @@ python-jose[cryptography]
 python-multipart
 aiofiles
 pgvector
-passlib[bcrypt]
-bcrypt
 openai
 httpx
 Pillow

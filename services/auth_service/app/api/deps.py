@@ -8,12 +8,12 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
-from app.models.user import User
-from app.repositories.user_repository import UserRepository
-from app.services.auth_service import AuthService
-from app.services.user_service import UserService
-from app.api.controllers.auth_controller import AuthController
-from app.api.controllers.user_controller import UserController
+from app.domains.user.models import User
+from app.domains.user.repository import UserRepository
+from app.domains.user.auth_service import AuthService
+from app.domains.user.service import UserService
+from app.domains.user.auth_controller import AuthController
+from app.domains.user.controller import UserController
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login"

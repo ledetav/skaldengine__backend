@@ -12,31 +12,31 @@ from app.core.config import settings
 from app.db.base import AsyncSessionLocal
 
 # Repositories
-from app.repositories.character_repository import CharacterRepository
-from app.repositories.chat_repository import ChatRepository
-from app.repositories.message_repository import MessageRepository
-from app.repositories.scenario_repository import ScenarioRepository
-from app.repositories.user_persona_repository import UserPersonaRepository
-from app.repositories.lorebook_repository import LorebookRepository, LorebookEntryRepository
-from app.repositories.character_attribute_repository import CharacterAttributeRepository
+from ..domains.character.repository import CharacterRepository
+from ..domains.chat.repository import ChatRepository
+from ..domains.chat.message_repository import MessageRepository
+from ..domains.scenario.repository import ScenarioRepository
+from ..domains.persona.repository import UserPersonaRepository
+from ..domains.lorebook.repository import LorebookRepository, LorebookEntryRepository
+from ..domains.character.attribute_repository import CharacterAttributeRepository
 
 # Services
-from app.services.character_service import CharacterService
-from app.services.chat_service import ChatService
-from app.services.message_service import MessageService
-from app.services.scenario_service import ScenarioService
-from app.services.user_persona_service import UserPersonaService
-from app.services.lorebook_service import LorebookService
-from app.services.character_attribute_service import CharacterAttributeService
+from ..domains.character.service import CharacterService
+from ..domains.chat.service import ChatService
+from ..domains.chat.message_service import MessageService
+from ..domains.scenario.service import ScenarioService
+from ..domains.persona.service import UserPersonaService
+from ..domains.lorebook.service import LorebookService
+from ..domains.character.attribute_service import CharacterAttributeService
 
 # Controllers
-from app.api.controllers.character_controller import CharacterController
-from app.api.controllers.chat_controller import ChatController
-from app.api.controllers.message_controller import MessageController
-from app.api.controllers.scenario_controller import ScenarioController
-from app.api.controllers.user_persona_controller import UserPersonaController
-from app.api.controllers.lorebook_controller import LorebookController
-from app.api.controllers.character_attribute_controller import CharacterAttributeController
+from ..domains.character.controller import CharacterController
+from ..domains.chat.controller import ChatController
+from ..domains.chat.message_controller import MessageController
+from ..domains.scenario.controller import ScenarioController
+from ..domains.persona.controller import UserPersonaController
+from ..domains.lorebook.controller import LorebookController
+from ..domains.character.attribute_controller import CharacterAttributeController
 
 class CurrentUser(BaseModel):
     id: UUID
