@@ -1,91 +1,73 @@
 # SKALDEngine Backend
 
-**SKALD Engine** — это высокопроизводительная платформа для интерактивного сторителлинга и ролевой игры с ИИ-персонажами. Архитектура построена на микросервисах, продвинутом RAG (Retrieval Augmented Generation) на базе **pgvector** и гибридной системе памяти.
+**SKALD Engine** — high-performance platform for interactive storytelling and roleplay with AI characters. Built with **Domain-Driven Design (Vertical Slices)** and optimized for scalability and production readiness.
 
-## ✨ Особенности
+## Architecture
 
-- **Иммерсивный ролеплей:** Глубокое погружение благодаря динамическим системным промптам, стилизации под разные типы повествования (1-е, 2-е, 3-е лицо).
-- **Два режима игры:**
-  - **Песочница:** Свободное развитие истории без жестких рамок.
-  - **Сценарий:** Прохождение по заданным сюжетам с AI-Супервизором, который контролирует ключевые чекпоинты (Chat Checkpoints).
-- **Умная память (pgvector RAG):** 
-  - **Эпизодическая память:** ИИ сжимает и запоминает важные факты диалога в векторном хранилище.
-  - **Лорбуки (Lorebooks):** Глобальные знания о мире и персонажах, подгружаемые по ключевым словам.
-- **Древовидная история (Branching):** Поддержка бесконечных веток развития событий (Swipe/Regenerate) благодаря хранению сообщений в виде дерева.
-- **Система Персон:** Гибкая настройка игровых профилей пользователя (имя, возраст, внешность, навыки) для разных сценариев.
+The project uses **Vertical Slices**, where each business domain is isolated within its directory. All services share a common base logic in the root shared/ folder.
 
-## 🛠 Технический стек
+- **services/auth_service/**: Auth, JWT, and User Profiles.
+- **services/core_service/**: Game Logic, Chats, AI Personas, RAG, and Lorebooks.
+- **shared/**: Global base classes for Repositories, Services, and Controllers.
 
-- **Backend:** Python 3.11+, FastAPI.
-- **Базы данных:**
-  - **PostgreSQL 15 + pgvector** — единое хранилище для данных, истории сообщений и векторных эмбеддингов.
-  - **Redis 7** — брокер задач (ARQ) и кеширование.
-- **ORM / Миграции:** SQLAlchemy 2.0 (Async), Alembic.
-- **AI Models (Polza.ai / OpenAI Wrapper):**
-  - **Main LLM:** Gemini 3 Flash Preview.
-  - **Logic/Supervisor:** Gemini 3.1 Flsh Lite Preview.
-  - **Embeddings:** OpenAI `text-embedding-3-small`.
+---
 
-## 🏗 Архитектура сервисов
+## Production Deployment (Docker)
 
-| Сервис | Порт | Описание | База данных |
-| :--- | :--- | :--- | :--- |
-| **Auth Service** | `:8001` | Auth, JWT, профили пользователей | PostgreSQL (`auth_db`) |
-| **Core Service** | `:8000` | Game Logic, Chats, RAG, Characters | PostgreSQL (`core_db`) + Redis |
+The project is configured for a unified deployment where both services run in a single container behind an Nginx reverse proxy.
 
-## 🚀 Быстрый старт
-
-### 1. Инфраструктура (Docker)
-Запустите PostgreSQL с поддержкой векторов и Redis:
-
+### 1. Configure Environment
+Create a .env file in the root directory based on .env.example:
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
+Fill in the required variables (especially SECRET_KEY and POLZA_API_KEY).
 
-### 2. Настройка Auth Service
-В отдельном терминале:
+### 2. Build and Run
+```bash
+docker compose up -d --build
+```
+This will:
+- Build the unified image (Python 3.11-slim).
+- Start PostgreSQL instances for both services.
+- Start the application container (Exposed on port 8000).
 
+### 3. API Access Points
+- **Unified Gateway**: http://localhost:8000/api/v1
+- **Auth Endpoints**: /api/v1/auth/..., /api/v1/users/...
+- **Core Endpoints**: /api/v1/chats/..., /api/v1/personas/..., etc.
+- **Static Files (Uploads)**: http://localhost:8000/static/
+
+---
+
+## Manual Development Setup
+
+If you need to run services separately without Docker:
+
+### 1. Setup Database
+Ensure you have two PostgreSQL databases (e.g., auth_db on 5432 and core_db on 5433).
+
+### 2. Environment
+Both services read configuration from the root .env file.
+Ensure AUTH_DATABASE_URL and CORE_DATABASE_URL are set in the root .env.
+
+### 3. Run Services
+**Auth Service:**
 ```bash
 cd services/auth_service
-# Настройка окружения (Linux/macOS)
-python3 -m venv .venv && source .venv/bin/activate
-# Настройка окружения (Windows)
-# python -m venv .venv; .venv\Scripts\activate
-
 pip install -r requirements.txt
-cp .env.example .env  # copy .env.example .env для Windows
-# Отредактируйте .env и вставьте POLZA_API_KEY и SECRET_KEY
-
 python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 ```
 
-### 3. Настройка Core Service
-В другом терминале:
-
+**Core Service:**
 ```bash
 cd services/core_service
-# Настройка окружения (Linux/macOS)
-python3 -m venv .venv && source .venv/bin/activate
-# Настройка окружения (Windows)
-# python -m venv .venv; .venv\Scripts\activate
-
 pip install -r requirements.txt
-cp .env.example .env  # copy .env.example .env для Windows
-# Отредактируйте .env и вставьте POLZA_API_KEY и SECRET_KEY
-
 python -m alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8002
 ```
 
-## 📚 Документация API
-
-- **Core Service:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Auth Service:** [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
-
-### Типовой сценарий начала игры:
-1. Регистрация в Auth Service (`POST /auth/register`).
-2. Авторизация в Swagger (Authorize) с полученным JWT-токеном.
-3. Создание Персоны (`POST /personas`).
-4. Создание Чата с выбранным персонажем (`POST /chats`).
-5. Отправка сообщений (`POST /chats/{id}/messages`).
+## Documentation
+Detailed API documentation with all endpoints, models, and security roles:
+👉 [API Documentation](api_documentation.md)

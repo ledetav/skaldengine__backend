@@ -1,19 +1,16 @@
 from fastapi import APIRouter
-from app.api.endpoints import (
-    user_personas,
-    characters,
-    chats,
-    lorebooks,
-    scenarios,
-    upload,
-    messages,
-    ws,
-)
-from app.api.endpoints.admin import (
-    characters as admin_characters,
-    attributes as admin_attributes,
-    lorebooks as admin_lorebooks,
-)
+from ..domains.persona import router as user_personas
+from ..domains.character import router as characters
+from ..domains.chat import router as chats
+from ..domains.lorebook import router as lorebooks
+from ..domains.scenario import router as scenarios
+from ..domains.chat import message_router as messages
+from ..domains.character import admin_router as admin_characters
+from ..domains.character import attribute_router as admin_attributes
+from ..domains.lorebook import admin_router as admin_lorebooks
+
+# Temporary/Shared endpoints
+from app.api.endpoints import upload, ws
 
 api_router = APIRouter()
 

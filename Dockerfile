@@ -1,5 +1,5 @@
 # Stage 1: Build dependencies
-FROM python:3.10-slim AS builder
+FROM python:3.11-slim AS builder
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
@@ -8,26 +8,32 @@ COPY services/core_service/requirements.txt ./core_req.txt
 RUN pip install --no-cache-dir --user -r auth_req.txt -r core_req.txt
 
 # Stage 2: Final image
-FROM python:3.10-slim
+FROM python:3.11-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 nginx && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /root/.local /root/.local
 COPY services/ ./services/
+COPY shared/ ./shared/
+COPY start.sh ./start.sh
+RUN chmod +x ./start.sh
 
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV CORE_UPLOAD_DIR=/app/uploads
 
-# Ensure permissions for Nginx to run as non-root if needed
-RUN mkdir -p /app/services/core_service/uploads && \
+# Ensure permissions for Nginx and Uploads
+RUN mkdir -p /app/uploads && \
     mkdir -p /var/cache/nginx /var/log/nginx /run && \
-    chmod -R 777 /var/cache/nginx /var/log/nginx /run
+    chmod -R 777 /var/cache/nginx /var/log/nginx /run /app/uploads
 
-# Updated Nginx Config - Listening on 8000
+# Nginx Config - Listening on 8000, routing to services
 RUN echo 'server {\n\
     listen 8000;\n\
+    client_max_body_size 20M;\n\
     location /api/v1/auth { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }\n\
     location /api/v1/users { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }\n\
     location / { \n\
@@ -37,14 +43,13 @@ RUN echo 'server {\n\
         proxy_set_header Upgrade $http_upgrade; \n\
         proxy_set_header Connection "upgrade"; \n\
     }\n\
+    location /static/ { \n\
+        alias /app/uploads/; \n\
+    }\n\
 }' > /etc/nginx/sites-available/default
 
 # Primary Exposed Port
 EXPOSE 8000
 
-# Start command: Nginx in background, then Services.
-# Auth Service -> 8001
-# Core Service -> 8002 (matching Nginx config above)
-CMD nginx && \
-    (cd services/auth_service && DATABASE_URL=$AUTH_DATABASE_URL SECRET_KEY=$SECRET_KEY uvicorn app.main:app --host 127.0.0.1 --port 8001 &) && \
-    (cd services/core_service && DATABASE_URL=$CORE_DATABASE_URL SECRET_KEY=$SECRET_KEY POLZA_API_KEY=$POLZA_API_KEY uvicorn app.main:app --host 127.0.0.1 --port 8002)
+# Start command
+CMD ["./start.sh"]

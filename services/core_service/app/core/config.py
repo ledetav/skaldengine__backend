@@ -1,15 +1,16 @@
 import os
+from pydantic import Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "SkaldEngine Core Service"
+    PROJECT_NAME: str = Field("SkaldEngine Core Service", validation_alias=AliasChoices("CORE_PROJECT_NAME", "PROJECT_NAME"))
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
     # PostgreSQL (asyncpg)
-    DATABASE_URL: str
+    DATABASE_URL: str = Field(validation_alias=AliasChoices("CORE_DATABASE_URL", "DATABASE_URL"))
 
 
     # Polza.ai (OpenAI wrapper)
@@ -23,9 +24,14 @@ class Settings(BaseSettings):
     POLZA_TITLE_MAX_TOKENS: int = 50
 
     # Uploads (аватарки, карточки)
-    UPLOAD_DIR: str = "./uploads"
+    UPLOAD_DIR: str = Field("./uploads", validation_alias=AliasChoices("CORE_UPLOAD_DIR", "UPLOAD_DIR"))
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding='utf-8', 
+        case_sensitive=True, 
+        extra="ignore"
+    )
 
 
 settings = Settings()
