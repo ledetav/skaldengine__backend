@@ -108,7 +108,8 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
         
         # 1. RAG Memory (Sliding Window Ingestion)
         try:
-            await rag.process_sliding_window(db, chat_id, ai_msg_id)
+            api_key = state.get("polza_api_key")
+            await rag.process_sliding_window(db, chat_id, ai_msg_id, api_key=api_key)
         except Exception as e:
             print(f"[RAG] Error adding to memory: {e}")
             

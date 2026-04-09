@@ -42,6 +42,7 @@ All requests and responses use **JSON**. All responses follow this common struct
 | **full_name**| string | Имя и фамилия | Нет | Вручную |
 | **password** | string | Пароль (мин. 8 символов) | Да | Вручную |
 | **birth_date**| string | Дата рождения (YYYY-MM-DD) | Да | Вручную |
+| **polza_api_key**| string | Личный API ключ Polza AI | Нет | Вручную |
 
 #### Список выходных данных (внутри `data`):
 
@@ -55,6 +56,7 @@ All requests and responses use **JSON**. All responses follow this common struct
 | **role** | string | Роль (user/admin) | Да | Автоматически |
 | **avatar_url**| string | Ссылка на аватар | Нет | Из базы |
 | **cover_url** | string | Ссылка на обложку профиля | Нет | Из базы |
+| **polza_api_key**| string | Личный API ключ Polza AI | Нет | Из базы |
 | **created_at**| string | Дата создания профиля | Да | Автоматически |
 
 #### Пример ввода:
@@ -65,7 +67,8 @@ All requests and responses use **JSON**. All responses follow this common struct
   "username": "@Skaldik",
   "full_name": "Ivan Ivanov",
   "password": "StrongPassword123!",
-  "birth_date": "1995-04-03"
+  "birth_date": "1995-04-03",
+  "polza_api_key": "sk-polza-..."
 }
 ```
 
@@ -82,6 +85,7 @@ All requests and responses use **JSON**. All responses follow this common struct
     "avatar_url": null,
     "cover_url": null,
     "birth_date": "1995-04-03",
+    "polza_api_key": "sk-polza-...",
     "role": "user",
     "created_at": "2024-03-27T10:00:00Z"
   },
@@ -143,6 +147,7 @@ All requests and responses use **JSON**. All responses follow this common struct
     "full_name": "Ivan Ivanov",
     "avatar_url": "http://...",
     "cover_url": "http://...",
+    "polza_api_key": "sk-polza-...",
     "role": "user"
   }
 }
@@ -193,6 +198,7 @@ All requests and responses use **JSON**. All responses follow this common struct
 | :--- | :--- | :--- | :--- |
 | **avatar_url** | string | Ссылка на новое изображение аватара | Нет |
 | **cover_url** | string | Ссылка на новое изображение обложки | Нет |
+| **polza_api_key** | string | Личный API ключ Polza AI | Нет |
 
 ---
 

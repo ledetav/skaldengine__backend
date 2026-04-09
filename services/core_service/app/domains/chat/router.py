@@ -75,7 +75,7 @@ async def send_message_stream(
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Отправить сообщение и получить ответ AI SSE."""
-    return await controller.send_message_stream(chat_id, current_user.id, message_in, background_tasks, db)
+    return await controller.send_message_stream(chat_id, current_user, message_in, background_tasks, db)
 
 
 @router.get("/{chat_id}/history", response_model=BaseResponse)

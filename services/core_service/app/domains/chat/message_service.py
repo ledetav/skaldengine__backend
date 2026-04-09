@@ -11,7 +11,7 @@ from sqlalchemy import select, update as sa_update
 
 class MessageService(BaseService[MessageRepository]):
     async def send_message_stream(
-        self, chat_id: UUID, user_id: UUID, message_in: MessageCreate, 
+        self, chat_id: UUID, current_user: Any, message_in: MessageCreate, 
         background_tasks: BackgroundTasks, db: AsyncSession
     ):
         from .models import Chat
@@ -20,7 +20,7 @@ class MessageService(BaseService[MessageRepository]):
         from ..scenario.models import Scenario
 
         chat = await db.get(Chat, chat_id)
-        if not chat or str(chat.user_id) != str(user_id):
+        if not chat or str(chat.user_id) != str(current_user.id):
             raise ValueError("Chat not found")
 
         # Save user message
@@ -42,7 +42,7 @@ class MessageService(BaseService[MessageRepository]):
 
         # Build payload
         from app.core.prompt_pipeline import PromptPipeline
-        pipeline = PromptPipeline(db, chat_id, user_id=user_id, parent_id=message_in.parent_id)
+        pipeline = PromptPipeline(db, chat_id, current_user=current_user, parent_id=message_in.parent_id)
         payload = await pipeline.build_payload(message_in.content)
         
         # AI message template
@@ -66,20 +66,21 @@ class MessageService(BaseService[MessageRepository]):
 
         # Streaming
         from app.api.endpoints.stream_utils import generate_chat_stream
-        state = {}
+        from app.core.config import settings
+        state = {"polza_api_key": current_user.polza_api_key or settings.POLZA_API_KEY}
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
-    async def regenerate_stream(self, parent_id: UUID, user_id: UUID, db: AsyncSession):
+    async def regenerate_stream(self, parent_id: UUID, current_user: Any, db: AsyncSession):
         parent_msg = await self.repository.get(parent_id)
         if not parent_msg or parent_msg.role != "user":
             raise ValueError("Parent user message not found")
             
         chat = await db.get(Chat, parent_msg.chat_id)
-        if not chat or str(chat.user_id) != str(user_id):
+        if not chat or str(chat.user_id) != str(current_user.id):
             raise ValueError("Chat not found")
 
         from app.core.prompt_pipeline import PromptPipeline
-        pipeline = PromptPipeline(db, chat.id, user_id=user_id, parent_id=parent_id)
+        pipeline = PromptPipeline(db, chat.id, current_user=current_user, parent_id=parent_id)
         payload = await pipeline.build_payload(parent_msg.content)
         
         ai_msg = Message(
@@ -100,7 +101,8 @@ class MessageService(BaseService[MessageRepository]):
         await db.refresh(ai_msg)
 
         from app.api.endpoints.stream_utils import generate_chat_stream
-        state = {}
+        from app.core.config import settings
+        state = {"polza_api_key": current_user.polza_api_key or settings.POLZA_API_KEY}
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
     async def edit_message(self, message_id: UUID, new_content: str, user_id: UUID, db: AsyncSession) -> Message:
