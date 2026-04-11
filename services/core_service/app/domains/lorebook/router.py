@@ -77,8 +77,9 @@ async def create_entry(
     return await controller.create_entry(lorebook_id, entry_in)
 
 
-@router.patch("/entries/{entry_id}", response_model=BaseResponse)
+@router.patch("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)
 async def update_entry(
+    lorebook_id: UUID,
     entry_id: UUID,
     entry_update: LorebookEntryUpdate,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
@@ -88,16 +89,20 @@ async def update_entry(
     return await controller.update_entry(entry_id, entry_update)
 
 
-@router.delete("/entries/{entry_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
+@router.delete("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_entry(
+    lorebook_id: UUID,
     entry_id: UUID,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Удалить запись из лорбука."""
     return await controller.delete_entry(entry_id)
-@router.get("/entries/{entry_id}", response_model=BaseResponse)
+
+
+@router.get("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)
 async def read_entry(
+    lorebook_id: UUID,
     entry_id: UUID,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
