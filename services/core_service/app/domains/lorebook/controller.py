@@ -10,8 +10,8 @@ class LorebookController(BaseController):
     def __init__(self, lorebook_service: LorebookService):
         self.lorebook_service = lorebook_service
 
-    async def get_lorebooks(self, character_id: Optional[UUID] = None, persona_id: Optional[UUID] = None) -> BaseResponse:
-        lorebooks = await self.lorebook_service.get_lorebooks(character_id, persona_id)
+    async def get_lorebooks(self, character_id: Optional[UUID] = None, persona_id: Optional[UUID] = None, user_id: Optional[UUID] = None) -> BaseResponse:
+        lorebooks = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id)
         return self.handle_success(data=lorebooks)
 
     async def check_fandom(self, fandom_name: str) -> BaseResponse:
@@ -59,6 +59,12 @@ class LorebookController(BaseController):
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> BaseResponse:
         entry = await self.lorebook_service.create_entry(lorebook_id, entry_in)
         return self.handle_success(data=entry, status_code=status.HTTP_201_CREATED)
+
+    async def get_entry(self, entry_id: UUID) -> BaseResponse:
+        entry = await self.lorebook_service.get_entry(entry_id)
+        if not entry:
+            self.handle_error("Entry not found", status_code=status.HTTP_404_NOT_FOUND)
+        return self.handle_success(data=entry)
 
     async def update_entry(self, entry_id: UUID, entry_update: LorebookEntryUpdate) -> BaseResponse:
         entry = await self.lorebook_service.update_entry(entry_id, entry_update)

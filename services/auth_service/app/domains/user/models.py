@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from sqlalchemy import String, Boolean, DateTime, Date
+from sqlalchemy import String, Boolean, DateTime, Date, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.db.base import Base
@@ -24,6 +24,7 @@ class User(Base):
     # Профиль пользователя
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    about: Mapped[str | None] = mapped_column(Text, nullable=True)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
     
     # API Keys (BYOK)

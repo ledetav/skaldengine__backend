@@ -4,7 +4,7 @@ from fastapi import status
 from shared.base.controller import BaseController
 from .service import CharacterService
 from app.services.lorebook_service import LorebookService
-from app.schemas.character import CharacterCreate, CharacterUpdate, CharacterRead, CharacterAdminRead
+from app.domains.character.schemas import CharacterCreate, CharacterUpdate, CharacterRead, CharacterAdminRead
 from app.schemas.response import BaseResponse
 
 class CharacterController(BaseController):

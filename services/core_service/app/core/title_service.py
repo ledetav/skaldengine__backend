@@ -1,7 +1,7 @@
 import uuid
 from openai import AsyncOpenAI
 from app.core.config import settings
-from app.models.chat import Chat
+from app.domains.chat.models import Chat
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

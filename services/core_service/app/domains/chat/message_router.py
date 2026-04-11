@@ -50,3 +50,29 @@ async def fork_chat_at(
     Явное ветвление (Форк в новый чат).
     """
     return await controller.fork_chat(message_id, current_user.id, db)
+
+
+@router.get("/{message_id}", response_model=BaseResponse)
+async def read_message(
+    message_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    controller: MessageController = Depends(deps.get_message_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """
+    Получить конкретное сообщение по ID.
+    """
+    return await controller.get_message(message_id, current_user.id, db)
+
+
+@router.delete("/{message_id}", response_model=BaseResponse)
+async def delete_message(
+    message_id: UUID,
+    db: AsyncSession = Depends(deps.get_db),
+    controller: MessageController = Depends(deps.get_message_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """
+    Удалить сообщение из истории.
+    """
+    return await controller.delete_message(message_id, current_user.id, db)

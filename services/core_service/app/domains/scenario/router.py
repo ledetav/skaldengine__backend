@@ -22,7 +22,7 @@ async def list_scenarios(
 async def create_scenario(
     scenario_in: ScenarioCreate,
     controller: ScenarioController = Depends(deps.get_scenario_controller),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.verify_staff_role)
 ):
     """Создать новый сценарий (Только для админов/модеров)."""
     return await controller.create_scenario(scenario_in)
@@ -38,12 +38,12 @@ async def read_scenario(
     return await controller.get_scenario(scenario_id)
 
 
-@router.patch("/{scenario_id}", response_model=BaseResponse)
+@router.put("/{scenario_id}", response_model=BaseResponse)
 async def update_scenario(
     scenario_id: UUID,
     scenario_in: ScenarioUpdate,
     controller: ScenarioController = Depends(deps.get_scenario_controller),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.verify_staff_role)
 ):
     """Обновить сценарий (Только для админов)."""
     return await controller.update_scenario(scenario_id, scenario_in)
@@ -53,7 +53,7 @@ async def update_scenario(
 async def delete_scenario(
     scenario_id: UUID,
     controller: ScenarioController = Depends(deps.get_scenario_controller),
-    current_user: deps.CurrentUser = Depends(deps.get_current_active_superuser)
+    current_user: deps.CurrentUser = Depends(deps.verify_staff_role)
 ):
     """Удалить сценарий (Только для админов)."""
     return await controller.delete_scenario(scenario_id)

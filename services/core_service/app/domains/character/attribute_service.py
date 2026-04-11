@@ -11,6 +11,9 @@ class CharacterAttributeService(BaseService[CharacterAttributeRepository]):
             return await self.repository.get_by_character(character_id, category)
         return await self.repository.get_multi(skip=skip, limit=limit)
 
+    async def get_attribute(self, attribute_id: UUID) -> Optional[CharacterAttribute]:
+        return await self.repository.get(attribute_id)
+
     async def create_attribute(self, attribute_in: CharacterAttributeCreate) -> CharacterAttribute:
         return await self.repository.create(obj_in=attribute_in)
 

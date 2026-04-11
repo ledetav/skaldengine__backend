@@ -134,8 +134,8 @@ class MessageService(BaseService[MessageRepository]):
         return new_msg
 
     async def fork_chat(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> Chat:
-        from app.models.episodic_memory import EpisodicMemory
-        from app.models.chat_checkpoint import ChatCheckpoint
+        from app.domains.chat.models import EpisodicMemory
+        from app.domains.chat.models import ChatCheckpoint
         from sqlalchemy import cast as sql_cast
 
         target_msg = await self.repository.get(message_id)
@@ -216,3 +216,22 @@ class MessageService(BaseService[MessageRepository]):
         await db.commit()
         await db.refresh(new_chat)
         return new_chat
+
+    async def get_message(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> Optional[Message]:
+        message = await self.repository.get(message_id)
+        if not message:
+            return None
+        chat = await db.get(Chat, message.chat_id)
+        if not chat or str(chat.user_id) != str(user_id):
+            return None
+        return message
+
+    async def delete_message(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> bool:
+        message = await self.repository.get(message_id)
+        if not message:
+            return False
+        chat = await db.get(Chat, message.chat_id)
+        if not chat or str(chat.user_id) != str(user_id):
+            return False
+        await self.repository.delete(id=message_id)
+        return True

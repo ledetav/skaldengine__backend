@@ -45,6 +45,23 @@ class UserController(BaseController):
         updated_user = await self.user_service.update_profile(user, update_in)
         return self.handle_success(data=updated_user)
 
+    async def update_me(self, user: User, update_in: UserUpdate) -> BaseResponse:
+        try:
+            updated_user = await self.user_service.update_me(user, update_in)
+            return self.handle_success(data=updated_user)
+        except ValueError as e:
+            self.handle_error(str(e))
+
     async def delete_user(self, user: User) -> BaseResponse:
         await self.user_service.delete_user(user.id)
         return self.handle_success(data=None)
+
+    async def get_public_profile(self, username: str) -> BaseResponse:
+        user = await self.user_service.get_by_username(username)
+        if not user:
+            self.handle_error("User not found", status_code=status.HTTP_404_NOT_FOUND)
+        
+        from .schemas import PublicProfileResponse
+        
+        public_data = PublicProfileResponse.model_validate(user)
+        return self.handle_success(data=public_data)

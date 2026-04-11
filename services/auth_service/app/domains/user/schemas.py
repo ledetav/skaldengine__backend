@@ -9,6 +9,7 @@ class UserBase(BaseModel):
     login: str
     username: str
     full_name: str | None = None
+    about: str | None = None
     birth_date: date
 
     @field_validator("login")
@@ -99,7 +100,33 @@ class FullNameUpdate(BaseModel):
 class ProfileUpdate(BaseModel):
     avatar_url: str | None = None
     cover_url: str | None = None
+    about: str | None = None
     polza_api_key: str | None = None
+
+
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    login: str | None = None
+    username: str | None = None
+    full_name: str | None = None
+    about: str | None = None
+    avatar_url: str | None = None
+    cover_url: str | None = None
+    polza_api_key: str | None = None
+
+    @field_validator("login")
+    @classmethod
+    def validate_login(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return UserBase.validate_login(v)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        return UserBase.validate_username(v)
 
 
 class PasswordUpdate(BaseModel):
@@ -118,6 +145,20 @@ class UserResponse(UserBase):
     avatar_url: str | None = None
     cover_url: str | None = None
     polza_api_key: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PublicProfileResponse(BaseModel):
+    id: UUID
+    username: str
+    full_name: str | None = None
+    avatar_url: str | None = None
+    cover_url: str | None = None
+    about: str | None = None
+    role: str
     created_at: datetime
 
     class Config:

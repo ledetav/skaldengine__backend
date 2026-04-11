@@ -7,7 +7,12 @@ from alembic import context
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models import * 
+from app.domains.character.models import *
+from app.domains.lorebook.models import *
+from app.domains.persona.models import *
+from app.domains.scenario.models import *
+from app.domains.chat.models import *
+from app.domains.chat.message_models import * 
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)

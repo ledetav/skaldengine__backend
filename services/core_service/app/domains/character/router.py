@@ -5,7 +5,7 @@ from .schemas import CharacterCreate, CharacterResponse
 from .controller import CharacterController
 from app.api import deps
 from app.schemas.response import BaseResponse
-from app.schemas.character import CharacterCreate, CharacterUpdate
+from app.domains.character.schemas import CharacterCreate, CharacterUpdate
 
 router = APIRouter()
 
@@ -31,7 +31,8 @@ async def create_character(
     """
     Create a new character.
     """
-    return await controller.create_character(character_in, current_user.id)
+    is_admin = current_user.role in ["admin", "moderator"]
+    return await controller.create_character(character_in, current_user.id, is_admin=is_admin)
 
 @router.get("/{character_id}", response_model=BaseResponse)
 async def read_character(
@@ -55,7 +56,8 @@ async def update_character(
     """
     Update a character.
     """
-    return await controller.update_character(character_id, character_update)
+    is_admin = current_user.role in ["admin", "moderator"]
+    return await controller.update_character(character_id, character_update, current_user.id, is_admin=is_admin)
 
 @router.delete("/{character_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_character(
@@ -66,4 +68,5 @@ async def delete_character(
     """
     Delete a character.
     """
-    return await controller.delete_character(character_id)
+    is_admin = current_user.role in ["admin", "moderator"]
+    return await controller.delete_character(character_id, current_user.id, is_admin=is_admin)

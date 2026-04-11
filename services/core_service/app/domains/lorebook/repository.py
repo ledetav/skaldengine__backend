@@ -18,6 +18,16 @@ class LorebookRepository(BaseRepository[Lorebook]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def get_by_user(self, user_id: UUID) -> List[Lorebook]:
+        from app.domains.character.models import Character
+        from app.domains.persona.models import UserPersona
+        from sqlalchemy import or_
+        query = select(Lorebook).join(Character, Lorebook.character_id == Character.id, isouter=True)\
+            .join(UserPersona, Lorebook.user_persona_id == UserPersona.id, isouter=True)\
+            .where(or_(Character.creator_id == user_id, UserPersona.owner_id == user_id))
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
     async def get_fandom_lorebook(self, fandom_name: str) -> Optional[Lorebook]:
         query = select(Lorebook).where(
             Lorebook.fandom == fandom_name,

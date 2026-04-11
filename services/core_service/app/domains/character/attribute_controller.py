@@ -14,6 +14,12 @@ class CharacterAttributeController(BaseController):
         attributes = await self.attribute_service.get_attributes(character_id, category)
         return self.handle_success(data=attributes)
 
+    async def get_attribute(self, attribute_id: UUID) -> BaseResponse:
+        attribute = await self.attribute_service.get_attribute(attribute_id)
+        if not attribute:
+            self.handle_error("Attribute not found", status_code=status.HTTP_404_NOT_FOUND)
+        return self.handle_success(data=attribute)
+
     async def create_attribute(self, attribute_in: CharacterAttributeCreate) -> BaseResponse:
         attribute = await self.attribute_service.create_attribute(attribute_in)
         return self.handle_success(data=attribute, status_code=status.HTTP_201_CREATED)

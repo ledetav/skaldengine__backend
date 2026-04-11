@@ -1,7 +1,7 @@
 from shared.base.service import BaseService
 from .repository import CharacterRepository
 from .models import Character
-from app.schemas.character import CharacterCreate, CharacterUpdate
+from app.domains.character.schemas import CharacterCreate, CharacterUpdate
 from app.core.broadcast import manager
 
 class CharacterService(BaseService[CharacterRepository]):

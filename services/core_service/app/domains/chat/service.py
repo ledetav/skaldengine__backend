@@ -12,9 +12,9 @@ class ChatService(BaseService[ChatRepository]):
     async def create_chat(self, chat_in: ChatCreate, user_id: UUID, background_tasks: BackgroundTasks, db: AsyncSession) -> Chat:
         # We pass db here temporarily if needed for complex cross-service logic, 
         # but ideally we should use injected repositories.
-        from app.models.character import Character
-        from app.models.user_persona import UserPersona
-        from app.models.scenario import Scenario
+        from app.domains.character.models import Character
+        from app.domains.persona.models import UserPersona
+        from app.domains.scenario.models import Scenario
 
         character = await db.get(Character, chat_in.character_id)
         if not character:
@@ -83,8 +83,8 @@ class ChatService(BaseService[ChatRepository]):
         return True
 
     async def get_history_payload(self, chat_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
-        from app.models.message import Message
-        from app.models.chat_checkpoint import ChatCheckpoint
+        from app.domains.chat.message_models import Message
+        from app.domains.chat.models import ChatCheckpoint
         from collections import defaultdict
 
         chat = await self.get_chat(chat_id, user_id)

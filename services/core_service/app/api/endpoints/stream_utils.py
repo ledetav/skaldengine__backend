@@ -78,8 +78,8 @@ async def generate_chat_stream(
 
 async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
     from app.db.base import AsyncSessionLocal
-    from app.models.message import Message
-    from app.models.chat_checkpoint import ChatCheckpoint
+    from app.domains.chat.message_models import Message
+    from app.domains.chat.models import ChatCheckpoint
     from sqlalchemy import select
     from app.core import rag
     from app.core.director_service import DirectorService

@@ -3,7 +3,7 @@ from uuid import UUID
 from shared.base.service import BaseService
 from .repository import UserPersonaRepository
 from .models import UserPersona
-from app.schemas.user_persona import UserPersonaCreate, UserPersonaUpdate
+from app.domains.persona.schemas import UserPersonaCreate, UserPersonaUpdate
 
 class UserPersonaService(BaseService[UserPersonaRepository]):
     async def get_user_personas(self, owner_id: UUID) -> List[UserPersona]:

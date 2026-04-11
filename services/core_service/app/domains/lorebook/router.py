@@ -23,11 +23,12 @@ async def create_lorebook(
 async def list_lorebooks(
     character_id: UUID | None = None,
     persona_id: UUID | None = None,
+    user_id: UUID | None = None,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
-    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user)
 ):
     """Получить список лорбуков (с фильтрацией)."""
-    return await controller.get_lorebooks(character_id, persona_id)
+    return await controller.get_lorebooks(character_id, persona_id, user_id)
 
 
 @router.get("/{lorebook_id}", response_model=BaseResponse)
@@ -95,3 +96,11 @@ async def delete_entry(
 ):
     """Удалить запись из лорбука."""
     return await controller.delete_entry(entry_id)
+@router.get("/entries/{entry_id}", response_model=BaseResponse)
+async def read_entry(
+    entry_id: UUID,
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Получить информацию о конкретной записи лорбука."""
+    return await controller.get_entry(entry_id)

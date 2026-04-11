@@ -43,6 +43,16 @@ async def create_attributes_bulk(
     return await controller.create_bulk(bulk_in)
 
 
+@router.get("/{attribute_id}", response_model=BaseResponse)
+async def read_attribute(
+    attribute_id: uuid.UUID,
+    controller: CharacterAttributeController = Depends(deps.get_character_attribute_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Получить информацию о конкретном атрибуте."""
+    return await controller.get_attribute(attribute_id)
+
+
 @router.patch("/{attribute_id}", response_model=BaseResponse)
 async def update_attribute(
     attribute_id: uuid.UUID,

@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy import select, func
 from shared.base.repository import BaseRepository
 from .models import Character
-from app.models.scenario import Scenario
-from app.models.chat import Chat
+from app.domains.scenario.models import Scenario
+from app.domains.chat.models import Chat
 
 class CharacterRepository(BaseRepository[Character]):
     def __init__(self, db):

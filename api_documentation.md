@@ -155,25 +155,21 @@ All requests and responses use **JSON**. All responses follow this common struct
 
 ---
 
-### PATCH `/users/me/login` (User)
-Изменение логина пользователя.
+### PATCH `/users/me` (User)
+Обновление профиля пользователя. Поддерживает частичное обновление всех основных полей.
 
 #### Список входных данных:
 
-| Поле | Формат | Описание | Обязательное | Ввод |
-| :--- | :--- | :--- | :--- | :--- |
-| **new_login** | string | Новый уникальный логин | Да | Вручную |
-
----
-
-### PATCH `/users/me/username` (User)
-Изменение публичного никнейма (@handle).
-
-#### Список входных данных:
-
-| Поле | Формат | Описание | Обязательное | Ввод |
-| :--- | :--- | :--- | :--- | :--- |
-| **new_username** | string | Новый публичный никнейм | Да | Вручную |
+| Поле | Формат | Описание | Обязательное |
+| :--- | :--- | :--- | :--- |
+| **email** | string | Электронная почта | Нет |
+| **login** | string | Логин | Нет |
+| **username** | string | Публичный никнейм | Нет |
+| **full_name**| string | Имя и фамилия | Нет |
+| **birth_date**| string | Дата рождения (YYYY-MM-DD) | Нет |
+| **avatar_url**| string | Ссылка на аватар | Нет |
+| **cover_url** | string | Ссылка на обложку профиля | Нет |
+| **polza_api_key**| string | API ключ Polza AI | Нет |
 
 ---
 
@@ -186,19 +182,6 @@ All requests and responses use **JSON**. All responses follow this common struct
 | :--- | :--- | :--- | :--- | :--- |
 | **old_password** | string | Текущий пароль | Да | Вручную |
 | **new_password** | string | Новый пароль | Да | Вручную |
-
----
-
-### PATCH `/users/me/profile` (User)
-Обновление аватара или обложки профиля.
-
-#### Список входных данных:
-
-| Поле | Формат | Описание | Обязательное |
-| :--- | :--- | :--- | :--- |
-| **avatar_url** | string | Ссылка на новое изображение аватара | Нет |
-| **cover_url** | string | Ссылка на новое изображение обложки | Нет |
-| **polza_api_key** | string | Личный API ключ Polza AI | Нет |
 
 ---
 
@@ -423,6 +406,12 @@ All requests and responses use **JSON**. All responses follow this common struct
 **Входные данные:**
 - `content`: Новый текст сообщения.
 
+#### GET `/messages/{message_id}` (User)
+Получить информацию о конкретном сообщении.
+
+#### DELETE `/messages/{message_id}` (User)
+Удалить сообщение. Удаление возможно только если вы владелец чата.
+
 ### Lorebooks & Entries (`/lorebooks`)
 Управление базами знаний (лорбуками) для контекста AI.
 
@@ -471,6 +460,9 @@ All requests and responses use **JSON**. All responses follow this common struct
   "priority": 10
 }
 ```
+
+#### GET `/lorebooks/entries/{entry_id}` (User)
+Получить информацию о конкретной записи лорбука.
 
 ---
 
@@ -547,9 +539,12 @@ All requests and responses use **JSON**. All responses follow this common struct
 - **Admin**: Может создавать любые лорбуки.
 - **Moderator**: Обязан передать `character_id`. Создание общих лорбуков фандомов запрещено.
 
-#### PATCH/DELETE `/admin/lorebooks/{id}` (Admin, Moderator)
+#### PUT/DELETE `/admin/lorebooks/{id}` (Admin, Moderator)
 - **Admin**: Полный доступ.
 - **Moderator**: Изменение/удаление возможно только для лорбуков, привязанных к конкретному персонажу (`character_id != null`).
+
+#### GET `/admin/lorebooks/entries/{id}` (Admin, Moderator)
+Получить информацию о конкретной записи лорбука.
 
 ---
 
@@ -558,6 +553,7 @@ All requests and responses use **JSON**. All responses follow this common struct
 
 **Методы:**
 - **GET** `/admin/attributes/` (Admin, Moderator)
+- **GET** `/admin/attributes/{attribute_id}` (Admin, Moderator)
 - **POST** `/admin/attributes/bulk` (Admin, Moderator)
 
 ---
