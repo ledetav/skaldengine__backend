@@ -26,9 +26,9 @@ class UserBase(BaseModel):
     def validate_username(cls, v: str) -> str:
         if v.strip() != v:
             raise ValueError("Username cannot have leading or trailing spaces")
-        if not v.startswith("@"):
-            v = "@" + v
-        if not re.match(r"^@[a-zA-Z0-9_-]+$", v):
+        if v.startswith("@"):
+            v = v[1:]
+        if not re.match(r"^[a-zA-Z0-9_-]+$", v):
             raise ValueError("Username can only contain alphanumeric characters, hyphens, and underscores")
         return v
 
@@ -56,7 +56,7 @@ class UserCreate(UserBase):
                 {
                     "email": "user@example.com",
                     "login": "SuperPlayer2000",
-                    "username": "@Skaldik",
+                    "username": "Skaldik",
                     "full_name": "Ivan Ivanov",
                     "password": "StrongPassword123!",
                     "birth_date": "1995-04-03"

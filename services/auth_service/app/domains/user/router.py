@@ -21,10 +21,9 @@ async def read_public_profile(
     username: str,
     controller: UserController = Depends(deps.get_user_controller)
 ):
-    """Получить публичный профиль пользователя по его username (без @)."""
-    # Гарантируем, что username начинается с @ для поиска в БД
-    if not username.startswith("@"):
-        username = f"@{username}"
+    """Получить публичный профиль пользователя по его username."""
+    if username.startswith("@"):
+        username = username[1:]
     return await controller.get_public_profile(username)
 
 
@@ -40,7 +39,7 @@ async def get_my_login(
 async def get_my_username(
     current_user: User = Depends(deps.get_current_user),
 ):
-    """Вернуть только юзернейм (@handle) текущего пользователя."""
+    """Вернуть только юзернейм (handle) текущего пользователя."""
     return BaseResponse(success=True, data={"username": current_user.username})
 
 
@@ -60,7 +59,7 @@ async def update_username(
     current_user: User = Depends(deps.get_current_user),
     controller: UserController = Depends(deps.get_user_controller)
 ):
-    """Изменить публичный юзернейм (@handle) пользователя."""
+    """Изменить публичный юзернейм (handle) пользователя."""
     return await controller.update_username(current_user, update_in)
 
 
