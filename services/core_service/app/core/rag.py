@@ -45,8 +45,8 @@ async def get_query_embedding(query: str, api_key: Optional[str] = None) -> list
 
 
 async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: uuid.UUID, api_key: Optional[str] = None):
-    from app.models.message import Message
-    from app.models.episodic_memory import EpisodicMemory
+    from app.domains.chat.message_models import Message
+    from app.domains.chat.models import EpisodicMemory
     
     current_id = leaf_id
     branch = []
@@ -116,4 +116,4 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
                     db.add(mem)
                     await db.commit()
         except Exception as e:
-            print(f"[RAG] Error in process_sliding_window: {e}")
+            print(f"[RAG] Error in process_sliding_window: {e}")

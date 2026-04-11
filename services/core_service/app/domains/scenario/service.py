@@ -1,7 +1,7 @@
 from shared.base.service import BaseService
 from .repository import ScenarioRepository
 from .models import Scenario
-from app.schemas.scenario import ScenarioCreate, ScenarioUpdate
+from app.domains.scenario.schemas import ScenarioCreate, ScenarioUpdate
 
 class ScenarioService(BaseService[ScenarioRepository]):
     async def get_scenarios(self, skip: int = 0, limit: int = 100) -> List[Scenario]:

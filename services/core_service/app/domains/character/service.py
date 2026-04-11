@@ -1,7 +1,7 @@
 from shared.base.service import BaseService
 from .repository import CharacterRepository
 from .models import Character
-from app.schemas.character import CharacterCreate, CharacterUpdate
+from app.domains.character.schemas import CharacterCreate, CharacterUpdate
 from app.core.broadcast import manager
 
 class CharacterService(BaseService[CharacterRepository]):
@@ -25,6 +25,30 @@ class CharacterService(BaseService[CharacterRepository]):
         character = Character(**character_in.model_dump(), creator_id=creator_id)
         created = await self.repository.create(obj_in=character)
         
+        # Автоматическое создание базового лорбука для "original" персонаже
+        if created.fandom and created.fandom.lower() == "original":
+            try:
+                from app.domains.lorebook.models import Lorebook, LorebookType
+                from app.domains.lorebook.repository import LorebookRepository
+                
+                # Для этого нужен LorebookRepository
+                # Вариант с Session
+                db_session = self.repository.session
+                lorebook_repo = LorebookRepository(db_session)
+                
+                lorebook = Lorebook(
+                    name=f"Основной лор {created.name}",
+                    type=LorebookType.CHARACTER,
+                    character_id=created.id,
+                    description=f"Базовый лорбук персонажа {created.name}",
+                )
+                await lorebook_repo.create(obj_in=lorebook)
+            except Exception as e:
+                # Лучше залогировать ошибку, но не прерывать создание персонажа
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to create default lorebook for original character {created.id}: {e}")
+
         # Broadcast new character update
         await manager.broadcast({
             "type": "NEW_CHARACTER",

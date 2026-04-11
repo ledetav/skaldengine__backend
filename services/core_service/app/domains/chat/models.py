@@ -74,3 +74,31 @@ class Chat(Base):
     episodic_memories: Mapped[list["EpisodicMemory"]] = relationship(
         "EpisodicMemory", back_populates="chat", cascade="all, delete-orphan"
     )
+
+from pgvector.sqlalchemy import Vector
+
+class EpisodicMemory(Base):
+    __tablename__ = "episodic_memories"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
+    message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
+    summary: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(768))
+
+    chat: Mapped["Chat"] = relationship("Chat", back_populates="episodic_memories")
+    message: Mapped["Message"] = relationship("Message", back_populates="episodic_memory")
+
+from sqlalchemy import Integer
+
+class ChatCheckpoint(Base):
+    __tablename__ = "chat_checkpoints"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
+    order_num: Mapped[int] = mapped_column(Integer)
+    goal_description: Mapped[str] = mapped_column(Text)
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    messages_spent: Mapped[int] = mapped_column(Integer, default=0)
+
+    chat: Mapped["Chat"] = relationship("Chat", back_populates="checkpoints")

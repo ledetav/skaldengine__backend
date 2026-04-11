@@ -2,8 +2,8 @@ import uuid
 import datetime
 from sqlalchemy import select, func, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.chat import Chat
-from app.models.character import Character
+from app.domains.chat.models import Chat
+from app.domains.character.models import Character
 
 class StatsService:
     """

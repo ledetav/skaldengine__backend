@@ -24,3 +24,8 @@ class UserRepository(BaseRepository[User]):
         )
         result = await self.db.execute(query)
         return result.scalars().first()
+
+    async def get_by_username(self, username: str) -> Optional[User]:
+        query = select(User).where(User.username == username)
+        result = await self.db.execute(query)
+        return result.scalars().first()

@@ -1,23 +1,40 @@
 from typing import List, Optional
 from uuid import UUID
 from shared.base.service import BaseService
-from app.repositories.lorebook_repository import LorebookRepository, LorebookEntryRepository
-from app.models.lorebook import Lorebook, LorebookEntry
-from app.schemas.lorebook import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
+from app.domains.lorebook.repository import LorebookRepository, LorebookEntryRepository
+from app.domains.lorebook.models import Lorebook, LorebookEntry
+from app.domains.lorebook.schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
 
 class LorebookService(BaseService[LorebookRepository]):
     def __init__(self, repository: LorebookRepository, entry_repository: LorebookEntryRepository):
         super().__init__(repository)
         self.entry_repository = entry_repository
 
-    async def get_lorebooks(self, character_id: Optional[UUID] = None, persona_id: Optional[UUID] = None) -> List[Lorebook]:
+    async def get_lorebooks(self, character_id: Optional[UUID] = None, persona_id: Optional[UUID] = None, user_id: Optional[UUID] = None) -> List[Lorebook]:
         if character_id:
             return await self.repository.get_by_character(character_id)
         if persona_id:
             return await self.repository.get_by_persona(persona_id)
+        if user_id:
+            return await self.repository.get_by_user(user_id)
         return await self.repository.get_multi()
 
     async def create_lorebook(self, lorebook_in: LorebookCreate) -> Lorebook:
+        from fastapi import HTTPException
+        from app.domains.lorebook.models import LorebookType
+
+        if lorebook_in.type == LorebookType.FANDOM:
+            if not lorebook_in.fandom:
+                raise HTTPException(status_code=400, detail="Fandom lorebook must have a fandom name")
+            if lorebook_in.fandom.lower() == "original":
+                raise HTTPException(status_code=400, detail="Fandom name 'original' is reserved for character lorebooks")
+        elif lorebook_in.type == LorebookType.CHARACTER:
+            if not lorebook_in.character_id:
+                raise HTTPException(status_code=400, detail="Character lorebook must be linked to a character")
+        elif lorebook_in.type == LorebookType.PERSONA:
+            if not lorebook_in.user_persona_id:
+                raise HTTPException(status_code=400, detail="Persona lorebook must be linked to a user persona")
+
         return await self.repository.create(obj_in=lorebook_in)
 
     async def get_lorebook(self, lorebook_id: UUID) -> Optional[Lorebook]:
@@ -50,6 +67,9 @@ class LorebookService(BaseService[LorebookRepository]):
         if not entry:
             return None
         return await self.entry_repository.update(db_obj=entry, obj_in=entry_update)
+
+    async def get_entry(self, entry_id: UUID) -> Optional[LorebookEntry]:
+        return await self.entry_repository.get(entry_id)
 
     async def delete_entry(self, entry_id: UUID) -> bool:
         entry = await self.entry_repository.get(entry_id)

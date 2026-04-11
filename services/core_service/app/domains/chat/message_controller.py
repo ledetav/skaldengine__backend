@@ -42,3 +42,15 @@ class MessageController(BaseController):
             return self.handle_success(data=new_chat)
         except (ValueError, PermissionError) as e:
             self.handle_error(str(e), status_code=status.HTTP_404_NOT_FOUND)
+
+    async def get_message(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> BaseResponse:
+        message = await self.message_service.get_message(message_id, user_id, db)
+        if not message:
+            self.handle_error("Message not found", status_code=status.HTTP_404_NOT_FOUND)
+        return self.handle_success(data=message)
+
+    async def delete_message(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> BaseResponse:
+        success = await self.message_service.delete_message(message_id, user_id, db)
+        if not success:
+            self.handle_error("Message not found", status_code=status.HTTP_404_NOT_FOUND)
+        return self.handle_success(data={"message": "Message deleted successfully"})

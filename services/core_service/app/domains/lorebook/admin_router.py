@@ -57,8 +57,9 @@ async def get_lorebook_entries(
     return controller.handle_success(data=entries)
 
 
-@router.patch("/entries/{entry_id}", response_model=BaseResponse)
+@router.patch("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)
 async def update_lorebook_entry(
+    lorebook_id: uuid.UUID,
     entry_id: uuid.UUID,
     entry_in: LorebookEntryUpdate,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
@@ -69,8 +70,9 @@ async def update_lorebook_entry(
     return await controller.update_entry(entry_id, entry_in) # Entries don't have role check yet, but lorebook metadata does
 
 
-@router.delete("/entries/{entry_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
+@router.delete("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
 async def delete_lorebook_entry(
+    lorebook_id: uuid.UUID,
     entry_id: uuid.UUID,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)

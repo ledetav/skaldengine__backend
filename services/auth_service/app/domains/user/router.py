@@ -2,9 +2,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, status
 
 from app.api import deps
-from app.api.controllers.user_controller import UserController
+from .controller import UserController
 from app.models.user import User
-from app.schemas.user import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate
+from app.schemas.user import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate
 from app.schemas.response import BaseResponse
 
 router = APIRouter()
@@ -15,6 +15,16 @@ async def read_user_me(
 ):
     """Получить информацию о текущем пользователе по токену."""
     return BaseResponse(success=True, data=current_user)
+
+@router.get("/profile/{username}", response_model=BaseResponse)
+async def read_public_profile(
+    username: str,
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Получить публичный профиль пользователя по его username."""
+    if username.startswith("@"):
+        username = username[1:]
+    return await controller.get_public_profile(username)
 
 
 @router.get("/me/login", response_model=BaseResponse)
@@ -29,7 +39,7 @@ async def get_my_login(
 async def get_my_username(
     current_user: User = Depends(deps.get_current_user),
 ):
-    """Вернуть только юзернейм (@handle) текущего пользователя."""
+    """Вернуть только юзернейм (handle) текущего пользователя."""
     return BaseResponse(success=True, data={"username": current_user.username})
 
 
@@ -49,7 +59,7 @@ async def update_username(
     current_user: User = Depends(deps.get_current_user),
     controller: UserController = Depends(deps.get_user_controller)
 ):
-    """Изменить публичный юзернейм (@handle) пользователя."""
+    """Изменить публичный юзернейм (handle) пользователя."""
     return await controller.update_username(current_user, update_in)
 
 
@@ -85,6 +95,16 @@ async def update_profile(
 ):
     """Обновить аватар или обложку профиля."""
     return await controller.update_profile(current_user, update_in)
+
+
+@router.patch("/me", response_model=BaseResponse)
+async def update_user_me(
+    update_in: UserUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Обновить данные профиля пользователя (универсальный метод)."""
+    return await controller.update_me(current_user, update_in)
 
 
 @router.delete("/me", response_model=BaseResponse, status_code=status.HTTP_200_OK)

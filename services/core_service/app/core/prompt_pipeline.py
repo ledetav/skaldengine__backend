@@ -9,14 +9,14 @@ from openai import AsyncOpenAI
 from app.api.deps import CurrentUser
 
 from app.core.config import settings
-from app.models.chat import Chat
-from app.models.character import Character
-from app.models.user_persona import UserPersona
-from app.models.scenario import Scenario
-from app.models.message import Message
-from app.models.lorebook import Lorebook, LorebookEntry
-from app.models.chat_checkpoint import ChatCheckpoint
-from app.models.episodic_memory import EpisodicMemory
+from app.domains.chat.models import Chat
+from app.domains.character.models import Character
+from app.domains.persona.models import UserPersona
+from app.domains.scenario.models import Scenario
+from app.domains.chat.message_models import Message
+from app.domains.lorebook.models import Lorebook, LorebookEntry
+from app.domains.chat.models import ChatCheckpoint
+from app.domains.chat.models import EpisodicMemory
 from app.models.character_attribute import CharacterAttribute
 from app.core import rag
 
@@ -253,7 +253,7 @@ class PromptPipeline:
             return
             
         from sqlalchemy import and_
-        from app.models.message import Message
+        from app.domains.chat.message_models import Message
         import datetime
         
         # 1. Собираем все ID сообщений в текущей ветке (от текущего родителя до корня)

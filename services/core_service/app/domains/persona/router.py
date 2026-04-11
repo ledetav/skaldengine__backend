@@ -9,20 +9,28 @@ from app.schemas.response import BaseResponse
 router = APIRouter()
 
 @router.get("/", response_model=BaseResponse)
-async def list_my_personas(
+async def list_personas(
+    user_id: UUID | None = None,
     controller: UserPersonaController = Depends(deps.get_user_persona_controller),
-    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user)
 ):
-    """Получить список всех персон текущего пользователя."""
-    return await controller.get_my_personas(current_user.id)
+    """Получить список всех персон (своих или указанного пользователя)."""
+    target_id = user_id or (current_user.id if current_user else None)
+    if not target_id:
+        return BaseResponse(success=False, message="User ID required")
+    return await controller.get_my_personas(target_id)
 
 @router.get("/stats", response_model=BaseResponse)
-async def get_my_stats(
-    current_user: deps.CurrentUser = Depends(deps.get_current_user),
+async def get_user_stats(
+    user_id: UUID | None = None,
+    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user),
     controller: UserPersonaController = Depends(deps.get_user_persona_controller)
 ):
     """Получить агрегированную статистику пользователя (чаты, персоны, лорбуки)."""
-    return await controller.get_user_stats(current_user.id)
+    target_id = user_id or (current_user.id if current_user else None)
+    if not target_id:
+        return BaseResponse(success=False, message="User ID required")
+    return await controller.get_user_stats(target_id)
 
 
 @router.post("/", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
