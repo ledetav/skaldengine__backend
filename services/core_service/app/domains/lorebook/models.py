@@ -5,6 +5,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
+import enum
+from sqlalchemy import Enum
+
+class LorebookType(str, enum.Enum):
+    FANDOM = "fandom"
+    CHARACTER = "character"
+    PERSONA = "persona"
+
 class Lorebook(Base):
     """
     Справочник мира — контейнер для лор-записей.
@@ -13,6 +21,7 @@ class Lorebook(Base):
     __tablename__ = "lorebooks"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    type: Mapped[LorebookType] = mapped_column(Enum(LorebookType), default=LorebookType.FANDOM, index=True)
 
     # Привязка к персонажу (опционально — для персонального лора)
     character_id: Mapped[uuid.UUID | None] = mapped_column(

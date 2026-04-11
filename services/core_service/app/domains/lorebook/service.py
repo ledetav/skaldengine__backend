@@ -20,6 +20,21 @@ class LorebookService(BaseService[LorebookRepository]):
         return await self.repository.get_multi()
 
     async def create_lorebook(self, lorebook_in: LorebookCreate) -> Lorebook:
+        from fastapi import HTTPException
+        from app.domains.lorebook.models import LorebookType
+
+        if lorebook_in.type == LorebookType.FANDOM:
+            if not lorebook_in.fandom:
+                raise HTTPException(status_code=400, detail="Fandom lorebook must have a fandom name")
+            if lorebook_in.fandom.lower() == "original":
+                raise HTTPException(status_code=400, detail="Fandom name 'original' is reserved for character lorebooks")
+        elif lorebook_in.type == LorebookType.CHARACTER:
+            if not lorebook_in.character_id:
+                raise HTTPException(status_code=400, detail="Character lorebook must be linked to a character")
+        elif lorebook_in.type == LorebookType.PERSONA:
+            if not lorebook_in.user_persona_id:
+                raise HTTPException(status_code=400, detail="Persona lorebook must be linked to a user persona")
+
         return await self.repository.create(obj_in=lorebook_in)
 
     async def get_lorebook(self, lorebook_id: UUID) -> Optional[Lorebook]:

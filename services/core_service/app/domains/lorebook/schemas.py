@@ -52,8 +52,11 @@ class LorebookEntry(LorebookEntryBase):
 
 # ─── Lorebook ──────────────────────────────────────────────────────────────── #
 
+from app.domains.lorebook.models import LorebookType
+
 class LorebookBase(BaseModel):
     name: str
+    type: LorebookType = LorebookType.FANDOM
     character_id: UUID | None = None
     user_persona_id: UUID | None = None
     fandom: str | None = None
@@ -80,6 +83,7 @@ class LorebookCreate(LorebookBase):
 
 class LorebookUpdate(BaseModel):
     name: str | None = None
+    type: LorebookType | None = None
     fandom: str | None = None
 
     model_config = {
