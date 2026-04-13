@@ -39,35 +39,37 @@ RUN mkdir -p /app/uploads && \
     chmod -R 775 /var/lib/nginx /var/cache/nginx /var/log/nginx /run /etc/nginx /app/uploads
 
 # Nginx Config - Properly structured with events section and stdout logging
-RUN echo 'daemon off;\n\
-error_log /dev/stderr warn;\n\
-pid /run/nginx.pid;\n\
-events {\n\
-    worker_connections 1024;\n\
-}\n\
-http {\n\
-    include /etc/nginx/mime.types;\n\
-    default_type application/octet-stream;\n\
-    access_log /dev/stdout;\n\
-    sendfile on;\n\
-    keepalive_timeout 65;\n\
-    server {\n\
-        listen 8000;\n\
-        client_max_body_size 20M;\n\
-        location /api/v1/auth { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }\n\
-        location /api/v1/users { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }\n\
-        location / { \n\
-            proxy_pass http://127.0.0.1:8002; \n\
-            proxy_set_header Host $host; \n\
-            proxy_http_version 1.1; \n\
-            proxy_set_header Upgrade $http_upgrade; \n\
-            proxy_set_header Connection "upgrade"; \n\
-        }\n\
-        location /static/ { \n\
-            alias /app/uploads/; \n\
-        }\n\
-    }\n\
-}' > /etc/nginx/nginx.conf
+RUN cat <<'EOF' > /etc/nginx/nginx.conf
+daemon off;
+error_log /dev/stderr warn;
+pid /run/nginx.pid;
+events {
+    worker_connections 1024;
+}
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /dev/stdout;
+    sendfile on;
+    keepalive_timeout 65;
+    server {
+        listen 8000;
+        client_max_body_size 20M;
+        location /api/v1/auth { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }
+        location /api/v1/users { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }
+        location / { 
+            proxy_pass http://127.0.0.1:8002; 
+            proxy_set_header Host $host; 
+            proxy_http_version 1.1; 
+            proxy_set_header Upgrade $http_upgrade; 
+            proxy_set_header Connection "upgrade"; 
+        }
+        location /static/ { 
+            alias /app/uploads/; 
+        }
+    }
+}
+EOF
 
 # Primary Exposed Port
 EXPOSE 8000
