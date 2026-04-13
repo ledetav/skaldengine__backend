@@ -39,37 +39,31 @@ RUN mkdir -p /app/uploads && \
     chmod -R 775 /var/lib/nginx /var/cache/nginx /var/log/nginx /run /etc/nginx /app/uploads
 
 # Nginx Config - Properly structured with events section and stdout logging
-RUN cat <<'EOF' > /etc/nginx/nginx.conf
-daemon off;
-error_log /dev/stderr warn;
-pid /run/nginx.pid;
-events {
-    worker_connections 1024;
-}
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-    access_log /dev/stdout;
-    sendfile on;
-    keepalive_timeout 65;
-    server {
-        listen 8000;
-        client_max_body_size 20M;
-        location /api/v1/auth { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }
-        location /api/v1/users { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }
-        location / { 
-            proxy_pass http://127.0.0.1:8002; 
-            proxy_set_header Host $host; 
-            proxy_http_version 1.1; 
-            proxy_set_header Upgrade $http_upgrade; 
-            proxy_set_header Connection "upgrade"; 
-        }
-        location /static/ { 
-            alias /app/uploads/; 
-        }
-    }
-}
-EOF
+RUN echo 'daemon off;' > /etc/nginx/nginx.conf && \
+    echo 'error_log /dev/stderr warn;' >> /etc/nginx/nginx.conf && \
+    echo 'pid /run/nginx.pid;' >> /etc/nginx/nginx.conf && \
+    echo 'events { worker_connections 1024; }' >> /etc/nginx/nginx.conf && \
+    echo 'http {' >> /etc/nginx/nginx.conf && \
+    echo '    include /etc/nginx/mime.types;' >> /etc/nginx/nginx.conf && \
+    echo '    default_type application/octet-stream;' >> /etc/nginx/nginx.conf && \
+    echo '    access_log /dev/stdout;' >> /etc/nginx/nginx.conf && \
+    echo '    sendfile on;' >> /etc/nginx/nginx.conf && \
+    echo '    keepalive_timeout 65;' >> /etc/nginx/nginx.conf && \
+    echo '    server {' >> /etc/nginx/nginx.conf && \
+    echo '        listen 8000;' >> /etc/nginx/nginx.conf && \
+    echo '        client_max_body_size 20M;' >> /etc/nginx/nginx.conf && \
+    echo '        location /api/v1/auth { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }' >> /etc/nginx/nginx.conf && \
+    echo '        location /api/v1/users { proxy_pass http://127.0.0.1:8001; proxy_set_header Host $host; }' >> /etc/nginx/nginx.conf && \
+    echo '        location / { ' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_pass http://127.0.0.1:8002; ' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Host $host; ' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_http_version 1.1; ' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Upgrade $http_upgrade; ' >> /etc/nginx/nginx.conf && \
+    echo '            proxy_set_header Connection "upgrade"; ' >> /etc/nginx/nginx.conf && \
+    echo '        }' >> /etc/nginx/nginx.conf && \
+    echo '        location /static/ { alias /app/uploads/; }' >> /etc/nginx/nginx.conf && \
+    echo '    }' >> /etc/nginx/nginx.conf && \
+    echo '}' >> /etc/nginx/nginx.conf
 
 # Primary Exposed Port
 EXPOSE 8000
