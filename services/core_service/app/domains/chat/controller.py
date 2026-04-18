@@ -1,9 +1,10 @@
 from typing import List, Optional
+from fastapi import BackgroundTasks, status
 from uuid import UUID
 from shared.base.controller import BaseController
 from .service import ChatService
-from .schemas import ChatCreate, ChatResponse
-from app.schemas.response import BaseResponse
+from .schemas import ChatCreate, ChatUpdate
+from shared.schemas.response import BaseResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class ChatController(BaseController):
