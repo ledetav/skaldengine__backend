@@ -4,7 +4,7 @@ from fastapi import status, BackgroundTasks
 from shared.base.controller import BaseController
 from .message_service import MessageService
 from .message_schemas import MessageCreate
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.responses import StreamingResponse
 
