@@ -5,7 +5,7 @@ from .repository import UserRepository
 from .models import User
 from app.core.security import verify_password, create_access_token, get_password_hash
 from app.core.config import settings
-from app.schemas.user import UserCreate, UserResponse, Token
+from .schemas import UserCreate, UserResponse, Token
 
 class AuthService(BaseService[UserRepository]):
     async def authenticate(self, identifier: str, password: str) -> Optional[Dict]:
