@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.api import deps
 from .controller import LorebookController
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
 
 router = APIRouter()

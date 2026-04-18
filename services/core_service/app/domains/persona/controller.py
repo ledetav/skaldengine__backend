@@ -4,8 +4,8 @@ from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserPersonaService
 from .schemas import UserPersonaCreate, UserPersonaResponse
-from app.schemas.user import UserStatistics
-from app.schemas.response import BaseResponse
+from app.domains.persona.schemas import UserStatistics
+from shared.schemas.response import BaseResponse
 
 class UserPersonaController(BaseController):
     def __init__(self, persona_service: UserPersonaService):

@@ -8,7 +8,7 @@ from .attribute_schemas import (
     CharacterAttributeUpdate,
     CharacterAttributeBulkCreate
 )
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 router = APIRouter(dependencies=[Depends(deps.verify_admin_role)])
 
