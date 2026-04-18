@@ -1,9 +1,9 @@
 from typing import List, Optional
 from uuid import UUID
-from app.services.base_service import BaseService
-from app.repositories.character_attribute_repository import CharacterAttributeRepository
-from app.models.character_attribute import CharacterAttribute
-from app.schemas.character_attribute import CharacterAttributeCreate, CharacterAttributeUpdate, CharacterAttributeBulkCreate
+from shared.base.service import BaseService
+from app.domains.character.attribute_repository import CharacterAttributeRepository
+from app.domains.character.attribute_models import CharacterAttribute
+from app.domains.character.attribute_schemas import CharacterAttributeCreate, CharacterAttributeUpdate, CharacterAttributeBulkCreate
 
 class CharacterAttributeService(BaseService[CharacterAttributeRepository]):
     async def get_attributes(self, character_id: Optional[UUID] = None, category: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[CharacterAttribute]:

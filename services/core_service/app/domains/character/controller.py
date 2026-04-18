@@ -3,9 +3,9 @@ from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import CharacterService
-from app.services.lorebook_service import LorebookService
+from app.domains.lorebook.service import LorebookService
 from app.domains.character.schemas import CharacterCreate, CharacterUpdate, CharacterRead, CharacterAdminRead
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 class CharacterController(BaseController):
     def __init__(self, character_service: CharacterService, lorebook_service: LorebookService):

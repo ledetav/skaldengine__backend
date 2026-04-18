@@ -4,7 +4,7 @@ from fastapi import status
 from shared.base.controller import BaseController
 from .service import LorebookService
 from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 class LorebookController(BaseController):
     def __init__(self, lorebook_service: LorebookService):
