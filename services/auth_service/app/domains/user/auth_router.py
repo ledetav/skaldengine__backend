@@ -27,4 +27,4 @@ async def register_user(
     """
     Create a new user.
     """
-    return await controller.register(user_in)
+    return await controller.register(user_in)
