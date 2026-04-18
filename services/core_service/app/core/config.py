@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # Uploads (аватарки, карточки)
     UPLOAD_DIR: str = Field("./uploads", validation_alias=AliasChoices("CORE_UPLOAD_DIR", "UPLOAD_DIR"))
 
+    BACKEND_CORS_ORIGINS: list[str] = [
+        "http://localhost",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:8001",
+        "http://localhost:8080",
+    ]
+
     model_config = SettingsConfigDict(
         env_file=".env", 
         env_file_encoding='utf-8', 
