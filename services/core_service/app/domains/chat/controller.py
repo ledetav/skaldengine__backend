@@ -3,7 +3,7 @@ from uuid import UUID
 from shared.base.controller import BaseController
 from .service import ChatService
 from .schemas import ChatCreate, ChatResponse
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 class ChatController(BaseController):

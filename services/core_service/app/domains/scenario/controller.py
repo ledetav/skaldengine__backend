@@ -4,7 +4,7 @@ from fastapi import status
 from shared.base.controller import BaseController
 from .service import ScenarioService
 from .schemas import ScenarioCreate, ScenarioUpdate, ScenarioResponse
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 class ScenarioController(BaseController):
     def __init__(self, scenario_service: ScenarioService):

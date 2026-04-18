@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status, UploadFile, File
 from app.api import deps
 from .controller import CharacterController
 from .schemas import CharacterCreate, CharacterUpdate
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 router = APIRouter(dependencies=[Depends(deps.verify_admin_role)])
 
