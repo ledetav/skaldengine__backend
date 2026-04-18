@@ -1,6 +1,6 @@
 import uuid
 import datetime
-from sqlalchemy import select, func, and_, update
+from sqlalchemy import select, func, and_, update, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.chat.models import Chat
 from app.domains.character.models import Character
@@ -58,44 +58,14 @@ class StatsService:
         result = await db.execute(query)
         stats = result.all()
         
-        # 3. Обновляем каждого персонажа
-        for char_id, count in stats:
+        # 3. Обновляем персонажей (bulk update)
+        if stats:
             await db.execute(
                 update(Character)
-                .where(Character.id == char_id)
-                .values(monthly_chats_count=count)
+                .where(Character.id == bindparam("id"))
+                .values(monthly_chats_count=bindparam("monthly_chats_count")),
+                [{"id": char_id, "monthly_chats_count": count} for char_id, count in stats]
             )
         
         await db.commit()
 
-    @staticmethod
-    async def refresh_all_stats(db: AsyncSession):
-        """
-        Полностью пересчитывает статистику для всех персонажей:
-        - total_chats_count: на основе всех записей в таблице chats
-        - monthly_chats_count: на основе записей за прошлый календарный месяц
-        
-        Полезно при выполнении миграции для заполнения исторических данных.
-        """
-        # 1. Сначала считаем общий счетчик (total)
-        total_query = (
-            select(Chat.character_id, func.count(Chat.id))
-            .group_by(Chat.character_id)
-        )
-        total_result = await db.execute(total_query)
-        total_stats = total_result.all()
-        
-        # Сбрасываем всем в 0 перед обновлением
-        await db.execute(update(Character).values(total_chats_count=0))
-        
-        for char_id, count in total_stats:
-            await db.execute(
-                update(Character)
-                .where(Character.id == char_id)
-                .values(total_chats_count=count)
-            )
-            
-        # 2. Вызываем обновление за прошлый месяц
-        await StatsService.refresh_monthly_stats(db)
-        
-        await db.commit()

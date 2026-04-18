@@ -4,7 +4,7 @@ from fastapi import status
 from shared.base.controller import BaseController
 from .attribute_service import CharacterAttributeService
 from .attribute_schemas import CharacterAttributeCreate, CharacterAttributeUpdate, CharacterAttributeBulkCreate
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 class CharacterAttributeController(BaseController):
     def __init__(self, attribute_service: CharacterAttributeService):

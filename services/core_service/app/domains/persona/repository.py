@@ -12,20 +12,35 @@ class UserPersonaRepository(BaseRepository[UserPersona]):
         from app.domains.chat.models import Chat
         from app.domains.lorebook.models import Lorebook
 
-        # Common query with counts
-        query = select(UserPersona).where(UserPersona.owner_id == owner_id)
+        # Setup scalar subqueries to avoid N+1 queries
+        lb_subq = (
+            select(func.count(Lorebook.id))
+            .where(Lorebook.user_persona_id == UserPersona.id)
+            .scalar_subquery()
+            .correlate(UserPersona)
+        )
+
+        chat_subq = (
+            select(func.count(Chat.id))
+            .where(Chat.user_persona_id == UserPersona.id)
+            .scalar_subquery()
+            .correlate(UserPersona)
+        )
+
+        # Single query to fetch personas and their counts
+        query = (
+            select(UserPersona, lb_subq.label("lorebook_count"), chat_subq.label("chat_count"))
+            .where(UserPersona.owner_id == owner_id)
+        )
+
         result = await self.db.execute(query)
-        personas = result.scalars().all()
+        rows = result.all()
 
-        for persona in personas:
-            # Count lorebooks
-            lb_query = select(func.count(Lorebook.id)).where(Lorebook.user_persona_id == persona.id)
-            lb_count = await self.db.execute(lb_query)
-            persona.lorebook_count = lb_count.scalar() or 0
-
-            # Count chats
-            chat_query = select(func.count(Chat.id)).where(Chat.user_persona_id == persona.id)
-            chat_count = await self.db.execute(chat_query)
-            persona.chat_count = chat_count.scalar() or 0
+        # Reconstruct the persona objects with the fetched counts
+        personas = []
+        for persona, lb_count, chat_count in rows:
+            persona.lorebook_count = lb_count or 0
+            persona.chat_count = chat_count or 0
+            personas.append(persona)
 
         return personas
