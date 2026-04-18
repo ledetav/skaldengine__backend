@@ -1,5 +1,5 @@
+from typing import Optional, List
 from uuid import UUID
-from typing import List, Optional
 from shared.base.service import BaseService
 from .repository import CharacterRepository
 from .models import Character
