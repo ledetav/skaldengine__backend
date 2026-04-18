@@ -17,7 +17,7 @@ from app.domains.chat.message_models import Message
 from app.domains.lorebook.models import Lorebook, LorebookEntry
 from app.domains.chat.models import ChatCheckpoint
 from app.domains.chat.models import EpisodicMemory
-from app.models.character_attribute import CharacterAttribute
+from app.domains.character.attribute_models import CharacterAttribute
 from app.core import rag
 
 

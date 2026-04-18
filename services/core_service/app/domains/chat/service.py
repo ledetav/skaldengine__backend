@@ -4,7 +4,7 @@ from fastapi import BackgroundTasks
 from shared.base.service import BaseService
 from .repository import ChatRepository
 from .models import Chat
-from app.schemas.chat import ChatCreate, ChatUpdate
+from app.domains.chat.schemas import ChatCreate, ChatUpdate
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
