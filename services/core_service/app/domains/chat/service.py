@@ -48,7 +48,9 @@ class ChatService(BaseService[ChatRepository]):
         created_chat = await self.repository.create(obj_in=chat)
         
         # Increment character chat count
-        character.total_chats_count += 1
+        from app.core.stats_service import StatsService
+        await StatsService.increment_total_chats(db, character.id)
+
         await db.commit()
         await db.refresh(created_chat)
 
