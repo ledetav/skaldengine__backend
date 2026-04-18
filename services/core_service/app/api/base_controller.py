@@ -1,6 +1,6 @@
 from typing import Any, Optional
 from fastapi import HTTPException, status
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 class BaseController:
     def handle_success(self, data: Any = None, meta: Optional[dict] = None) -> BaseResponse:
