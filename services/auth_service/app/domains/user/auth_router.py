@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api import deps
 from .auth_controller import AuthController
-from app.schemas.user import UserCreate
+from app.domains.user.schemas import UserCreate
 from shared.schemas.response import BaseResponse
 
 router = APIRouter()
