@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from .controller import ChatController
 from .message_controller import MessageController
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 from .schemas import ChatCreate, ChatUpdate
 from .message_schemas import MessageCreate
 
