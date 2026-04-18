@@ -1,9 +1,6 @@
 import json
-import re
 import uuid
-from typing import List, Dict, Any, Optional
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, desc
+from sqlalchemy import select, desc
 from openai import AsyncOpenAI
 
 from app.core.config import settings
