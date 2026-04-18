@@ -8,4 +8,5 @@ DIPLOMA.session.sql
 .vscode/
 .venv/
 .codesandbox/
-.agents/
+.agents/test-venv/
+test-venv/
