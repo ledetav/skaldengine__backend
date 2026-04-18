@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from app.api import deps
 from .controller import UserPersonaController
 from .schemas import UserPersonaCreate, UserPersonaUpdate, UserPersona
-from app.schemas.response import BaseResponse
+from shared.schemas.response import BaseResponse
 
 router = APIRouter()
 

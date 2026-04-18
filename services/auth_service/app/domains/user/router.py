@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends, status
 
 from app.api import deps
 from .controller import UserController
-from app.models.user import User
-from app.schemas.user import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate
-from app.schemas.response import BaseResponse
+from app.domains.user.models import User
+from app.domains.user.schemas import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate
+from shared.schemas.response import BaseResponse
 
 router = APIRouter()
 
