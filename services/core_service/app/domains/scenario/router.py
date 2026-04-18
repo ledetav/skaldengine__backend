@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.api import deps
 from .controller import ScenarioController
-from shared.schemas.response import BaseResponse
+from app.schemas.response import BaseResponse
 from .schemas import ScenarioCreate, ScenarioUpdate
 
 router = APIRouter()

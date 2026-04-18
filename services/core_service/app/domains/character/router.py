@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from .schemas import CharacterCreate, CharacterResponse
 from .controller import CharacterController
 from app.api import deps
-from shared.schemas.response import BaseResponse
+from app.schemas.response import BaseResponse
 from app.domains.character.schemas import CharacterCreate, CharacterUpdate
 
 router = APIRouter()

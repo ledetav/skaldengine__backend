@@ -1,8 +1,8 @@
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import select, delete
-from shared.base.repository import BaseRepository
-from app.domains.character.attribute_models import CharacterAttribute
+from app.repositories.base_repository import BaseRepository
+from app.models.character_attribute import CharacterAttribute
 
 class CharacterAttributeRepository(BaseRepository[CharacterAttribute]):
     def __init__(self, db):

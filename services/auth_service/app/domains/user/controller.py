@@ -1,9 +1,9 @@
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserService
-from app.domains.user.models import User
+from app.models.user import User
 from .schemas import UserUpdate, ProfileUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate
-from shared.schemas.response import BaseResponse
+from app.schemas.response import BaseResponse
 
 class UserController(BaseController):
     def __init__(self, user_service: UserService):

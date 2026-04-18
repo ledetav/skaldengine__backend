@@ -1,5 +1,3 @@
-from typing import Optional, List
-from uuid import UUID
 from shared.base.service import BaseService
 from .repository import ScenarioRepository
 from .models import Scenario

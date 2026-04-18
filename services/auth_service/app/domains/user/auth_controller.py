@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from shared.base.controller import BaseController
 from .auth_service import AuthService
 from .schemas import Token, UserCreate, UserResponse
-from shared.schemas.response import BaseResponse
+from app.schemas.response import BaseResponse
 
 class AuthController(BaseController):
     def __init__(self, auth_service: AuthService):

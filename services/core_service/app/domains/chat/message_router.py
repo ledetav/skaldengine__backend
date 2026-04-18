@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
 from .message_controller import MessageController
-from shared.schemas.response import BaseResponse
+from app.schemas.response import BaseResponse
 from pydantic import BaseModel
 
 router = APIRouter()

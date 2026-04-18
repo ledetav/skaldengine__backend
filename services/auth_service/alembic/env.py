@@ -7,7 +7,7 @@ from alembic import context
 
 from app.core.config import settings
 from app.db.base import Base
-from app.domains.user.models import User  # Импортируем модель, чтобы alembic её увидел
+from app.models.user import User  # Импортируем модель, чтобы alembic её увидел
 
 config = context.config
 
