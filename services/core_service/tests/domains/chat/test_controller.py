@@ -1,113 +1,54 @@
 import pytest
 import uuid
 from unittest.mock import AsyncMock, MagicMock
-from fastapi import BackgroundTasks, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException, status
 
 from app.domains.chat.controller import ChatController
-from app.domains.chat.schemas import ChatCreate, Chat
+from app.domains.chat.service import ChatService
 from shared.schemas.response import BaseResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.fixture
-def mock_chat_service():
-    return AsyncMock()
+def chat_service_mock():
+    return AsyncMock(spec=ChatService)
 
 @pytest.fixture
-def chat_controller(mock_chat_service):
-    return ChatController(chat_service=mock_chat_service)
-
-@pytest.fixture
-def mock_db():
+def db_session_mock():
     return AsyncMock(spec=AsyncSession)
 
 @pytest.fixture
-def mock_background_tasks():
-    return MagicMock(spec=BackgroundTasks)
-
-@pytest.fixture
-def valid_chat_create():
-    return ChatCreate(
-        character_id=uuid.uuid4(),
-        user_persona_id=uuid.uuid4(),
-        scenario_id=None,
-        is_acquainted=False,
-        relationship_dynamic="Friends",
-        language="en",
-        narrative_voice="first"
-    )
-
-@pytest.fixture
-def user_id():
-    return uuid.uuid4()
+def controller(chat_service_mock):
+    return ChatController(chat_service=chat_service_mock)
 
 @pytest.mark.asyncio
-async def test_create_chat_success(
-    chat_controller, mock_chat_service, valid_chat_create, user_id, mock_db, mock_background_tasks
-):
-    # Setup
-    expected_chat = Chat(
-        id=uuid.uuid4(),
-        user_id=user_id,
-        mode="sandbox",
-        created_at="2023-01-01T00:00:00Z",
-        **valid_chat_create.model_dump()
-    )
-    mock_chat_service.create_chat.return_value = expected_chat
+async def test_get_history_success(controller, chat_service_mock, db_session_mock):
+    # Arrange
+    chat_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    mock_payload = [{"id": str(uuid.uuid4()), "content": "hello"}]
+    chat_service_mock.get_history_payload.return_value = mock_payload
 
-    # Execution
-    response = await chat_controller.create_chat(
-        chat_in=valid_chat_create,
-        user_id=user_id,
-        background_tasks=mock_background_tasks,
-        db=mock_db
-    )
+    # Act
+    response = await controller.get_history(chat_id=chat_id, user_id=user_id, db=db_session_mock)
 
-    # Verification
-    mock_chat_service.create_chat.assert_awaited_once_with(
-        valid_chat_create, user_id, mock_background_tasks, mock_db
-    )
+    # Assert
     assert isinstance(response, BaseResponse)
     assert response.success is True
-    assert response.data == expected_chat
+    assert response.data == mock_payload
+    chat_service_mock.get_history_payload.assert_called_once_with(chat_id, user_id, db_session_mock)
 
 @pytest.mark.asyncio
-async def test_create_chat_value_error(
-    chat_controller, mock_chat_service, valid_chat_create, user_id, mock_db, mock_background_tasks
-):
-    # Setup
-    error_message = "Character not found"
-    mock_chat_service.create_chat.side_effect = ValueError(error_message)
+async def test_get_history_value_error(controller, chat_service_mock, db_session_mock):
+    # Arrange
+    chat_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    chat_service_mock.get_history_payload.side_effect = ValueError("Chat history not found")
 
-    # Execution & Verification
+    # Act & Assert
     with pytest.raises(HTTPException) as exc_info:
-        await chat_controller.create_chat(
-            chat_in=valid_chat_create,
-            user_id=user_id,
-            background_tasks=mock_background_tasks,
-            db=mock_db
-        )
+        await controller.get_history(chat_id=chat_id, user_id=user_id, db=db_session_mock)
 
-    assert exc_info.value.status_code == 400
+    assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
     assert exc_info.value.detail["success"] is False
-    assert exc_info.value.detail["message"] == error_message
-
-@pytest.mark.asyncio
-async def test_create_chat_permission_error(
-    chat_controller, mock_chat_service, valid_chat_create, user_id, mock_db, mock_background_tasks
-):
-    # Setup
-    error_message = "You can only use your own personas"
-    mock_chat_service.create_chat.side_effect = PermissionError(error_message)
-
-    # Execution & Verification
-    with pytest.raises(HTTPException) as exc_info:
-        await chat_controller.create_chat(
-            chat_in=valid_chat_create,
-            user_id=user_id,
-            background_tasks=mock_background_tasks,
-            db=mock_db
-        )
-
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail["success"] is False
-    assert exc_info.value.detail["message"] == error_message
+    assert exc_info.value.detail["message"] == "Chat history not found"
+    chat_service_mock.get_history_payload.assert_called_once_with(chat_id, user_id, db_session_mock)
