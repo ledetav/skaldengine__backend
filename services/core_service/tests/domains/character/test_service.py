@@ -1,72 +1,109 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import uuid4
 
-# import needed models to resolve sqlalchemy relationship strings
-import app.domains.character.attribute_models
-import app.domains.lorebook.models
-import app.domains.scenario.models
-import app.domains.chat.models
-import app.domains.persona.models
-import app.domains.chat.message_models
-
-from app.domains.character.models import Character
 from app.domains.character.service import CharacterService
+from app.domains.character.models import Character
+from app.domains.character.schemas import CharacterUpdate
+
+@pytest.fixture
+def mock_repo():
+    return AsyncMock()
+
+@pytest.fixture
+def service(mock_repo):
+    return CharacterService(repository=mock_repo)
 
 @pytest.mark.asyncio
-async def test_get_characters():
-    # Setup mock repository
-    mock_repo = AsyncMock()
+async def test_update_character_success(service, mock_repo):
+    character_id = uuid4()
+    creator_id = uuid4()
 
-    # Create some dummy characters
-    char1 = Character(id=uuid4(), name="Char 1")
-    char2 = Character(id=uuid4(), name="Char 2")
+    mock_character = MagicMock(spec=Character)
+    mock_character.creator_id = creator_id
+    mock_character.id = character_id
 
-    # Configure mock returns
-    mock_repo.get_active_characters.return_value = [char1, char2]
+    mock_updated_character = MagicMock(spec=Character)
+    mock_updated_character.id = character_id
 
-    # We can either make get_scenarios_count / get_scenario_chats_count return a static value,
-    # or return different values based on character id using a side_effect
-    async def mock_get_scenarios_count(char_id):
-        if char_id == char1.id:
-            return 5
-        return 10
+    mock_repo.get.return_value = mock_character
+    mock_repo.update.return_value = mock_updated_character
 
-    async def mock_get_scenario_chats_count(char_id):
-        if char_id == char1.id:
-            return 20
-        return 50
+    update_data = CharacterUpdate(name="New Name")
 
-    mock_repo.get_scenarios_count.side_effect = mock_get_scenarios_count
-    mock_repo.get_scenario_chats_count.side_effect = mock_get_scenario_chats_count
+    with patch('app.domains.character.service.manager') as mock_manager:
+        mock_manager.broadcast = AsyncMock()
+        with patch.object(service, '_format_broadcast_data', return_value={"id": str(character_id)}) as mock_format:
+            result = await service.update_character(character_id, update_data, creator_id)
 
-    # Initialize service
-    service = CharacterService(repository=mock_repo)
-
-    # Call method
-    characters = await service.get_characters(skip=0, limit=20)
-
-    # Assertions
-    mock_repo.get_active_characters.assert_called_once_with(0, 20)
-
-    assert len(characters) == 2
-    assert characters[0].id == char1.id
-    assert getattr(characters[0], "scenarios_count") == 5
-    assert getattr(characters[0], "scenario_chats_count") == 20
-
-    assert characters[1].id == char2.id
-    assert getattr(characters[1], "scenarios_count") == 10
-    assert getattr(characters[1], "scenario_chats_count") == 50
+            assert result == mock_updated_character
+            mock_repo.get.assert_called_once_with(character_id)
+            mock_repo.update.assert_called_once_with(db_obj=mock_character, obj_in=update_data)
+            mock_format.assert_called_once_with(mock_updated_character)
+            mock_manager.broadcast.assert_called_once_with({
+                "type": "UPDATE_CHARACTER",
+                "data": {"id": str(character_id)}
+            })
 
 @pytest.mark.asyncio
-async def test_get_characters_empty():
-    mock_repo = AsyncMock()
-    mock_repo.get_active_characters.return_value = []
+async def test_update_character_not_found(service, mock_repo):
+    character_id = uuid4()
+    creator_id = uuid4()
 
-    service = CharacterService(repository=mock_repo)
-    characters = await service.get_characters(skip=10, limit=5)
+    mock_repo.get.return_value = None
 
-    mock_repo.get_active_characters.assert_called_once_with(10, 5)
-    assert mock_repo.get_scenarios_count.call_count == 0
-    assert mock_repo.get_scenario_chats_count.call_count == 0
-    assert characters == []
+    update_data = CharacterUpdate(name="New Name")
+
+    result = await service.update_character(character_id, update_data, creator_id)
+
+    assert result is None
+    mock_repo.get.assert_called_once_with(character_id)
+    mock_repo.update.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_character_forbidden(service, mock_repo):
+    character_id = uuid4()
+    creator_id = uuid4()
+    other_creator_id = uuid4()
+
+    mock_character = MagicMock(spec=Character)
+    mock_character.creator_id = other_creator_id
+    mock_character.id = character_id
+
+    mock_repo.get.return_value = mock_character
+
+    update_data = CharacterUpdate(name="New Name")
+
+    result = await service.update_character(character_id, update_data, creator_id)
+
+    assert result is None
+    mock_repo.get.assert_called_once_with(character_id)
+    mock_repo.update.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_update_character_without_creator_id(service, mock_repo):
+    character_id = uuid4()
+    original_creator_id = uuid4()
+
+    mock_character = MagicMock(spec=Character)
+    mock_character.creator_id = original_creator_id
+    mock_character.id = character_id
+
+    mock_updated_character = MagicMock(spec=Character)
+    mock_updated_character.id = character_id
+
+    mock_repo.get.return_value = mock_character
+    mock_repo.update.return_value = mock_updated_character
+
+    update_data = CharacterUpdate(name="New Name")
+
+    with patch('app.domains.character.service.manager') as mock_manager:
+        mock_manager.broadcast = AsyncMock()
+        with patch.object(service, '_format_broadcast_data', return_value={"id": str(character_id)}) as mock_format:
+            # Not passing creator_id
+            result = await service.update_character(character_id, update_data)
+
+            assert result == mock_updated_character
+            mock_repo.get.assert_called_once_with(character_id)
+            mock_repo.update.assert_called_once_with(db_obj=mock_character, obj_in=update_data)
