@@ -45,6 +45,7 @@ class DummyBase:
 sys.modules["app.db.base"] = MagicMock(Base=DummyBase)
 
 # 2. Setup specific mocks for security functions
+from unittest.mock import patch
 import app.core.security as mock_security
 mock_security.verify_password = MagicMock()
 mock_security.create_access_token = MagicMock()
@@ -60,32 +61,34 @@ class TestAuthService(IsolatedAsyncioTestCase):
         self.repository = AsyncMock()
         self.service = AuthService(repository=self.repository)
 
-    async def test_authenticate_success(self):
+    @patch('app.domains.user.auth_service.verify_password')
+    @patch('app.domains.user.auth_service.create_access_token')
+    async def test_authenticate_success(self, mock_create_access_token, mock_verify_password):
         # Arrange
         identifier = "test@example.com"
         password = "password123"
 
         user = MagicMock(spec=User)
         user.id = "user-id"
-        user.password_hash = "hashed_password"
+        user.password_hash = "$2b$12$Lb1L9UREHfkdzuQ07DFzQO7NsFeAa0dF8GWVZsZXODyP0yZsOYK1C"
         user.role = "user"
         user.login = "testuser"
         user.username = "testusername"
         user.full_name = "Test User"
-        user.birth_date = MagicMock()
+        user.birth_date = "2000-01-01"
         user.polza_api_key = "api-key"
 
         self.repository.get_by_email_or_login.return_value = user
-        mock_security.verify_password.return_value = True
-        mock_security.create_access_token.return_value = "fake-jwt-token"
+        mock_verify_password.return_value = True
+        mock_create_access_token.return_value = "fake-jwt-token"
 
         # Act
         result = await self.service.authenticate(identifier, password)
 
         # Assert
         self.repository.get_by_email_or_login.assert_called_once_with(identifier)
-        mock_security.verify_password.assert_called_once_with(password, "hashed_password")
-        mock_security.create_access_token.assert_called_once()
+        mock_verify_password.assert_called_once_with(password, "$2b$12$Lb1L9UREHfkdzuQ07DFzQO7NsFeAa0dF8GWVZsZXODyP0yZsOYK1C")
+        mock_create_access_token.assert_called_once()
         self.assertEqual(result, {
             "access_token": "fake-jwt-token",
             "token_type": "bearer",
@@ -101,12 +104,13 @@ class TestAuthService(IsolatedAsyncioTestCase):
         # Assert
         self.assertIsNone(result)
 
-    async def test_authenticate_wrong_password(self):
+    @patch('app.domains.user.auth_service.verify_password')
+    async def test_authenticate_wrong_password(self, mock_verify_password):
         # Arrange
         user = MagicMock(spec=User)
-        user.password_hash = "hashed_password"
+        user.password_hash = "$2b$12$Lb1L9UREHfkdzuQ07DFzQO7NsFeAa0dF8GWVZsZXODyP0yZsOYK1C"
         self.repository.get_by_email_or_login.return_value = user
-        mock_security.verify_password.return_value = False
+        mock_verify_password.return_value = False
 
         # Act
         result = await self.service.authenticate("test@example.com", "wrong_password")

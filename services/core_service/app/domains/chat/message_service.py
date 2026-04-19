@@ -15,9 +15,9 @@ class MessageService(BaseService[MessageRepository]):
         background_tasks: BackgroundTasks, db: AsyncSession
     ):
         from .models import Chat
-        from ..character.models import Character
-        from ..persona.models import UserPersona
-        from ..scenario.models import Scenario
+        from app.domains.character.models import Character
+        from app.domains.persona.models import UserPersona
+        from app.domains.scenario.models import Scenario
 
         chat = await db.get(Chat, chat_id)
         if not chat or str(chat.user_id) != str(current_user.id):
