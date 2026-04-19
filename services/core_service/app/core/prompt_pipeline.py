@@ -17,7 +17,7 @@ from app.domains.chat.message_models import Message
 from app.domains.lorebook.models import Lorebook, LorebookEntry
 from app.domains.chat.models import ChatCheckpoint
 from app.domains.chat.models import EpisodicMemory
-from app.models.character_attribute import CharacterAttribute
+from app.domains.character.attribute_models import CharacterAttribute
 from app.core import rag
 
 
@@ -258,16 +258,25 @@ class PromptPipeline:
         
         # 1. Собираем все ID сообщений в текущей ветке (от текущего родителя до корня)
         ancestor_ids = []
-        curr_id = self.parent_id
-        while curr_id:
-            ancestor_ids.append(curr_id)
-            # В идеале здесь нужен один запрос или кеширование, но для RAG-путей < 100 сообщений это допустимо
-            # Для оптимизации лучше было бы передавать дерево или использовать CTE, но пока сделаем просто
-            res = await self.db.get(Message, curr_id)
-            if not res:
-                break
-            curr_id = res.parent_id
-        
+        if self.parent_id:
+            # Recursive CTE to fetch all ancestor IDs efficiently
+            base_query = (
+                select(Message.id, Message.parent_id)
+                .where(Message.id == self.parent_id)
+                .cte(name="message_tree", recursive=True)
+            )
+
+            recursive_query = (
+                select(Message.id, Message.parent_id)
+                .join(base_query, Message.id == base_query.c.parent_id)
+            )
+
+            cte = base_query.union_all(recursive_query)
+            query = select(cte.c.id)
+
+            result = await self.db.execute(query)
+            ancestor_ids = list(result.scalars().all())
+
         if not ancestor_ids:
             return
 
@@ -354,12 +363,31 @@ class PromptPipeline:
         messages = []
         limit = 20
         
-        while current_id and len(messages) < limit:
-            msg = await self.db.get(Message, current_id)
-            if not msg:
-                break
-            messages.append(msg)
-            current_id = msg.parent_id
+        if current_id:
+            from sqlalchemy import literal
+            base_query = (
+                select(Message.id, Message.parent_id, literal(1).label('depth'))
+                .where(Message.id == current_id)
+                .cte(name="history_tree", recursive=True)
+            )
+
+            recursive_query = (
+                select(Message.id, Message.parent_id, (base_query.c.depth + 1).label('depth'))
+                .join(base_query, Message.id == base_query.c.parent_id)
+                .where(base_query.c.depth < limit)
+            )
+
+            cte = base_query.union_all(recursive_query)
+
+            # Fetch the actual messages sorted by depth ascending (from newest to oldest relative to current_id)
+            query = (
+                select(Message)
+                .join(cte, Message.id == cte.c.id)
+                .order_by(cte.c.depth.asc())
+            )
+
+            result = await self.db.execute(query)
+            messages = list(result.scalars().all())
             
         # Разворачиваем историю, чтобы она шла от старых к новым
         messages.reverse()
