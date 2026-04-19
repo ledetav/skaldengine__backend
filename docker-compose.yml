@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: auth_password
       POSTGRES_DB: auth_db
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - auth_db_data:/var/lib/postgresql/data
 
@@ -19,7 +19,7 @@ services:
       POSTGRES_PASSWORD: core_password
       POSTGRES_DB: core_db
     ports:
-      - "5433:5432"
+      - "5436:5432"
     volumes:
       - core_db_data:/var/lib/postgresql/data
 
@@ -29,10 +29,10 @@ services:
     ports:
       - "8001:8001"
     env_file:
-      - services/auth_service/.env
+      - .env
     environment:
       - SERVICE_NAME=auth
-      - DATABASE_URL=postgresql+asyncpg://auth_user:auth_password@auth-db:5432/auth_db
+      - DATABASE_URL=postgresql+asyncpg://auth_user:${AUTH_PASSWORD}@auth-db:5432/auth_db
       - PORT=8001
     depends_on:
       - auth-db
@@ -42,10 +42,10 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - services/core_service/.env
+      - .env
     environment:
       - SERVICE_NAME=core
-      - DATABASE_URL=postgresql+asyncpg://core_user:core_password@core-db:5432/core_db
+      - DATABASE_URL=postgresql+asyncpg://core_user:${CORE_PASSWORD}@core-db:5432/core_db
       - PORT=8000
     depends_on:
       - core-db
