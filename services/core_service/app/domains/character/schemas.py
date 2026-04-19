@@ -105,3 +105,7 @@ class Character(CharacterBase):
 
     class Config:
         from_attributes = True
+
+
+# Alias for response schema
+CharacterResponse = CharacterRead

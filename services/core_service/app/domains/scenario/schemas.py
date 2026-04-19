@@ -63,3 +63,7 @@ class Scenario(ScenarioBase):
 
     class Config:
         from_attributes = True
+
+
+# Alias for response schema
+ScenarioResponse = Scenario

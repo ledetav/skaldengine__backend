@@ -90,11 +90,67 @@ async def verify_staff_role(current_user: CurrentUser = Depends(get_current_user
         raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
     return current_user
 
+async def get_optional_current_user(token_auth: HTTPAuthorizationCredentials | None = Depends(security)) -> CurrentUser | None:
+    """Get current user if token is provided, return None otherwise."""
+    if token_auth is None:
+        return None
+    token = token_auth.credentials
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        token_data = payload.get("sub")
+        if token_data is None:
+            return None
+        
+        # Parse birth_date
+        birth_date_str = payload.get("birth_date")
+        birth_date_val = None
+        if birth_date_str:
+            try:
+                birth_date_val = date.fromisoformat(birth_date_str)
+            except ValueError:
+                pass
+
+        return CurrentUser(
+            id=UUID(token_data),
+            role=payload.get("role", "user"),
+            login=payload.get("login"),
+            username=payload.get("username"),
+            full_name=payload.get("full_name"),
+            birth_date=birth_date_val,
+            polza_api_key=payload.get("polza_api_key")
+        )
+    except (JWTError, ValueError):
+        return None
+
+async def verify_staff_role(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+    """Allow both admins and moderators."""
+    if current_user.role not in ["admin", "moderator"]:
+        raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
+    return current_user
+
 async def verify_admin_role(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     """Allow ONLY admins."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="This operation requires Administrator privileges")
     return current_user
+
+# DI for Lorebook (defined first because Character depends on it)
+async def get_lorebook_repository(db: AsyncSession = Depends(get_db)) -> LorebookRepository:
+    return LorebookRepository(db)
+
+async def get_lorebook_entry_repository(db: AsyncSession = Depends(get_db)) -> LorebookEntryRepository:
+    return LorebookEntryRepository(db)
+
+async def get_lorebook_service(
+    repo: LorebookRepository = Depends(get_lorebook_repository),
+    entry_repo: LorebookEntryRepository = Depends(get_lorebook_entry_repository)
+) -> LorebookService:
+    return LorebookService(repo, entry_repo)
+
+async def get_lorebook_controller(service: LorebookService = Depends(get_lorebook_service)) -> LorebookController:
+    return LorebookController(service)
 
 # DI for Character
 async def get_character_repository(db: AsyncSession = Depends(get_db)) -> CharacterRepository:
@@ -148,22 +204,6 @@ async def get_user_persona_service(repo: UserPersonaRepository = Depends(get_use
 
 async def get_user_persona_controller(service: UserPersonaService = Depends(get_user_persona_service)) -> UserPersonaController:
     return UserPersonaController(service)
-
-# DI for Lorebook
-async def get_lorebook_repository(db: AsyncSession = Depends(get_db)) -> LorebookRepository:
-    return LorebookRepository(db)
-
-async def get_lorebook_entry_repository(db: AsyncSession = Depends(get_db)) -> LorebookEntryRepository:
-    return LorebookEntryRepository(db)
-
-async def get_lorebook_service(
-    repo: LorebookRepository = Depends(get_lorebook_repository),
-    entry_repo: LorebookEntryRepository = Depends(get_lorebook_entry_repository)
-) -> LorebookService:
-    return LorebookService(repo, entry_repo)
-
-async def get_lorebook_controller(service: LorebookService = Depends(get_lorebook_service)) -> LorebookController:
-    return LorebookController(service)
 
 # DI for CharacterAttribute
 async def get_character_attribute_repository(db: AsyncSession = Depends(get_db)) -> CharacterAttributeRepository:
