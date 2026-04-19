@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserPersonaService
-from .schemas import UserPersonaCreate, UserPersonaResponse
+from .schemas import UserPersonaCreate, UserPersonaUpdate
 from app.domains.persona.schemas import UserStatistics
 from shared.schemas.response import BaseResponse
 
