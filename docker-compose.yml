@@ -1,53 +1,46 @@
 services:
-  # База данных для микросервиса авторизации (с pgvector)
+  # БД для авторизации
   auth-db:
     image: pgvector/pgvector:pg15
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: auth_user
-      POSTGRES_PASSWORD: auth_password
+      POSTGRES_PASSWORD: ${AUTH_PASSWORD}
       POSTGRES_DB: auth_db
     ports:
       - "5435:5432"
     volumes:
       - auth_db_data:/var/lib/postgresql/data
 
-  # База данных для основного микросервиса (с pgvector)
+  # БД для основного сервиса
   core-db:
     image: pgvector/pgvector:pg15
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: core_user
-      POSTGRES_PASSWORD: core_password
+      POSTGRES_PASSWORD: ${CORE_PASSWORD}
       POSTGRES_DB: core_db
     ports:
       - "5436:5432"
     volumes:
       - core_db_data:/var/lib/postgresql/data
 
-
-  auth-service:
+  # Единый Backend + API Gateway (Nginx)
+  backend-gateway:
     build: .
+    container_name: skald_backend
     ports:
-      - "8001:8001"
+      - "8000:8000"  # Наружу торчит только Nginx
     env_file:
       - .env
     environment:
-      - SERVICE_NAME=auth
-      - DATABASE_URL=postgresql+asyncpg://auth_user:${AUTH_PASSWORD}@auth-db:5432/auth_db
-      - PORT=8001
+      # Nginx и start.sh разрулят всё внутри
+      - AUTH_DATABASE_URL=postgresql+asyncpg://auth_user:${AUTH_PASSWORD}@auth-db:5432/auth_db
+      - CORE_DATABASE_URL=postgresql+asyncpg://core_user:${CORE_PASSWORD}@core-db:5432/core_db
     depends_on:
       - auth-db
-
-  core-service:
-    build: .
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    environment:
-      - SERVICE_NAME=core
-      - DATABASE_URL=postgresql+asyncpg://core_user:${CORE_PASSWORD}@core-db:5432/core_db
-      - PORT=8000
-    depends_on:
       - core-db
 
 volumes:
