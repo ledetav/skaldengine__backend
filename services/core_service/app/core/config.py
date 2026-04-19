@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = Field("SkaldEngine Core Service", validation_alias=AliasChoices("CORE_PROJECT_NAME", "PROJECT_NAME"))
     API_V1_STR: str = "/api/v1"
+    LOG_LEVEL: str = "INFO"
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
