@@ -26,6 +26,8 @@ services:
 
   auth-service:
     build: .
+    working_dir: /app/services/auth_service
+    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
     ports:
       - "8001:8001"
     env_file:
@@ -39,14 +41,16 @@ services:
 
   core-service:
     build: .
+    working_dir: /app/services/core_service
+    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
     ports:
-      - "8000:8000"
+      - "8002:8002"
     env_file:
       - .env
     environment:
       - SERVICE_NAME=core
       - DATABASE_URL=postgresql+asyncpg://core_user:core_password@core-db:5432/core_db
-      - PORT=8000
+      - PORT=8002
     depends_on:
       - core-db
 
