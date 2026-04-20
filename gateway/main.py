@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
@@ -18,9 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "gateway"}
+
 
 @app.get("/")
 def root():
@@ -33,52 +35,93 @@ def root():
         }
     }
 
-@app.get("/auth/docs", include_in_schema=False)
-async def auth_docs_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=f"{AUTH_BASE}/docs")
 
-@app.get("/core/docs", include_in_schema=False)
-async def core_docs_redirect():
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=f"{CORE_BASE}/docs")
-
-async def _proxy(request: Request, target_base: str) -> StreamingResponse:
-    url = httpx.URL(
-        target_base + request.url.path,
-        params=request.query_params,
-    )
-    headers = dict(request.headers)
-    headers.pop("host", None)
-
+async def _fetch(path: str, target_base: str, request: Request) -> httpx.Response:
+    url = httpx.URL(target_base + path, params=request.query_params)
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
     body = await request.body()
-
     async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.request(
+        return await client.request(
             method=request.method,
             url=url,
             headers=headers,
             content=body,
+            follow_redirects=True,
         )
 
-    return StreamingResponse(
-        content=iter([resp.content]),
+
+async def _proxy(path: str, target_base: str, request: Request) -> Response:
+    resp = await _fetch(path, target_base, request)
+    excluded = {"content-encoding", "transfer-encoding", "content-length"}
+    headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+    return Response(
+        content=resp.content,
         status_code=resp.status_code,
-        headers=dict(resp.headers),
+        headers=headers,
+        media_type=resp.headers.get("content-type"),
     )
+
+
+async def _proxy_docs(docs_path: str, openapi_path: str,
+                      target_base: str, prefix: str, request: Request) -> Response:
+    resp = await _fetch(docs_path, target_base, request)
+    html = resp.text
+    # Rewrite the openapi.json URL so the browser fetches it through the gateway
+    html = html.replace(
+        f"url: '{openapi_path}'",
+        f"url: '/{prefix}{openapi_path}'"
+    )
+    return HTMLResponse(content=html, status_code=resp.status_code)
+
+
+# ── Auth docs ────────────────────────────────────────────────────────────────
+
+@app.get("/auth/docs", include_in_schema=False)
+async def auth_docs(request: Request):
+    return await _proxy_docs(
+        docs_path="/docs",
+        openapi_path="/api/v1/openapi.json",
+        target_base=AUTH_BASE,
+        prefix="auth",
+        request=request,
+    )
+
+
+@app.get("/auth/api/v1/openapi.json", include_in_schema=False)
+async def auth_openapi(request: Request):
+    return await _proxy("/api/v1/openapi.json", AUTH_BASE, request)
+
+
+# ── Core docs ────────────────────────────────────────────────────────────────
+
+@app.get("/core/docs", include_in_schema=False)
+async def core_docs(request: Request):
+    return await _proxy_docs(
+        docs_path="/docs",
+        openapi_path="/api/v1/openapi.json",
+        target_base=CORE_BASE,
+        prefix="core",
+        request=request,
+    )
+
+
+@app.get("/core/api/v1/openapi.json", include_in_schema=False)
+async def core_openapi(request: Request):
+    return await _proxy("/api/v1/openapi.json", CORE_BASE, request)
+
+
+# ── API proxy ────────────────────────────────────────────────────────────────
 
 @app.api_route(
     "/api/v1/{path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 )
-async def proxy(request: Request, path: str):
+async def api_proxy(request: Request, path: str):
     full_path = "/api/v1/" + path
     target = AUTH_BASE if full_path.startswith(AUTH_PREFIXES) else CORE_BASE
-    return await _proxy(request, target)
+    return await _proxy(full_path, target, request)
 
-@app.api_route(
-    "/static/{path:path}",
-    methods=["GET"],
-)
+
+@app.api_route("/static/{path:path}", methods=["GET"])
 async def static_proxy(request: Request, path: str):
-    return await _proxy(request, CORE_BASE)
+    return await _proxy("/static/" + path, CORE_BASE, request)
