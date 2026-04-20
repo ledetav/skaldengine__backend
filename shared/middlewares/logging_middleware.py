@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 from fastapi import Request, FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.responses import JSONResponse
@@ -25,6 +26,9 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 def add_global_exception_handler(app: FastAPI):
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        print(f"\n{'='*50}\n🔥 КРИТИЧЕСКАЯ ОШИБКА 🔥")
+        traceback.print_exc()
+        print(f"{'='*50}\n")
         logger.error(f"Unhandled exception during {request.method} {request.url.path}: {exc}", exc_info=True)
         return JSONResponse(
             status_code=500,

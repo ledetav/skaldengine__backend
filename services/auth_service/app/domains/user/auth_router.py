@@ -1,3 +1,4 @@
+import traceback
 from typing import Any
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -27,4 +28,18 @@ async def register_user(
     """
     Create a new user.
     """
-    return await controller.register(user_in)
+    try:
+        print("\n--- НАЧИНАЕМ РЕГИСТРАЦИЮ ---")
+        
+        # Вот тут вызывается код, который падает
+        result = await controller.register(user_in)
+        
+        print("--- РЕГИСТРАЦИЯ УСПЕШНА, РЕЗУЛЬТАТ:", result)
+        return result
+        
+    except Exception as e:
+        # ВОТ ЭТО МЫ ТОЧНО УВИДИМ В КОНСОЛИ!
+        print("\n!!! ПОЙМАЛИ ОШИБКУ В РОУТЕРЕ !!!")
+        traceback.print_exc()
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+        raise e

@@ -39,6 +39,9 @@ services:
       # Nginx и start.sh разрулят всё внутри
       - AUTH_DATABASE_URL=postgresql+asyncpg://auth_user:${AUTH_PASSWORD}@auth-db:5432/auth_db
       - CORE_DATABASE_URL=postgresql+asyncpg://core_user:${CORE_PASSWORD}@core-db:5432/core_db
+    volumes:
+      - ./services:/app/services
+      - ./shared:/app/shared
     depends_on:
       - auth-db
       - core-db
