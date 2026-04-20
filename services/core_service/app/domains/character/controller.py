@@ -41,7 +41,7 @@ class CharacterController(BaseController):
                 )
 
         character = await self.character_service.create_character(character_in, user_id)
-        return self.handle_success(data=character, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=character)
 
     async def update_character(self, character_id: UUID, character_update: CharacterUpdate, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         creator_id = None if is_admin else user_id

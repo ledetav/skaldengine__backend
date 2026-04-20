@@ -25,7 +25,7 @@ class LorebookController(BaseController):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         lorebook = await self.lorebook_service.create_lorebook(lorebook_in)
-        return self.handle_success(data=lorebook, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=lorebook)
 
     async def get_lorebook(self, lorebook_id: UUID) -> BaseResponse:
         lorebook = await self.lorebook_service.get_lorebook(lorebook_id)
@@ -58,7 +58,7 @@ class LorebookController(BaseController):
     # Entry methods
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> BaseResponse:
         entry = await self.lorebook_service.create_entry(lorebook_id, entry_in)
-        return self.handle_success(data=entry, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=entry)
 
     async def get_entry(self, entry_id: UUID) -> BaseResponse:
         entry = await self.lorebook_service.get_entry(entry_id)
