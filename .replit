@@ -1,0 +1,73 @@
+modules = ["python-3.12", "nix"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+ALGORITHM = "HS256"
+API_V1_STR = "/api/v1"
+AUTH_PROJECT_NAME = "SkaldEngine Auth Service"
+CORE_PROJECT_NAME = "SkaldEngine Core Service"
+ACCESS_TOKEN_EXPIRE_MINUTES = "60"
+POLZA_CHAT_MODEL = "google/gemini-3-flash-preview"
+POLZA_EMBEDDING_MODEL = "openai/text-embedding-3-small"
+POLZA_SUMMARY_MODEL = "google/gemini-3.1-flash-lite-preview"
+POLZA_TITLE_MODEL = "google/gemini-2.0-flash-lite-preview-02-05"
+POLZA_TEMPERATURE = "1.0"
+POLZA_MAX_TOKENS = "8000"
+POLZA_TITLE_MAX_TOKENS = "50"
+SECRET_KEY = "c46e63b1ac738dd036fc4d6ffe88836e0feecba4c456fa10a9c16ff8c77e3c9d"
+AUTH_DATABASE_URL = "postgresql+asyncpg://postgres:password@helium/heliumdb?ssl=disable"
+CORE_DATABASE_URL = "postgresql+asyncpg://postgres:password@helium/heliumdb?ssl=disable"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Core Service"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash start_auth.sh"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow]]
+name = "Core Service"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash start_core.sh"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
