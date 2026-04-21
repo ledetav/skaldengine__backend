@@ -3,8 +3,8 @@ from fastapi.responses import StreamingResponse, HTMLResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
-AUTH_BASE = "http://localhost:8001"
-CORE_BASE = "http://localhost:8000"
+AUTH_BASE = "http://127.0.0.1:8001"
+CORE_BASE = "http://127.0.0.1:8000"
 
 AUTH_PREFIXES = ("/api/v1/auth", "/api/v1/users")
 
