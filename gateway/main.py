@@ -1,10 +1,7 @@
 import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, HTMLResponse, Response, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, Response, JSONResponse
 import httpx
-import os
-import json
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("gateway")
@@ -16,31 +13,42 @@ AUTH_PREFIXES = ("/api/v1/auth", "/api/v1/users")
 
 app = FastAPI(title="SKALD Gateway", docs_url=None)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"Global Error: {exc.__class__.__name__} - {str(exc)}"},
+
+# ── Custom CORS Middleware ─────────────────────────────────────────────────────
+# Replaces Starlette CORSMiddleware with a more reliable implementation.
+# Reflects the requesting Origin back if it matches the allowed pattern.
+_ALLOWED_ORIGIN_SUFFIXES = (".replit.dev", ".replit.app", "localhost:3000", "localhost:5173")
+
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin", "")
+    origin_allowed = origin and (
+        any(origin.endswith(s) for s in _ALLOWED_ORIGIN_SUFFIXES)
+        or origin.startswith("http://localhost:")
     )
 
-# Load CORS settings from environment
-raw_origins = os.getenv("BACKEND_CORS_ORIGINS", '["*"]')
-try:
-    CORS_ORIGINS = json.loads(raw_origins)
-except Exception:
-    CORS_ORIGINS = [raw_origins] if raw_origins else ["*"]
+    # Handle preflight OPTIONS request immediately
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        if origin_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Max-Age"] = "600"
+        return response
 
-CORS_ALLOW_ORIGIN_REGEX = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "https://.*\.replit\.dev")
+    response = await call_next(request)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    if origin_allowed:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+
+    return response
+
+
 
 
 @app.get("/health")
