@@ -1,10 +1,9 @@
-import logging
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, HTMLResponse, Response, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-import httpx
 import os
 import json
+import logging
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, Response, JSONResponse
+import httpx
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("gateway")
@@ -16,31 +15,54 @@ AUTH_PREFIXES = ("/api/v1/auth", "/api/v1/users")
 
 app = FastAPI(title="SKALD Gateway", docs_url=None)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": f"Global Error: {exc.__class__.__name__} - {str(exc)}"},
+
+# ── Custom CORS Middleware ─────────────────────────────────────────────────────
+# This implementation is more stable for Gateways.
+# It uses domains from BACKEND_CORS_ORIGINS env var + safe defaults.
+
+_ALLOWED_SUFFIXES = (".replit.dev", ".replit.app", "localhost:3000", "localhost:5173", "127.0.0.1:3000", "127.0.0.1:5173")
+
+@app.middleware("http")
+async def cors_middleware(request: Request, call_next):
+    origin = request.headers.get("origin", "")
+    
+    # Dynamic load from env to allow runtime changes in Replit Secrets
+    raw = os.getenv("BACKEND_CORS_ORIGINS", "[]")
+    try:
+        allowed_origins = json.loads(raw)
+        if not isinstance(allowed_origins, list):
+            allowed_origins = [allowed_origins]
+    except:
+        allowed_origins = [raw] if raw else []
+
+    is_allowed = origin and (
+        origin in allowed_origins 
+        or any(origin.endswith(s) for s in _ALLOWED_SUFFIXES)
+        or "localhost" in origin
     )
 
-# Load CORS settings from environment
-raw_origins = os.getenv("BACKEND_CORS_ORIGINS", '["*"]')
-try:
-    CORS_ORIGINS = json.loads(raw_origins)
-except Exception:
-    CORS_ORIGINS = [raw_origins] if raw_origins else ["*"]
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+        if is_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Max-Age"] = "600"
+        return response
 
-CORS_ALLOW_ORIGIN_REGEX = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "https://.*\.replit\.dev")
+    response = await call_next(request)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    if is_allowed:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+
+    return response
+
+
 
 
 @app.get("/health")
@@ -80,7 +102,9 @@ def root():
 
 async def _fetch(path: str, target_base: str, request: Request) -> httpx.Response:
     url = httpx.URL(target_base + path, params=request.query_params)
-    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    # Remove host, origin and referer to make it look like a clean internal request
+    excluded_headers = {"host", "origin", "referer"}
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
     body = await request.body()
     
     logger.info(f"Proxying {request.method} request to: {url}")
