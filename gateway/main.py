@@ -80,7 +80,9 @@ def root():
 
 async def _fetch(path: str, target_base: str, request: Request) -> httpx.Response:
     url = httpx.URL(target_base + path, params=request.query_params)
-    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    # Remove host, origin and referer to make it look like a clean internal request
+    excluded_headers = {"host", "origin", "referer"}
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
     body = await request.body()
     
     logger.info(f"Proxying {request.method} request to: {url}")
