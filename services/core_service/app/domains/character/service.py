@@ -36,7 +36,7 @@ class CharacterService(BaseService[CharacterRepository]):
                 
                 # Для этого нужен LorebookRepository
                 # Вариант с Session
-                db_session = self.repository.session
+                db_session = self.repository.db
                 lorebook_repo = LorebookRepository(db_session)
                 
                 lorebook = Lorebook(

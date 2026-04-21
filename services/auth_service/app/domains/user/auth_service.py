@@ -52,6 +52,6 @@ class AuthService(BaseService[UserRepository]):
             "birth_date": user_in.birth_date,
             "password_hash": get_password_hash(user_in.password),
             "role": "user",
-            "polza_api_key": user_in.polza_api_key
+            "polza_api_key": user_in.polza_api_key,
         }
         return await self.repository.create(obj_in=user_data)

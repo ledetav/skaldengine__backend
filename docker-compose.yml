@@ -30,7 +30,8 @@ services:
   # Единый Backend + API Gateway (Nginx)
   backend-gateway:
     build: .
-    container_name: skald_backend
+    working_dir: /app/services/auth_service
+    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
     ports:
       - "8000:8000"  # Наружу торчит только Nginx
     env_file:
@@ -44,6 +45,20 @@ services:
       - ./shared:/app/shared
     depends_on:
       - auth-db
+
+  core-service:
+    build: .
+    working_dir: /app/services/core_service
+    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    environment:
+      - SERVICE_NAME=core
+      - DATABASE_URL=postgresql+asyncpg://core_user:core_password@core-db:5432/core_db
+      - PORT=8002
+    depends_on:
       - core-db
 
 volumes:

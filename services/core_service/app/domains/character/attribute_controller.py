@@ -22,11 +22,11 @@ class CharacterAttributeController(BaseController):
 
     async def create_attribute(self, attribute_in: CharacterAttributeCreate) -> BaseResponse:
         attribute = await self.attribute_service.create_attribute(attribute_in)
-        return self.handle_success(data=attribute, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=attribute)
 
     async def create_bulk(self, bulk_in: CharacterAttributeBulkCreate) -> BaseResponse:
         attributes = await self.attribute_service.create_bulk(bulk_in)
-        return self.handle_success(data=attributes, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=attributes)
 
     async def update_attribute(self, attribute_id: UUID, attribute_update: CharacterAttributeUpdate) -> BaseResponse:
         attribute = await self.attribute_service.update_attribute(attribute_id, attribute_update)

@@ -8,5 +8,7 @@ DIPLOMA.session.sql
 .vscode/
 .venv/
 .codesandbox/
-.agents/test-venv/
+.agents/
 test-venv/
+replit.md
+.replit
