@@ -217,6 +217,72 @@ async def api_proxy(request: Request, path: str):
     return await _proxy(full_path, target, request)
 
 
+
 @app.api_route("/static/{path:path}", methods=["GET"])
 async def static_proxy(request: Request, path: str):
     return await _proxy("/static/" + path, CORE_BASE, request)
+
+
+# ── WebSocket proxy ───────────────────────────────────────────────────────────
+
+from fastapi import WebSocket, WebSocketDisconnect
+import websockets as ws_lib
+
+def _ws_url(http_base: str, path: str) -> str:
+    """Convert http(s):// base URL to ws(s):// for WebSocket connections."""
+    base = http_base.replace("https://", "wss://").replace("http://", "ws://")
+    return base.rstrip("/") + path
+
+
+@app.websocket("/api/v1/ws/{path:path}")
+async def websocket_proxy(websocket: WebSocket, path: str):
+    """Proxy WebSocket connections through to the core service."""
+    target_url = _ws_url(CORE_BASE, f"/api/v1/ws/{path}")
+
+    # Forward query params (e.g. ?token=...)
+    if websocket.query_params:
+        qs = "&".join(f"{k}={v}" for k, v in websocket.query_params.items())
+        target_url = f"{target_url}?{qs}"
+
+    # Forward Authorization header if present
+    extra_headers = {}
+    if auth := websocket.headers.get("authorization"):
+        extra_headers["Authorization"] = auth
+
+    logger.info(f"WS proxy: {target_url}")
+
+    try:
+        async with ws_lib.connect(target_url, additional_headers=extra_headers) as backend_ws:
+            await websocket.accept()
+
+            async def client_to_backend():
+                try:
+                    while True:
+                        data = await websocket.receive_text()
+                        await backend_ws.send(data)
+                except (WebSocketDisconnect, Exception):
+                    pass
+
+            async def backend_to_client():
+                try:
+                    async for message in backend_ws:
+                        if isinstance(message, str):
+                            await websocket.send_text(message)
+                        else:
+                            await websocket.send_bytes(message)
+                except Exception:
+                    pass
+
+            import asyncio
+            await asyncio.gather(client_to_backend(), backend_to_client())
+
+    except ws_lib.exceptions.WebSocketException as e:
+        logger.error(f"WS proxy error connecting to {target_url}: {e}")
+        await websocket.close(code=1011, reason="Backend WebSocket unavailable")
+    except Exception as e:
+        logger.error(f"WS proxy unexpected error: {e}")
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
+

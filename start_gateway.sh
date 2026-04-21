@@ -1,8 +1,12 @@
 #!/bin/bash
 export PYTHONPATH="/home/runner/workspace:$PYTHONPATH"
 
+echo "Installing gateway dependencies..."
+pip install -q -r /home/runner/workspace/gateway/requirements.txt
+
 bash /home/runner/workspace/start_auth.sh &
 bash /home/runner/workspace/start_core.sh &
+
 
 echo "Waiting for auth service on port 8001..."
 for i in $(seq 1 30); do
