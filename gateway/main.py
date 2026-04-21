@@ -15,30 +15,41 @@ AUTH_PREFIXES = ("/api/v1/auth", "/api/v1/users")
 
 app = FastAPI(title="SKALD Gateway", docs_url=None)
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    logger.error(f"GATEWAY ERROR on {request.method} {request.url.path}: {str(exc)}")
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Gateway Error: {exc.__class__.__name__} - {str(exc)}"},
+    )
+
 
 # ── Custom CORS Middleware ─────────────────────────────────────────────────────
-# This implementation is more stable for Gateways.
-# It uses domains from BACKEND_CORS_ORIGINS env var + safe defaults.
+# Fully configurable via environment variables.
 
-_ALLOWED_SUFFIXES = (".replit.dev", ".replit.app", "localhost:3000", "localhost:5173", "127.0.0.1:3000", "127.0.0.1:5173")
+def get_env_list(key, default):
+    raw = os.getenv(key, "")
+    if not raw:
+        return default
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else [data]
+    except:
+        return [raw]
 
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
     
-    # Dynamic load from env to allow runtime changes in Replit Secrets
-    raw = os.getenv("BACKEND_CORS_ORIGINS", "[]")
-    try:
-        allowed_origins = json.loads(raw)
-        if not isinstance(allowed_origins, list):
-            allowed_origins = [allowed_origins]
-    except:
-        allowed_origins = [raw] if raw else []
+    # Load settings from environment on every request (allows changes in Replit Secrets)
+    allowed_origins = get_env_list("BACKEND_CORS_ORIGINS", [])
+    allowed_suffixes = get_env_list("BACKEND_CORS_ALLOWED_SUFFIXES", [".replit.dev", ".replit.app", "localhost", "127.0.0.1"])
 
     is_allowed = origin and (
         origin in allowed_origins 
-        or any(origin.endswith(s) for s in _ALLOWED_SUFFIXES)
-        or "localhost" in origin
+        or any(origin.endswith(s) or s in origin for s in allowed_suffixes)
     )
 
     # Handle preflight OPTIONS request
