@@ -3,6 +3,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, HTMLResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+import os
+import json
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("gateway")
@@ -22,9 +24,19 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": f"Global Error: {exc.__class__.__name__} - {str(exc)}"},
     )
 
+# Load CORS settings from environment
+raw_origins = os.getenv("BACKEND_CORS_ORIGINS", '["*"]')
+try:
+    CORS_ORIGINS = json.loads(raw_origins)
+except Exception:
+    CORS_ORIGINS = [raw_origins] if raw_origins else ["*"]
+
+CORS_ALLOW_ORIGIN_REGEX = os.getenv("CORS_ALLOW_ORIGIN_REGEX", "https://.*\.replit\.dev")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -161,7 +173,7 @@ async def core_openapi(request: Request):
 
 @app.api_route(
     "/api/v1/{path:path}",
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
 async def api_proxy(request: Request, path: str):
     full_path = "/api/v1/" + path
