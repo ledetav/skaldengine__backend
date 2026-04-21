@@ -1,3 +1,5 @@
+import os
+import json
 import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response, JSONResponse
@@ -15,22 +17,34 @@ app = FastAPI(title="SKALD Gateway", docs_url=None)
 
 
 # ── Custom CORS Middleware ─────────────────────────────────────────────────────
-# Replaces Starlette CORSMiddleware with a more reliable implementation.
-# Reflects the requesting Origin back if it matches the allowed pattern.
-_ALLOWED_ORIGIN_SUFFIXES = (".replit.dev", ".replit.app", "localhost:3000", "localhost:5173")
+# This implementation is more stable for Gateways.
+# It uses domains from BACKEND_CORS_ORIGINS env var + safe defaults.
+
+_ALLOWED_SUFFIXES = (".replit.dev", ".replit.app", "localhost:3000", "localhost:5173", "127.0.0.1:3000", "127.0.0.1:5173")
 
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
-    origin_allowed = origin and (
-        any(origin.endswith(s) for s in _ALLOWED_ORIGIN_SUFFIXES)
-        or origin.startswith("http://localhost:")
+    
+    # Dynamic load from env to allow runtime changes in Replit Secrets
+    raw = os.getenv("BACKEND_CORS_ORIGINS", "[]")
+    try:
+        allowed_origins = json.loads(raw)
+        if not isinstance(allowed_origins, list):
+            allowed_origins = [allowed_origins]
+    except:
+        allowed_origins = [raw] if raw else []
+
+    is_allowed = origin and (
+        origin in allowed_origins 
+        or any(origin.endswith(s) for s in _ALLOWED_SUFFIXES)
+        or "localhost" in origin
     )
 
-    # Handle preflight OPTIONS request immediately
+    # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
         response = Response(status_code=200)
-        if origin_allowed:
+        if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
@@ -40,7 +54,7 @@ async def cors_middleware(request: Request, call_next):
 
     response = await call_next(request)
 
-    if origin_allowed:
+    if is_allowed:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
