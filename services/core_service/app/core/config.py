@@ -1,6 +1,6 @@
 import os
 from pydantic import Field, AliasChoices, field_validator
-from typing import List, Union
+from typing import List, Union, Any
 import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +14,13 @@ class Settings(BaseSettings):
 
     # PostgreSQL (asyncpg)
     DATABASE_URL: str = Field(validation_alias=AliasChoices("CORE_DATABASE_URL", "DATABASE_URL"))
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def make_async_url(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
 
     # Polza.ai (OpenAI wrapper)
