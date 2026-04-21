@@ -1,7 +1,11 @@
+import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, HTMLResponse, Response
+from fastapi.responses import StreamingResponse, HTMLResponse, Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("gateway")
 
 AUTH_BASE = "http://127.0.0.1:8001"
 CORE_BASE = "http://127.0.0.1:8000"
@@ -9,6 +13,14 @@ CORE_BASE = "http://127.0.0.1:8000"
 AUTH_PREFIXES = ("/api/v1/auth", "/api/v1/users")
 
 app = FastAPI(title="SKALD Gateway", docs_url=None)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Global Error: {exc.__class__.__name__} - {str(exc)}"},
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,6 +52,9 @@ async def _fetch(path: str, target_base: str, request: Request) -> httpx.Respons
     url = httpx.URL(target_base + path, params=request.query_params)
     headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
     body = await request.body()
+    
+    logger.info(f"Proxying {request.method} request to: {url}")
+    
     async with httpx.AsyncClient(timeout=120) as client:
         return await client.request(
             method=request.method,
@@ -51,27 +66,41 @@ async def _fetch(path: str, target_base: str, request: Request) -> httpx.Respons
 
 
 async def _proxy(path: str, target_base: str, request: Request) -> Response:
-    resp = await _fetch(path, target_base, request)
-    excluded = {"content-encoding", "transfer-encoding", "content-length"}
-    headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
-    return Response(
-        content=resp.content,
-        status_code=resp.status_code,
-        headers=headers,
-        media_type=resp.headers.get("content-type"),
-    )
+    try:
+        resp = await _fetch(path, target_base, request)
+        excluded = {"content-encoding", "transfer-encoding", "content-length"}
+        headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers=headers,
+            media_type=resp.headers.get("content-type"),
+        )
+    except httpx.RequestError as e:
+        error_msg = f"Network error proxying to {target_base}{path}: {e}"
+        logger.error(error_msg, exc_info=True)
+        return JSONResponse(status_code=502, content={"detail": f"Bad Gateway: {e.__class__.__name__} - {str(e)}"})
+    except Exception as e:
+        error_msg = f"Unexpected error proxying to {target_base}{path}: {e}"
+        logger.error(error_msg, exc_info=True)
+        return JSONResponse(status_code=500, content={"detail": f"Internal Gateway Server Error: {e.__class__.__name__} - {str(e)}"})
 
 
 async def _proxy_docs(docs_path: str, openapi_path: str,
                       target_base: str, prefix: str, request: Request) -> Response:
-    resp = await _fetch(docs_path, target_base, request)
-    html = resp.text
-    # Rewrite the openapi.json URL so the browser fetches it through the gateway
-    html = html.replace(
-        f"url: '{openapi_path}'",
-        f"url: '/{prefix}{openapi_path}'"
-    )
-    return HTMLResponse(content=html, status_code=resp.status_code)
+    try:
+        resp = await _fetch(docs_path, target_base, request)
+        html = resp.text
+        # Rewrite the openapi.json URL so the browser fetches it through the gateway
+        html = html.replace(
+            f"url: '{openapi_path}'",
+            f"url: '/{prefix}{openapi_path}'"
+        )
+        return HTMLResponse(content=html, status_code=resp.status_code)
+    except Exception as e:
+        error_msg = f"Error proxying docs for {target_base}{docs_path}: {e}"
+        logger.error(error_msg, exc_info=True)
+        return JSONResponse(status_code=502, content={"detail": f"Docs Gateway Error: {e.__class__.__name__} - {str(e)}"})
 
 
 # ── Auth docs ────────────────────────────────────────────────────────────────
