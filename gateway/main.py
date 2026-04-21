@@ -36,6 +36,24 @@ def health():
     return {"status": "ok", "service": "gateway"}
 
 
+@app.get("/debug/health")
+async def debug_health():
+    """Check connectivity to all backend services."""
+    import asyncio
+    results = {}
+    for name, base in [("auth", AUTH_BASE), ("core", CORE_BASE)]:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                r = await client.get(f"{base}/health")
+                results[name] = {"status": "ok", "http_status": r.status_code, "url": base}
+        except httpx.ConnectError as e:
+            results[name] = {"status": "unreachable", "error": "Connection refused — service is down", "url": base}
+        except Exception as e:
+            results[name] = {"status": "error", "error": str(e), "url": base}
+    overall = "ok" if all(v["status"] == "ok" for v in results.values()) else "degraded"
+    return {"gateway": "ok", "services": results, "overall": overall}
+
+
 @app.get("/")
 def root():
     return {
