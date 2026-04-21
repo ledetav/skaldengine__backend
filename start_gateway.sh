@@ -30,4 +30,4 @@ done
 
 echo "Starting gateway on port 5000..."
 cd /home/runner/workspace
-exec python3 -m uvicorn gateway.main:app --host 0.0.0.0 --port 5000
+exec python3 -m uvicorn gateway.main:app --host 0.0.0.0 --port 8080

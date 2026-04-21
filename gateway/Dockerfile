@@ -28,6 +28,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 USER appuser
 
-EXPOSE 5000
+EXPOSE 8080
 
-CMD ["python", "-m", "uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["python", "-m", "uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8080"]
