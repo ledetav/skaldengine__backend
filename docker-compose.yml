@@ -105,16 +105,12 @@ services:
       start_period: 20s
     networks:
       - backend
-
-  # ── API Gateway (port 5000 → exposed as 80) ────────────────────────────────
-
+  
   gateway:
     build:
       context: .
       dockerfile: gateway/Dockerfile
     restart: unless-stopped
-    ports:
-      - "${GATEWAY_PORT:-8080}:8080"
     environment:
       PYTHONPATH: /app
       AUTH_BASE_URL: http://auth:8001
@@ -127,6 +123,19 @@ services:
         condition: service_healthy
       core:
         condition: service_healthy
+    networks:
+      - backend
+
+  frontend:
+    build:
+      # Путь к папке с фронтендом
+      context: ../skaldengine__frontend 
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - gateway
     networks:
       - backend
 
