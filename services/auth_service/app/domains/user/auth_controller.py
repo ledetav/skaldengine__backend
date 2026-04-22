@@ -18,8 +18,8 @@ class AuthController(BaseController):
     async def register(self, user_in: UserCreate) -> BaseResponse:
         try:
             user = await self.auth_service.register(user_in)
-            return self.handle_success(data=user)
+            return self.handle_success(data=UserResponse.model_validate(user))
         except ValueError as e:
             self.handle_error(str(e), status_code=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            self.handle_error("Internal server error", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            self.handle_error(str(e), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

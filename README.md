@@ -12,6 +12,29 @@
 
 ---
 
+## Развертывание локально
+
+1. В терминале выполняем команды:
+
+    ```bash
+    docker compose up --build -d
+    make migrate-auth m="Actualize db structure"
+    make migrate-core m="Actualize db structure"
+    make upgrade-auth
+    make upgrade-core
+    ```
+
+2. Для просмотра логов
+
+    ```bash
+    docker logs skald_backend -f
+    ```
+
+API доступен по адресу <http://localhost:8000>  
+Nginx сам раскидает по сервисам
+
+---
+
 ## Развертывание в продакшене (Docker)
 
 Проект настроен для развертывания с использованием Docker Compose, где сервисы запускаются в виде двух отдельных контейнеров `auth-service` (порт 8001) и `core-service` (порт 8000), а также баз данных `auth-db` и `core-db` с расширением `pgvector`.

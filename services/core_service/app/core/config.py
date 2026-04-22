@@ -1,6 +1,6 @@
 import os
 from pydantic import Field, AliasChoices, field_validator
-from typing import List, Union
+from typing import List, Union, Any
 import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,11 +8,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = Field("SkaldEngine Core Service", validation_alias=AliasChoices("CORE_PROJECT_NAME", "PROJECT_NAME"))
     API_V1_STR: str = "/api/v1"
+    LOG_LEVEL: str = "INFO"
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
     # PostgreSQL (asyncpg)
     DATABASE_URL: str = Field(validation_alias=AliasChoices("CORE_DATABASE_URL", "DATABASE_URL"))
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def make_async_url(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
 
 
     # Polza.ai (OpenAI wrapper)
