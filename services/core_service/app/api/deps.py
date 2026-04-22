@@ -4,8 +4,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel
 from uuid import UUID
+import logging
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 
 from app.core.config import settings
@@ -70,7 +73,7 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
             try:
                 birth_date_val = date.fromisoformat(birth_date_str)
             except ValueError:
-                pass
+                logger.warning(f"Invalid birth_date format in token: {birth_date_str}")
 
         return CurrentUser(
             id=UUID(token_data),
