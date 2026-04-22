@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List
 from openai import AsyncOpenAI
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
@@ -48,15 +48,20 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
     from app.domains.chat.message_models import Message
     from app.domains.chat.models import EpisodicMemory
     
-    current_id = leaf_id
-    branch = []
-    while current_id and len(branch) < 50:
-        msg = await db.get(Message, current_id)
-        if not msg:
-            break
-        branch.append(msg)
-        current_id = msg.parent_id
-        
+    cte = select(
+        Message.id, Message.parent_id, literal_column("1").label("depth")
+    ).where(Message.id == leaf_id).cte(recursive=True)
+
+    cte = cte.union_all(
+        select(Message.id, Message.parent_id, (cte.c.depth + 1).label("depth"))
+        .join(cte, Message.id == cte.c.parent_id)
+        .where(cte.c.depth < 50)
+    )
+
+    query = select(Message).join(cte, Message.id == cte.c.id).order_by(cte.c.depth)
+    res = await db.execute(query)
+    branch = list(res.scalars().all())
+
     branch.reverse()
     
     # Keep last 15 in working memory

@@ -70,3 +70,7 @@ class UserPersona(UserPersonaBase):
 
     class Config:
         from_attributes = True
+class UserStatistics(BaseModel):
+    total_personas: int = 0
+    total_lorebooks: int = 0
+    total_chats: int = 0

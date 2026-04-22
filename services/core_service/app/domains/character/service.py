@@ -1,3 +1,6 @@
+from typing import List, Optional
+from uuid import UUID
+
 from shared.base.service import BaseService
 from .repository import CharacterRepository
 from .models import Character
@@ -33,7 +36,7 @@ class CharacterService(BaseService[CharacterRepository]):
                 
                 # Для этого нужен LorebookRepository
                 # Вариант с Session
-                db_session = self.repository.session
+                db_session = self.repository.db
                 lorebook_repo = LorebookRepository(db_session)
                 
                 lorebook = Lorebook(

@@ -19,7 +19,7 @@ class ScenarioController(BaseController):
 
     async def create_scenario(self, scenario_in: ScenarioCreate) -> BaseResponse:
         scenario = await self.scenario_service.create_scenario(scenario_in)
-        return self.handle_success(data=scenario, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=scenario)
 
     async def get_scenario(self, scenario_id: UUID) -> BaseResponse:
         scenario = await self.scenario_service.repository.get(scenario_id)
