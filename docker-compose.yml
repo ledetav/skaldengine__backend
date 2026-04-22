@@ -1,5 +1,23 @@
 services:
 
+  # ── Caddy (TLS-терминация, reverse proxy) ──────────────────────────────────
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"     # нужен для HTTP-01 challenge (Let's Encrypt)
+      - "443:443"   # HTTPS
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    networks:
+      - backend
+
   # ── Databases ──────────────────────────────────────────────────────────────
 
   auth-db:
@@ -132,8 +150,9 @@ services:
       context: ../skaldengine__frontend 
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "80:80"
+    # Порт не пробрасываем наружу — Caddy проксирует внутри сети
+    expose:
+      - "80"
     depends_on:
       - gateway
     networks:
@@ -143,6 +162,8 @@ volumes:
   auth_db_data:
   core_db_data:
   uploads_data:
+  caddy_data:    # хранилище сертификатов Let's Encrypt
+  caddy_config:  # кэш конфига Caddy
 
 networks:
   backend:
