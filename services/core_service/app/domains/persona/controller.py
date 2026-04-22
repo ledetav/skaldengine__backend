@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserPersonaService
-from .schemas import UserPersonaCreate, UserPersonaResponse
+from .schemas import UserPersonaCreate, UserPersonaUpdate
 from app.domains.persona.schemas import UserStatistics
 from shared.schemas.response import BaseResponse
 
@@ -17,7 +17,7 @@ class UserPersonaController(BaseController):
 
     async def create_persona(self, persona_in: UserPersonaCreate, user_id: UUID) -> BaseResponse:
         persona = await self.persona_service.create_persona(persona_in, user_id)
-        return self.handle_success(data=persona, status_code=status.HTTP_201_CREATED)
+        return self.handle_success(data=persona)
 
     async def get_persona(self, persona_id: UUID, user_id: UUID) -> BaseResponse:
         persona = await self.persona_service.get_persona(persona_id, user_id)

@@ -47,14 +47,14 @@ class AuthService(BaseService[UserRepository]):
             else:
                 raise ValueError("Username (handle) already taken")
 
-        user = User(
-            email=user_in.email,
-            login=user_in.login,
-            username=user_in.username,
-            full_name=user_in.full_name,
-            birth_date=user_in.birth_date,
-            password_hash=get_password_hash(user_in.password),
-            role="user",
-            polza_api_key=user_in.polza_api_key
-        )
-        return await self.repository.create(obj_in=user)
+        user_data = {
+            "email": user_in.email,
+            "login": user_in.login,
+            "username": user_in.username,
+            "full_name": user_in.full_name,
+            "birth_date": user_in.birth_date,
+            "password_hash": get_password_hash(user_in.password),
+            "role": "user",
+            "polza_api_key": user_in.polza_api_key,
+        }
+        return await self.repository.create(obj_in=user_data)

@@ -22,8 +22,15 @@ class BaseRepository(Generic[ModelType]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def create(self, obj_in: dict) -> ModelType:
-        db_obj = self.model(**obj_in)
+    async def create(self, obj_in) -> ModelType:
+        if isinstance(obj_in, dict):
+            db_obj = self.model(**obj_in)
+        elif hasattr(obj_in, 'model_dump'):
+            db_obj = self.model(**obj_in.model_dump())
+        elif isinstance(obj_in, self.model):
+            db_obj = obj_in
+        else:
+            db_obj = self.model(**{c.key: getattr(obj_in, c.key) for c in obj_in.__table__.columns})
         self.db.add(db_obj)
         await self.db.commit()
         await self.db.refresh(db_obj)

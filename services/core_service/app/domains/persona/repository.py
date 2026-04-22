@@ -44,3 +44,30 @@ class UserPersonaRepository(BaseRepository[UserPersona]):
             personas.append(persona)
 
         return personas
+
+    async def get_aggregate_stats(self, owner_id: UUID) -> dict:
+        from app.domains.chat.models import Chat
+        from app.domains.lorebook.models import Lorebook
+
+        query = select(
+            func.count(UserPersona.id).label("total_personas"),
+            func.coalesce(func.sum(
+                select(func.count(Lorebook.id))
+                .where(Lorebook.user_persona_id == UserPersona.id)
+                .scalar_subquery()
+            ), 0).label("total_lorebooks"),
+            func.coalesce(func.sum(
+                select(func.count(Chat.id))
+                .where(Chat.user_persona_id == UserPersona.id)
+                .scalar_subquery()
+            ), 0).label("total_chats")
+        ).where(UserPersona.owner_id == owner_id)
+
+        result = await self.db.execute(query)
+        row = result.first()
+
+        return {
+            "total_personas": row.total_personas if row else 0,
+            "total_lorebooks": row.total_lorebooks if row else 0,
+            "total_chats": row.total_chats if row else 0
+        }

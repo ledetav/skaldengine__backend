@@ -1,58 +1,61 @@
 # SKALDEngine Backend
 
-**SKALD Engine** — high-performance platform for interactive storytelling and roleplay with AI characters. Built with **Domain-Driven Design (Vertical Slices)** and optimized for scalability and production readiness.
+**SKALD Engine** — высокопроизводительная платформа для интерактивного сторителлинга и ролевых игр с ИИ-персонажами. Построена с использованием **Предметно-ориентированного проектирования (Domain-Driven Design / Vertical Slices)** и оптимизирована для масштабируемости и использования в продакшене.
 
-## Architecture
+## Архитектура
 
-The project uses **Vertical Slices**, where each business domain is isolated within its directory. All services share a common base logic in the root shared/ folder.
+Проект использует архитектуру **Vertical Slices** (Вертикальные срезы), где каждая бизнес-область изолирована в собственной директории. Все сервисы используют общую базовую логику в корневой папке `shared/`.
 
-- **services/auth_service/**: Auth, JWT, and User Profiles.
-- **services/core_service/**: Game Logic, Chats, AI Personas, RAG, and Lorebooks.
-- **shared/**: Global base classes for Repositories, Services, and Controllers.
+- **services/auth_service/**: Авторизация, JWT и профили пользователей.
+- **services/core_service/**: Игровая логика, чаты, ИИ-персонажи, RAG и лорбуки.
+- **shared/**: Глобальные базовые классы для репозиториев, сервисов и контроллеров.
 
 ---
 
-## Production Deployment (Docker)
+## Развертывание в продакшене (Docker)
 
-The project is configured for a unified deployment where both services run in a single container behind an Nginx reverse proxy.
+Проект настроен для развертывания с использованием Docker Compose, где сервисы запускаются в виде двух отдельных контейнеров `auth-service` (порт 8001) и `core-service` (порт 8000), а также баз данных `auth-db` и `core-db` с расширением `pgvector`.
 
-### 1. Configure Environment
-Create a .env file in the root directory based on .env.example:
+### 1. Настройка окружения
+Создайте файл `.env` в корневой директории на основе `.env.example`:
 ```bash
 cp .env.example .env
 ```
-Fill in the required variables (especially SECRET_KEY and POLZA_API_KEY).
+Заполните необходимые переменные (особенно `SECRET_KEY` и `POLZA_API_KEY`).
 
-### 2. Build and Run
+### 2. Сборка и запуск
 ```bash
 docker compose up -d --build
 ```
-This will:
-- Build the unified image (Python 3.11-slim).
-- Start PostgreSQL instances for both services.
-- Start the application container (Exposed on port 8000).
+Это действие:
+- Соберет единый образ на основе Python 3.11-slim, из которого запускаются оба сервиса.
+- Запустит экземпляры PostgreSQL для обоих сервисов на портах 5432 и 5433 соответственно.
+- Запустит контейнер `auth-service` (доступен на порту 8001).
+- Запустит контейнер `core-service` (доступен на порту 8000).
 
-### 3. API Access Points
-- **Unified Gateway**: http://localhost:8000/api/v1
-- **Auth Endpoints**: /api/v1/auth/..., /api/v1/users/...
-- **Core Endpoints**: /api/v1/chats/..., /api/v1/personas/..., etc.
-- **Static Files (Uploads)**: http://localhost:8000/static/
+*Примечание: каждый из контейнеров сервисов также запускает Nginx.*
+
+### 3. Точки доступа API
+Для локального доступа при запущенном `core-service` на порту 8000 и `auth-service` на порту 8001:
+- **Auth Service (Авторизация)**: `http://localhost:8001/api/v1/auth/...`, `http://localhost:8001/api/v1/users/...`
+- **Core Service (Ядро)**: `http://localhost:8000/api/v1/chats/...`, `http://localhost:8000/api/v1/personas/...`, и т.д.
+- **Статические файлы (Uploads)**: Доступны по пути `/static/` на любом из сервисов.
 
 ---
 
-## Manual Development Setup
+## Настройка для локальной разработки (без Docker)
 
-If you need to run services separately without Docker:
+Если вам нужно запустить сервисы по отдельности без Docker:
 
-### 1. Setup Database
-Ensure you have two PostgreSQL databases (e.g., auth_db on 5432 and core_db on 5433).
+### 1. Настройка базы данных
+Убедитесь, что у вас есть две базы данных PostgreSQL (например, `auth_db` на порту 5432 и `core_db` на порту 5433). Для их работы потребуется расширение `pgvector`.
 
-### 2. Environment
-Both services read configuration from the root .env file.
-Ensure AUTH_DATABASE_URL and CORE_DATABASE_URL are set in the root .env.
+### 2. Окружение
+Оба сервиса считывают конфигурацию из корневого файла `.env`.
+Убедитесь, что переменные `AUTH_DATABASE_URL` и `CORE_DATABASE_URL` заданы в корневом `.env`.
 
-### 3. Run Services
-**Auth Service:**
+### 3. Запуск сервисов
+**Auth Service (Сервис авторизации):**
 ```bash
 cd services/auth_service
 pip install -r requirements.txt
@@ -60,14 +63,15 @@ python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 ```
 
-**Core Service:**
+**Core Service (Основной сервис):**
 ```bash
 cd services/core_service
 pip install -r requirements.txt
 python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8002
 ```
+*Примечание: Убедитесь, что при запуске `core-service` вручную вы указываете порт 8002 (как показано в примере), или 8000, в зависимости от ваших настроек фронтенда.*
 
-## Documentation
-Detailed API documentation with all endpoints, models, and security roles:
-👉 [API Documentation](api_documentation.md)
+## Документация
+Подробная документация API со всеми эндпоинтами, моделями и ролями безопасности:
+👉 [Документация API](api_documentation.md)
