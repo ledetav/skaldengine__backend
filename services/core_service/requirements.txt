@@ -14,4 +14,5 @@ openai
 httpx
 Pillow
 pyahocorasick
+psycopg2-binary
 python-magic

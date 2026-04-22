@@ -21,8 +21,10 @@ POLZA_TEMPERATURE = "1.0"
 POLZA_MAX_TOKENS = "8000"
 POLZA_TITLE_MAX_TOKENS = "50"
 SECRET_KEY = "c46e63b1ac738dd036fc4d6ffe88836e0feecba4c456fa10a9c16ff8c77e3c9d"
-AUTH_DATABASE_URL = "postgresql+asyncpg://postgres:password@helium/heliumdb?ssl=disable"
-CORE_DATABASE_URL = "postgresql+asyncpg://postgres:password@helium/heliumdb?ssl=disable"
+AUTH_DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_8lcFakePHEu0@ep-blue-surf-anep7arp.c-6.us-east-1.aws.neon.tech/neondb?ssl=require"
+CORE_DATABASE_URL = "postgresql+asyncpg://neondb_owner:npg_8lcFakePHEu0@ep-blue-surf-anep7arp.c-6.us-east-1.aws.neon.tech/neondb?ssl=require"
+BACKEND_CORS_ORIGINS = '["https://27ce52ae-181e-42ce-b7e3-15a281b159e2-00-3dwzya1att87j.picard.replit.dev", "http://localhost:5173"]'
+CORS_ALLOW_ORIGIN_REGEX = 'https://.*\.replit\.dev'
 
 [workflows]
 runButton = "Project"
@@ -51,16 +53,6 @@ waitForPort = 5000
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 8000
-externalPort = 8000
-exposeLocalhost = true
-
-[[ports]]
-localPort = 8001
-externalPort = 3000
-exposeLocalhost = true
 
 [deployment]
 deploymentTarget = "autoscale"

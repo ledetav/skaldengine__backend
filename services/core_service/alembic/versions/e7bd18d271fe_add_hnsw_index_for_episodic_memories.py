@@ -17,10 +17,25 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE INDEX IF NOT EXISTS ix_episodic_memories_embedding_hnsw "
-        "ON episodic_memories USING hnsw (embedding vector_cosine_ops);"
-    )
+    # HNSW index requires pgvector to be installed as a PostgreSQL extension.
+    # On some hosts (e.g. plain Replit PostgreSQL) the shared library is absent.
+    # We wrap in try/except so the overall migration chain is not blocked;
+    # the index can be created later once pgvector is available.
+    try:
+        op.execute(
+            "CREATE INDEX IF NOT EXISTS ix_episodic_memories_embedding_hnsw "
+            "ON episodic_memories USING hnsw (embedding vector_cosine_ops);"
+        )
+    except Exception as e:
+        import warnings
+        warnings.warn(
+            f"Could not create HNSW index (pgvector may not be installed): {e}. "
+            "Skipping. Re-run this migration after enabling pgvector.",
+            stacklevel=2,
+        )
+        # Roll back the failed DDL statement so the transaction stays clean.
+        op.get_bind().execute(sa.text("ROLLBACK TO SAVEPOINT hnsw_index"))
+
 
 
 def downgrade() -> None:

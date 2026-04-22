@@ -1,59 +1,170 @@
 services:
-  # База данных для микросервиса авторизации (с pgvector)
+
+  # ── Caddy (TLS-терминация, reverse proxy) ──────────────────────────────────
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"     # нужен для HTTP-01 challenge (Let's Encrypt)
+      - "443:443"   # HTTPS
+      - "443:443/udp" # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    networks:
+      - backend
+
+  # ── Databases ──────────────────────────────────────────────────────────────
+
   auth-db:
-    image: pgvector/pgvector:pg15
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: auth_user
-      POSTGRES_PASSWORD: auth_password
+      POSTGRES_PASSWORD: ${AUTH_PASSWORD}
       POSTGRES_DB: auth_db
-    ports:
-      - "5432:5432"
     volumes:
       - auth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
 
-  # База данных для основного микросервиса (с pgvector)
   core-db:
-    image: pgvector/pgvector:pg15
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
     environment:
       POSTGRES_USER: core_user
-      POSTGRES_PASSWORD: core_password
+      POSTGRES_PASSWORD: ${CORE_PASSWORD}
       POSTGRES_DB: core_db
-    ports:
-      - "5433:5432"
     volumes:
       - core_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U core_user -d core_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
 
+  # ── Auth Service (port 8001, internal only) ────────────────────────────────
 
-  auth-service:
-    build: .
-    working_dir: /app/services/auth_service
-    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
-    ports:
-      - "8001:8001"
-    env_file:
-      - .env
+  auth:
+    build:
+      context: .
+      dockerfile: services/auth_service/Dockerfile
+    restart: unless-stopped
     environment:
-      - SERVICE_NAME=auth
-      - DATABASE_URL=postgresql+asyncpg://auth_user:auth_password@auth-db:5432/auth_db
-      - PORT=8001
+      PYTHONPATH: /app
+      AUTH_DATABASE_URL: postgresql+asyncpg://auth_user:${AUTH_PASSWORD}@auth-db:5432/auth_db
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      AUTH_PROJECT_NAME: ${AUTH_PROJECT_NAME:-SkaldEngine Auth Service}
+      API_V1_STR: ${API_V1_STR:-/api/v1}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-[]}
+      BACKEND_CORS_ALLOWED_SUFFIXES: ${BACKEND_CORS_ALLOWED_SUFFIXES:-[]}
     depends_on:
-      - auth-db
+      auth-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
 
-  core-service:
-    build: .
-    working_dir: /app/services/core_service
-    command: ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002"]
-    ports:
-      - "8002:8002"
-    env_file:
-      - .env
+  # ── Core Service (port 8000, internal only) ────────────────────────────────
+
+  core:
+    build:
+      context: .
+      dockerfile: services/core_service/Dockerfile
+    restart: unless-stopped
     environment:
-      - SERVICE_NAME=core
-      - DATABASE_URL=postgresql+asyncpg://core_user:core_password@core-db:5432/core_db
-      - PORT=8002
+      PYTHONPATH: /app
+      CORE_DATABASE_URL: postgresql+asyncpg://core_user:${CORE_PASSWORD}@core-db:5432/core_db
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      CORE_PROJECT_NAME: ${CORE_PROJECT_NAME:-SkaldEngine Core Service}
+      API_V1_STR: ${API_V1_STR:-/api/v1}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORE_UPLOAD_DIR: /app/uploads
+      POLZA_API_KEY: ${POLZA_API_KEY}
+      POLZA_CHAT_MODEL: ${POLZA_CHAT_MODEL:-google/gemini-3-flash-preview}
+      POLZA_EMBEDDING_MODEL: ${POLZA_EMBEDDING_MODEL:-openai/text-embedding-3-small}
+      POLZA_SUMMARY_MODEL: ${POLZA_SUMMARY_MODEL:-google/gemini-3.1-flash-lite-preview}
+      POLZA_TITLE_MODEL: ${POLZA_TITLE_MODEL:-google/gemini-2.0-flash-lite-preview-02-05}
+      POLZA_TEMPERATURE: ${POLZA_TEMPERATURE:-1.0}
+      POLZA_MAX_TOKENS: ${POLZA_MAX_TOKENS:-8000}
+      POLZA_TITLE_MAX_TOKENS: ${POLZA_TITLE_MAX_TOKENS:-50}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-[]}
+      BACKEND_CORS_ALLOWED_SUFFIXES: ${BACKEND_CORS_ALLOWED_SUFFIXES:-[]}
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
-      - core-db
+      core-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - backend
+  
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      AUTH_BASE_URL: http://auth:8001
+      CORE_BASE_URL: http://core:8000
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-[]}
+      BACKEND_CORS_ALLOWED_SUFFIXES: ${BACKEND_CORS_ALLOWED_SUFFIXES:-[]}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      auth:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+    networks:
+      - backend
+
+  frontend:
+    build:
+      # Путь к папке с фронтендом
+      context: ../skaldengine__frontend 
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Порт не пробрасываем наружу — Caddy проксирует внутри сети
+    expose:
+      - "80"
+    depends_on:
+      - gateway
+    networks:
+      - backend
 
 volumes:
   auth_db_data:
   core_db_data:
+  uploads_data:
+  caddy_data:    # хранилище сертификатов Let's Encrypt
+  caddy_config:  # кэш конфига Caddy
+
+networks:
+  backend:
+    driver: bridge

@@ -16,3 +16,4 @@ services/*/uploads
 services/*/chroma_db
 README.md
 docker-compose.yml
+Caddyfile

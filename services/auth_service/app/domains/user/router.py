@@ -14,7 +14,7 @@ async def read_user_me(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить информацию о текущем пользователе по токену."""
-    return BaseResponse(success=True, data=current_user)
+    return BaseResponse(success=True, data=UserResponse.model_validate(current_user))
 
 @router.get("/profile/{username}", response_model=BaseResponse)
 async def read_public_profile(
