@@ -6,6 +6,7 @@ FROM python:3.12-slim AS builder
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    libmagic1 \
     build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
 
 COPY services/core_service/requirements.txt ./requirements.txt
@@ -16,7 +17,7 @@ FROM python:3.12-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 curl && rm -rf /var/lib/apt/lists/*
+    libpq5 curl libmagic1 && rm -rf /var/lib/apt/lists/*
 
 # Non-root user
 RUN addgroup --system appuser && adduser --system --ingroup appuser appuser
