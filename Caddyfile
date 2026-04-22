@@ -1,6 +1,7 @@
 # Заменить yourdomain.com на реальный домен.
 # Caddy автоматически получит и будет обновлять сертификат Let's Encrypt.
 
-yourdomain.com {
-    reverse_proxy frontend:80
+skaldengine.com {
+	encode zstd gzip
+	reverse_proxy frontend:80
 }
