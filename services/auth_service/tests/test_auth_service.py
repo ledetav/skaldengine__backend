@@ -52,6 +52,7 @@ mock_security.create_access_token = MagicMock()
 
 # 3. Import the class under test
 from app.domains.user.auth_service import AuthService
+from app.core.security import TokenPayload
 from app.domains.user.models import User
 
 from unittest import IsolatedAsyncioTestCase
@@ -87,8 +88,14 @@ class TestAuthService(IsolatedAsyncioTestCase):
 
         # Assert
         self.repository.get_by_email_or_login.assert_called_once_with(identifier)
-        mock_verify_password.assert_called_once_with(password, "$2b$12$Lb1L9UREHfkdzuQ07DFzQO7NsFeAa0dF8GWVZsZXODyP0yZsOYK1C")
-        mock_create_access_token.assert_called_once()
+        mock_security.verify_password.assert_called_once_with(password, "hashed_password")
+        mock_security.create_access_token.assert_called_once()
+
+        call_args = mock_security.create_access_token.call_args[1]
+        self.assertIn('payload', call_args)
+        self.assertIn('expires_delta', call_args)
+        self.assertIsInstance(call_args['payload'], TokenPayload)
+        self.assertEqual(call_args['payload'].subject, 'user-id')
         self.assertEqual(result, {
             "access_token": "fake-jwt-token",
             "token_type": "bearer",

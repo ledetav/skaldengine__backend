@@ -1,28 +1,37 @@
 import uuid
 import aiofiles
 import os
+import magic
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from app.core.config import settings
 from app.api import deps
 
 router = APIRouter()
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
-
-def validate_image(filename: str):
-    ext = filename.split(".")[-1].lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
-        )
-    return ext
+ALLOWED_MIME_TYPES = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/gif": "gif",
+    "image/webp": "webp"
+}
 
 @router.post("/", response_model=dict)
 async def upload_file(
     file: UploadFile = File(...),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    ext = validate_image(file.filename)
+    # Read first 2048 bytes for magic numbers
+    header = await file.read(2048)
+    # Reset file pointer to beginning so the entire file is saved later
+    await file.seek(0)
+
+    mime_type = magic.from_buffer(header, mime=True)
+    if mime_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed. Allowed types are: {', '.join(ALLOWED_MIME_TYPES.values())}"
+        )
+
+    ext = ALLOWED_MIME_TYPES[mime_type]
     unique_filename = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
     
