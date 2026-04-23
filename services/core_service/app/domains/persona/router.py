@@ -8,6 +8,18 @@ from shared.schemas.response import BaseResponse
 
 router = APIRouter()
 
+@router.get("/admin/all", response_model=BaseResponse)
+async def list_all_personas(
+    skip: int = 0,
+    limit: int = 200,
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
+    current_user: deps.CurrentUser = Depends(deps.verify_staff_role)
+):
+    """[Admin/Moderator] Получить список всех персон всех пользователей."""
+    personas = await controller.persona_service.repository.get_multi(skip=skip, limit=limit)
+    return BaseResponse(success=True, data=personas)
+
+
 @router.get("/", response_model=BaseResponse)
 async def list_personas(
     user_id: UUID | None = None,

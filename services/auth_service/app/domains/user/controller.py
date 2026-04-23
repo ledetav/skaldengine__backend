@@ -65,3 +65,7 @@ class UserController(BaseController):
         
         public_data = PublicProfileResponse.model_validate(user)
         return self.handle_success(data=public_data)
+
+    async def get_all_users(self, skip: int = 0, limit: int = 200) -> BaseResponse:
+        users = await self.user_service.get_all_users(skip=skip, limit=limit)
+        return self.handle_success(data=[UserResponse.model_validate(u) for u in users])

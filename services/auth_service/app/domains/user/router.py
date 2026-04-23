@@ -1,13 +1,42 @@
-from typing import Any
-from fastapi import APIRouter, Depends, status
+from typing import Any, List
+from fastapi import APIRouter, Depends, HTTPException, status
+from jose import jwt, JWTError
 
 from app.api import deps
 from .controller import UserController
 from app.domains.user.models import User
 from app.domains.user.schemas import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate
 from shared.schemas.response import BaseResponse
+from app.core.config import settings
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 router = APIRouter()
+
+_http_bearer = HTTPBearer()
+
+async def _verify_staff_from_token(
+    token_auth: HTTPAuthorizationCredentials = Depends(_http_bearer),
+) -> None:
+    """Check that the JWT token belongs to an admin or moderator."""
+    try:
+        payload = jwt.decode(
+            token_auth.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        role = payload.get("role", "user")
+    except (JWTError, ValueError):
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+    if role not in ("admin", "moderator"):
+        raise HTTPException(status_code=403, detail="Not enough privileges")
+
+@router.get("/", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
+async def list_all_users(
+    skip: int = 0,
+    limit: int = 200,
+    controller: UserController = Depends(deps.get_user_controller),
+):
+    """Получить список всех пользователей (только для admin/moderator)."""
+    return await controller.get_all_users(skip=skip, limit=limit)
+
 
 @router.get("/me", response_model=BaseResponse)
 async def read_user_me(
