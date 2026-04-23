@@ -147,10 +147,9 @@ services:
       - backend
 
   frontend:
-    build:
-      # Путь к папке с фронтендом
-      context: ../skaldengine__frontend 
-      dockerfile: Dockerfile
+    # Образ собирается в CI (GitHub Actions) и пушится в GHCR.
+    # FRONTEND_IMAGE_TAG задаётся в .env (по умолчанию latest).
+    image: ${FRONTEND_IMAGE:-ghcr.io/YOUR_ORG/skaldengine-frontend}:${FRONTEND_IMAGE_TAG:-latest}
     restart: unless-stopped
     # Порт не пробрасываем наружу — Caddy проксирует внутри сети
     expose:
