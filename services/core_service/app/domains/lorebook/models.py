@@ -37,6 +37,7 @@ class Lorebook(Base):
     fandom: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
 
     name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи
     character: Mapped["Character | None"] = relationship("Character", back_populates="lorebooks")
