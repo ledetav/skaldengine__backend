@@ -59,6 +59,9 @@ class UserService(BaseService[UserRepository]):
     async def get_by_username(self, username: str) -> Optional[User]:
         return await self.repository.get_by_username(username)
 
+    async def get(self, id: Any) -> Optional[User]:
+        return await self.repository.get(id)
+
     async def update_role(self, user: User, role: str) -> User:
         return await self.repository.update(db_obj=user, obj_in={"role": role})
 
