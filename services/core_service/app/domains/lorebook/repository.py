@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -8,6 +8,11 @@ from .models import Lorebook, LorebookEntry
 class LorebookRepository(BaseRepository[Lorebook]):
     def __init__(self, db):
         super().__init__(Lorebook, db)
+
+    async def get(self, id: Any) -> Optional[Lorebook]:
+        query = select(self.model).options(selectinload(Lorebook.entries)).where(self.model.id == id)
+        result = await self.db.execute(query)
+        return result.scalars().first()
 
     async def get_by_character(self, character_id: UUID) -> List[Lorebook]:
         query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.character_id == character_id)
