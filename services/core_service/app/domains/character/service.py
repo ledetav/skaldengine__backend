@@ -117,7 +117,7 @@ class CharacterService(BaseService[CharacterRepository]):
             "card_image_url": character.card_image_url,
             "gender": character.gender,
             "nsfw_allowed": character.nsfw_allowed,
-            "created_at": character.created_at.isoformat() if character.created_at else None,
+            "created_at": character.created_at.isoformat() if hasattr(character, 'created_at') and character.created_at else None,
             "total_chats_count": getattr(character, "total_chats_count", 0),
             "monthly_chats_count": getattr(character, "monthly_chats_count", 0)
         }

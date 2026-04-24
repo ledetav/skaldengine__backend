@@ -41,14 +41,16 @@ class CharacterController(BaseController):
                 )
 
         character = await self.character_service.create_character(character_in, user_id)
-        return self.handle_success(data=character)
+        return self.handle_success(data=CharacterAdminRead.model_validate(character))
 
     async def update_character(self, character_id: UUID, character_update: CharacterUpdate, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         creator_id = None if is_admin else user_id
         character = await self.character_service.update_character(character_id, character_update, creator_id)
         if not character:
             self.handle_error("Character not found or access denied", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=character)
+        
+        schema = CharacterAdminRead if is_admin else CharacterRead
+        return self.handle_success(data=schema.model_validate(character))
 
     async def delete_character(self, character_id: UUID, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         creator_id = None if is_admin else user_id
