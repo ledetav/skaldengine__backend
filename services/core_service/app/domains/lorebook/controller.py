@@ -51,7 +51,7 @@ class LorebookController(BaseController):
             self.handle_error("Moderators cannot edit fandom-wide lorebooks", status_code=status.HTTP_403_FORBIDDEN)
             
         updated = await self.lorebook_service.update_lorebook(lorebook_id, lorebook_update)
-        return self.handle_success(data=updated)
+        return self.handle_success(data=LorebookSchema.model_validate(updated))
 
     async def delete_lorebook(self, lorebook_id: UUID, is_admin: bool = False) -> BaseResponse:
         lorebook = await self.lorebook_service.get_lorebook(lorebook_id)
