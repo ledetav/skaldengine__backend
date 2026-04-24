@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from app.api import deps
 from .controller import UserController
 from app.domains.user.models import User
-from app.domains.user.schemas import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate
+from app.domains.user.schemas import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate, RoleUpdate
 from shared.schemas.response import BaseResponse
 from app.core.config import settings
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -36,6 +36,28 @@ async def list_all_users(
 ):
     """Получить список всех пользователей (только для admin/moderator)."""
     return await controller.get_all_users(skip=skip, limit=limit)
+
+
+@router.delete("/{user_id}", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
+async def admin_delete_user(
+    user_id: str,
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Удалить пользователя по ID (для admin)."""
+    return await controller.admin_delete_user(current_user, user_id)
+
+
+@router.patch("/{user_id}/role", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
+async def admin_update_role(
+    user_id: str,
+    role_update: RoleUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Изменить роль пользователя (для admin)."""
+    return await controller.admin_update_role(current_user, user_id, role_update.role)
+
 
 
 @router.get("/me", response_model=BaseResponse)

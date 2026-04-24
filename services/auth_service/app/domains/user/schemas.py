@@ -1,4 +1,5 @@
 import re
+from typing import Literal
 from pydantic import BaseModel, EmailStr, field_validator
 from uuid import UUID
 from datetime import date, datetime
@@ -137,6 +138,10 @@ class PasswordUpdate(BaseModel):
     @classmethod
     def validate_password(cls, v: str) -> str:
         return UserCreate.validate_password(v)
+
+
+class RoleUpdate(BaseModel):
+    role: Literal["user", "moderator", "admin"]
 
 
 class UserResponse(UserBase):

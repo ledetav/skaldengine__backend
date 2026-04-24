@@ -3,7 +3,7 @@ from shared.base.service import BaseService
 from .repository import UserRepository
 from .models import User
 from app.core import security
-from .schemas import UserUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate
+from .schemas import UserUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, RoleUpdate
 
 class UserService(BaseService[UserRepository]):
     async def update_login(self, user: User, update_in: LoginUpdate) -> User:
@@ -58,6 +58,9 @@ class UserService(BaseService[UserRepository]):
 
     async def get_by_username(self, username: str) -> Optional[User]:
         return await self.repository.get_by_username(username)
+
+    async def update_role(self, user: User, role: str) -> User:
+        return await self.repository.update(db_obj=user, obj_in={"role": role})
 
     async def get_all_users(self, skip: int = 0, limit: int = 200) -> list:
         return await self.repository.get_multi(skip=skip, limit=limit)
