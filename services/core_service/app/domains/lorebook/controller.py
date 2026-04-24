@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import LorebookService
-from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
+from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate, LorebookEntryBulkCreate
 from shared.schemas.response import BaseResponse
 
 class LorebookController(BaseController):
@@ -59,6 +59,10 @@ class LorebookController(BaseController):
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> BaseResponse:
         entry = await self.lorebook_service.create_entry(lorebook_id, entry_in)
         return self.handle_success(data=entry)
+
+    async def create_entries_bulk(self, lorebook_id: UUID, bulk_in: LorebookEntryBulkCreate) -> BaseResponse:
+        entries = await self.lorebook_service.create_entries_bulk(lorebook_id, bulk_in.entries)
+        return self.handle_success(data=entries)
 
     async def get_entry(self, entry_id: UUID) -> BaseResponse:
         entry = await self.lorebook_service.get_entry(entry_id)

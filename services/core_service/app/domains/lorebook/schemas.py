@@ -24,6 +24,10 @@ class LorebookEntryCreate(LorebookEntryBase):
     }
 
 
+class LorebookEntryBulkCreate(BaseModel):
+    entries: list[LorebookEntryCreate]
+
+
 class LorebookEntryUpdate(BaseModel):
     keywords: list[str] | None = None
     content: str | None = None
@@ -83,8 +87,11 @@ class LorebookCreate(LorebookBase):
 
 class LorebookUpdate(BaseModel):
     name: str | None = None
+    description: str | None = None
     type: LorebookType | None = None
     fandom: str | None = None
+    character_id: UUID | None = None
+    user_persona_id: UUID | None = None
 
     model_config = {
         "json_schema_extra": {

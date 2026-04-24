@@ -45,3 +45,14 @@ class LorebookEntryRepository(BaseRepository[LorebookEntry]):
         query = select(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id)
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def create_bulk(self, lorebook_id: UUID, entries_data: List[dict]) -> List[LorebookEntry]:
+        entries = [
+            LorebookEntry(lorebook_id=lorebook_id, **data)
+            for data in entries_data
+        ]
+        self.db.add_all(entries)
+        await self.db.commit()
+        for entry in entries:
+            await self.db.refresh(entry)
+        return entries

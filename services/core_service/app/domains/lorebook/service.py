@@ -62,6 +62,10 @@ class LorebookService(BaseService[LorebookRepository]):
         entry_data["lorebook_id"] = lorebook_id
         return await self.entry_repository.create(obj_in=entry_data)
 
+    async def create_entries_bulk(self, lorebook_id: UUID, entries_in: List[LorebookEntryCreate]) -> List[LorebookEntry]:
+        entries_data = [e.model_dump() for e in entries_in]
+        return await self.entry_repository.create_bulk(lorebook_id, entries_data)
+
     async def update_entry(self, entry_id: UUID, entry_update: LorebookEntryUpdate) -> Optional[LorebookEntry]:
         entry = await self.entry_repository.get(entry_id)
         if not entry:

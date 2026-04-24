@@ -6,7 +6,8 @@ from .controller import LorebookController
 from .schemas import (
     LorebookCreate,
     LorebookEntryCreate,
-    LorebookEntryUpdate
+    LorebookEntryUpdate,
+    LorebookEntryBulkCreate
 )
 from shared.schemas.response import BaseResponse
 
@@ -41,6 +42,17 @@ async def create_lorebook_entry(
 ) -> BaseResponse:
     """Добавить запись в лорбук."""
     return await controller.create_entry(lorebook_id, entry_in)
+
+
+@router.post("/{lorebook_id}/entries/bulk", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
+async def create_lorebook_entries_bulk(
+    lorebook_id: uuid.UUID,
+    bulk_in: LorebookEntryBulkCreate,
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+) -> BaseResponse:
+    """Добавить несколько записей в лорбук."""
+    return await controller.create_entries_bulk(lorebook_id, bulk_in)
 
 
 @router.get("/{lorebook_id}/entries", response_model=BaseResponse)
