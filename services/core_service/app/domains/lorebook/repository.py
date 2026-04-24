@@ -1,6 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from shared.base.repository import BaseRepository
 from .models import Lorebook, LorebookEntry
 
@@ -9,12 +10,12 @@ class LorebookRepository(BaseRepository[Lorebook]):
         super().__init__(Lorebook, db)
 
     async def get_by_character(self, character_id: UUID) -> List[Lorebook]:
-        query = select(Lorebook).where(Lorebook.character_id == character_id)
+        query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.character_id == character_id)
         result = await self.db.execute(query)
         return result.scalars().all()
 
     async def get_by_persona(self, persona_id: UUID) -> List[Lorebook]:
-        query = select(Lorebook).where(Lorebook.user_persona_id == persona_id)
+        query = select(Lorebook).options(selectinload(Lorebook.entries)).where(Lorebook.user_persona_id == persona_id)
         result = await self.db.execute(query)
         return result.scalars().all()
 
@@ -22,9 +23,15 @@ class LorebookRepository(BaseRepository[Lorebook]):
         from app.domains.character.models import Character
         from app.domains.persona.models import UserPersona
         from sqlalchemy import or_
-        query = select(Lorebook).join(Character, Lorebook.character_id == Character.id, isouter=True)\
+        query = select(Lorebook).options(selectinload(Lorebook.entries))\
+            .join(Character, Lorebook.character_id == Character.id, isouter=True)\
             .join(UserPersona, Lorebook.user_persona_id == UserPersona.id, isouter=True)\
             .where(or_(Character.creator_id == user_id, UserPersona.owner_id == user_id))
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
+    async def get_multi(self, skip: int = 0, limit: int = 100) -> List[Lorebook]:
+        query = select(Lorebook).options(selectinload(Lorebook.entries)).offset(skip).limit(limit)
         result = await self.db.execute(query)
         return result.scalars().all()
 

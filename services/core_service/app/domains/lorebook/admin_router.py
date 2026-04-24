@@ -7,7 +7,8 @@ from .schemas import (
     LorebookCreate,
     LorebookEntryCreate,
     LorebookEntryUpdate,
-    LorebookEntryBulkCreate
+    LorebookEntryBulkCreate,
+    LorebookEntry as LorebookEntrySchema
 )
 from shared.schemas.response import BaseResponse
 
@@ -66,7 +67,8 @@ async def get_lorebook_entries(
     if not lorebook:
         return controller.handle_error("Lorebook not found", status_code=status.HTTP_404_NOT_FOUND)
     entries = await controller.lorebook_service.entry_repository.get_by_lorebook(lorebook_id)
-    return controller.handle_success(data=entries)
+    data = [LorebookEntrySchema.model_validate(e) for e in entries]
+    return controller.handle_success(data=data)
 
 
 @router.patch("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)

@@ -10,14 +10,20 @@ class LorebookService(BaseService[LorebookRepository]):
         super().__init__(repository)
         self.entry_repository = entry_repository
 
-    async def get_lorebooks(self, character_id: Optional[UUID] = None, persona_id: Optional[UUID] = None, user_id: Optional[UUID] = None) -> List[Lorebook]:
+    async def get_lorebooks(self, 
+        character_id: Optional[UUID] = None, 
+        persona_id: Optional[UUID] = None, 
+        user_id: Optional[UUID] = None,
+        skip: int = 0,
+        limit: int = 20
+    ) -> List[Lorebook]:
         if character_id:
             return await self.repository.get_by_character(character_id)
         if persona_id:
             return await self.repository.get_by_persona(persona_id)
         if user_id:
             return await self.repository.get_by_user(user_id)
-        return await self.repository.get_multi()
+        return await self.repository.get_multi(skip=skip, limit=limit)
 
     async def create_lorebook(self, lorebook_in: LorebookCreate) -> Lorebook:
         from fastapi import HTTPException
