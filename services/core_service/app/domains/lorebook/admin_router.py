@@ -5,6 +5,7 @@ from app.api import deps
 from .controller import LorebookController
 from .schemas import (
     LorebookCreate,
+    LorebookUpdate,
     LorebookEntryCreate,
     LorebookEntryUpdate,
     LorebookEntryBulkCreate,
@@ -32,6 +33,27 @@ async def create_lorebook(
     """Создать новый лорбук."""
     is_admin = current_user.role == "admin"
     return await controller.create_lorebook(lorebook_in, is_admin=is_admin)
+
+@router.patch("/{lorebook_id}", response_model=BaseResponse)
+async def update_lorebook(
+    lorebook_id: uuid.UUID,
+    lorebook_in: LorebookUpdate,
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+) -> BaseResponse:
+    """Обновить лорбук (через админку)."""
+    is_admin = current_user.role == "admin"
+    return await controller.update_lorebook(lorebook_id, lorebook_in, is_admin=is_admin)
+
+@router.delete("/{lorebook_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
+async def delete_lorebook(
+    lorebook_id: uuid.UUID,
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+) -> BaseResponse:
+    """Удалить лорбук (через админку)."""
+    is_admin = current_user.role == "admin"
+    return await controller.delete_lorebook(lorebook_id, is_admin=is_admin)
 
 
 @router.post("/{lorebook_id}/entries", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
