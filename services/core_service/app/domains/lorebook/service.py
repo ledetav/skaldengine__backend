@@ -4,6 +4,7 @@ from shared.base.service import BaseService
 from app.domains.lorebook.repository import LorebookRepository, LorebookEntryRepository
 from app.domains.lorebook.models import Lorebook, LorebookEntry
 from app.domains.lorebook.schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
+from app.core.broadcast import manager
 
 class LorebookService(BaseService[LorebookRepository]):
     def __init__(self, repository: LorebookRepository, entry_repository: LorebookEntryRepository):
@@ -41,7 +42,22 @@ class LorebookService(BaseService[LorebookRepository]):
             if not lorebook_in.user_persona_id:
                 raise HTTPException(status_code=400, detail="Persona lorebook must be linked to a user persona")
 
-        return await self.repository.create(obj_in=lorebook_in)
+        created = await self.repository.create(obj_in=lorebook_in)
+        
+        # Broadcast creation
+        await manager.broadcast({
+            "type": "NEW_LOREBOOK",
+            "data": {
+                "id": str(created.id),
+                "name": created.name,
+                "type": created.type,
+                "fandom": created.fandom,
+                "character_id": str(created.character_id) if created.character_id else None,
+                "user_persona_id": str(created.user_persona_id) if created.user_persona_id else None,
+                "entries_count": 0
+            }
+        })
+        return created
 
     async def get_lorebook(self, lorebook_id: UUID) -> Optional[Lorebook]:
         return await self.repository.get(lorebook_id)
@@ -53,30 +69,71 @@ class LorebookService(BaseService[LorebookRepository]):
         lorebook = await self.repository.get(lorebook_id)
         if not lorebook:
             return None
-        return await self.repository.update(db_obj=lorebook, obj_in=lorebook_update)
+        updated = await self.repository.update(db_obj=lorebook, obj_in=lorebook_update)
+        
+        # Broadcast update
+        await manager.broadcast({
+            "type": "UPDATE_LOREBOOK",
+            "data": {
+                "id": str(updated.id),
+                "name": updated.name,
+                "type": updated.type,
+                "fandom": updated.fandom,
+                "character_id": str(updated.character_id) if updated.character_id else None,
+                "user_persona_id": str(updated.user_persona_id) if updated.user_persona_id else None,
+            }
+        })
+        return updated
 
     async def delete_lorebook(self, lorebook_id: UUID) -> bool:
         lorebook = await self.repository.get(lorebook_id)
         if not lorebook:
             return False
         await self.repository.delete(id=lorebook_id)
+        
+        # Broadcast deletion
+        await manager.broadcast({
+            "type": "DELETE_LOREBOOK",
+            "data": {"id": str(lorebook_id)}
+        })
         return True
 
     # Entry methods
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> LorebookEntry:
         entry_data = entry_in.model_dump()
         entry_data["lorebook_id"] = lorebook_id
-        return await self.entry_repository.create(obj_in=entry_data)
+        created = await self.entry_repository.create(obj_in=entry_data)
+        
+        # Broadcast entry update (refresh needed for this lorebook)
+        await manager.broadcast({
+            "type": "REFRESH_LOREBOOK_ENTRIES",
+            "data": {"lorebook_id": str(lorebook_id)}
+        })
+        return created
 
     async def create_entries_bulk(self, lorebook_id: UUID, entries_in: List[LorebookEntryCreate]) -> List[LorebookEntry]:
         entries_data = [e.model_dump() for e in entries_in]
-        return await self.entry_repository.create_bulk(lorebook_id, entries_data)
+        created_entries = await self.entry_repository.create_bulk(lorebook_id, entries_data)
+        
+        # Broadcast entry update
+        await manager.broadcast({
+            "type": "REFRESH_LOREBOOK_ENTRIES",
+            "data": {"lorebook_id": str(lorebook_id)}
+        })
+        return created_entries
 
     async def update_entry(self, entry_id: UUID, entry_update: LorebookEntryUpdate) -> Optional[LorebookEntry]:
         entry = await self.entry_repository.get(entry_id)
         if not entry:
             return None
-        return await self.entry_repository.update(db_obj=entry, obj_in=entry_update)
+        updated = await self.entry_repository.update(db_obj=entry, obj_in=entry_update)
+        
+        if updated:
+            await manager.broadcast({
+                "type": "REFRESH_LOREBOOK_ENTRIES",
+                "data": {"lorebook_id": str(updated.lorebook_id)}
+            })
+        return updated
 
     async def get_entry(self, entry_id: UUID) -> Optional[LorebookEntry]:
         return await self.entry_repository.get(entry_id)
@@ -85,5 +142,12 @@ class LorebookService(BaseService[LorebookRepository]):
         entry = await self.entry_repository.get(entry_id)
         if not entry:
             return False
+        lorebook_id = entry.lorebook_id
         await self.entry_repository.delete(id=entry_id)
+        
+        # Broadcast entry update
+        await manager.broadcast({
+            "type": "REFRESH_LOREBOOK_ENTRIES",
+            "data": {"lorebook_id": str(lorebook_id)}
+        })
         return True
