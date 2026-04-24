@@ -15,17 +15,10 @@ router = APIRouter()
 _http_bearer = HTTPBearer()
 
 async def _verify_staff_from_token(
-    token_auth: HTTPAuthorizationCredentials = Depends(_http_bearer),
+    current_user: User = Depends(deps.get_current_user),
 ) -> None:
-    """Check that the JWT token belongs to an admin or moderator."""
-    try:
-        payload = jwt.decode(
-            token_auth.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        role = payload.get("role", "user")
-    except (JWTError, ValueError):
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-    if role not in ("admin", "moderator"):
+    """Check that the user is an admin or moderator by checking DB."""
+    if current_user.role not in ("admin", "moderator"):
         raise HTTPException(status_code=403, detail="Not enough privileges")
 
 @router.get("/", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
