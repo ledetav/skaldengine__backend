@@ -38,6 +38,7 @@ class Lorebook(Base):
 
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
 
     # Связи
     characters: Mapped[list["Character"]] = relationship(

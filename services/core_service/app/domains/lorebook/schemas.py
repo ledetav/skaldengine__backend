@@ -65,6 +65,7 @@ class LorebookBase(BaseModel):
     user_persona_id: UUID | None = None
     fandom: str | None = None
     description: str | None = None
+    tags: list[str] = []
 
 
 class LorebookCreate(LorebookBase):
@@ -92,6 +93,7 @@ class LorebookUpdate(BaseModel):
     fandom: str | None = None
     character_id: UUID | None = None
     user_persona_id: UUID | None = None
+    tags: list[str] | None = None
 
     model_config = {
         "json_schema_extra": {

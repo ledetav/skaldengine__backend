@@ -74,7 +74,8 @@ class CharacterService(BaseService[CharacterRepository]):
                     type=LorebookType.CHARACTER,
                     character_id=created.id,
                     description=f"Базовый лорбук персонажа {created.name}",
-                    fandom="Original"
+                    fandom="Original",
+                    tags=["main"]
                 )
                 lorebook.characters = [created] # Link via M2M table
                 await lorebook_repo.create(obj_in=lorebook)
@@ -113,7 +114,19 @@ class CharacterService(BaseService[CharacterRepository]):
             from app.domains.lorebook.models import Lorebook
             lb_query = select(Lorebook).where(Lorebook.id.in_(lorebook_ids))
             lb_result = await self.repository.db.execute(lb_query)
-            character.lorebooks = list(lb_result.scalars().all())
+            new_lorebooks = list(lb_result.scalars().all())
+            
+            # Enforce "main" lorebook for Original characters (Requirement 2)
+            fandom_val = update_data.get("fandom") or character.fandom
+            is_original = fandom_val and (fandom_val.lower() == "original" or fandom_val.lower() == "оригинальный")
+            if is_original:
+                # Find current main lorebook(s)
+                main_lbs = [lb for lb in character.lorebooks if "main" in (getattr(lb, "tags", []) or [])]
+                for mlb in main_lbs:
+                    if mlb not in new_lorebooks:
+                        new_lorebooks.append(mlb)
+            
+            character.lorebooks = new_lorebooks
         
         # Handle "Original" fandom logic for updates
         fandom_val = update_data.get("fandom") or character.fandom
@@ -131,7 +144,8 @@ class CharacterService(BaseService[CharacterRepository]):
                     type=LorebookType.CHARACTER,
                     character_id=character.id,
                     description=f"Основной лорбук персонажа {update_data.get('name') or character.name}",
-                    fandom="Original"
+                    fandom="Original",
+                    tags=["main"]
                 )
                 self.repository.db.add(new_lb)
                 await self.repository.db.flush()
