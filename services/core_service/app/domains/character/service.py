@@ -65,6 +65,9 @@ class CharacterService(BaseService[CharacterRepository]):
             try:
                 from app.domains.lorebook.models import Lorebook, LorebookType
                 
+                # Ensure lorebooks are loaded to avoid MissingGreenlet
+                await self.repository.db.refresh(created, ["lorebooks"])
+                
                 # Check if character already has an associated character-type lorebook
                 has_personal_lb = any(lb.type == LorebookType.CHARACTER for lb in created.lorebooks)
                 
@@ -244,7 +247,6 @@ class CharacterService(BaseService[CharacterRepository]):
             "is_public": character.is_public,
             "is_deleted": character.is_deleted,
             "creator_id": str(character.creator_id) if character.creator_id else None,
-            "created_at": character.created_at.isoformat() if character.created_at else None,
             "total_chats_count": getattr(character, "total_chats_count", 0),
             "monthly_chats_count": getattr(character, "monthly_chats_count", 0),
             "scenarios_count": getattr(character, "scenarios_count", 0),
