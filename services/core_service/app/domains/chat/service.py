@@ -50,6 +50,9 @@ class ChatService(BaseService[ChatRepository]):
         # Increment character chat count
         from app.core.stats_service import StatsService
         await StatsService.increment_total_chats(db, character.id)
+        
+        if created_chat.mode == "scenario":
+            await StatsService.increment_scenario_chats(db, character.id)
 
         await db.commit()
         await db.refresh(created_chat)

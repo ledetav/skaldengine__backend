@@ -50,6 +50,7 @@ class Character(Base):
     # Статистика
     total_chats_count: Mapped[int] = mapped_column(default=0)
     monthly_chats_count: Mapped[int] = mapped_column(default=0) # Статистика за прошедший календарный месяц
+    scenario_chats_count: Mapped[int] = mapped_column(default=0)
 
     # Среда и контент
     gender: Mapped[str | None] = mapped_column(String(50), nullable=True) # мужской, женский, другой
