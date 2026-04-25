@@ -54,19 +54,27 @@ class CharacterService(BaseService[CharacterRepository]):
         created = await self.repository.create(obj_in=character)
         
         # Автоматическое создание базового лорбука для "original" персонажа
-        if created.fandom and created.fandom.lower() == "original":
+        is_original = created.fandom and (created.fandom.lower() == "original" or created.fandom.lower() == "оригинальный")
+        if is_original:
             try:
                 from app.domains.lorebook.models import Lorebook, LorebookType
+                
+                # Check if character already has an associated character-type lorebook
+                has_personal_lb = any(lb.type == LorebookType.CHARACTER for lb in created.lorebooks)
+                if has_personal_lb:
+                    return created
+
                 from app.domains.lorebook.repository import LorebookRepository
                 
                 db_session = self.repository.db
                 lorebook_repo = LorebookRepository(db_session)
                 
                 lorebook = Lorebook(
-                    name=f"Основной лор {created.name}",
+                    name=f"Основной {created.name}",
                     type=LorebookType.CHARACTER,
                     character_id=created.id,
                     description=f"Базовый лорбук персонажа {created.name}",
+                    fandom="Original"
                 )
                 lorebook.characters = [created] # Link via M2M table
                 await lorebook_repo.create(obj_in=lorebook)
@@ -108,7 +116,10 @@ class CharacterService(BaseService[CharacterRepository]):
             character.lorebooks = list(lb_result.scalars().all())
         
         # Handle "Original" fandom logic for updates
-        if "fandom" in update_data and update_data["fandom"] == "Оригинальный":
+        fandom_val = update_data.get("fandom") or character.fandom
+        is_original = fandom_val and (fandom_val.lower() == "original" or fandom_val.lower() == "оригинальный")
+        
+        if is_original:
             from app.domains.lorebook.models import Lorebook, LorebookType
             # Check if character already has an associated character-type lorebook
             has_personal_lb = any(lb.type == LorebookType.CHARACTER and lb.character_id == character.id for lb in character.lorebooks)
@@ -120,7 +131,7 @@ class CharacterService(BaseService[CharacterRepository]):
                     type=LorebookType.CHARACTER,
                     character_id=character.id,
                     description=f"Основной лорбук персонажа {update_data.get('name') or character.name}",
-                    fandom="Оригинальный"
+                    fandom="Original"
                 )
                 self.repository.db.add(new_lb)
                 await self.repository.db.flush()
