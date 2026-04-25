@@ -74,3 +74,4 @@ class UserStatistics(BaseModel):
     total_personas: int = 0
     total_lorebooks: int = 0
     total_chats: int = 0
+    total_messages: int = 0
