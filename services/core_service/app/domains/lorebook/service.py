@@ -17,14 +17,14 @@ class LorebookService(BaseService[LorebookRepository]):
         user_id: Optional[UUID] = None,
         skip: int = 0,
         limit: int = 20
-    ) -> List[Lorebook]:
+    ) -> tuple[List[Lorebook], int] | List[Lorebook]:
         if character_id:
             return await self.repository.get_by_character(character_id)
         if persona_id:
             return await self.repository.get_by_persona(persona_id)
         if user_id:
             return await self.repository.get_by_user(user_id)
-        return await self.repository.get_multi(skip=skip, limit=limit)
+        return await self.repository.get_multi_with_count(skip=skip, limit=limit)
 
     async def create_lorebook(self, lorebook_in: LorebookCreate) -> Lorebook:
         from fastapi import HTTPException

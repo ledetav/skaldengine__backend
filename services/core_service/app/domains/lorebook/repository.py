@@ -40,6 +40,17 @@ class LorebookRepository(BaseRepository[Lorebook]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def get_multi_with_count(self, skip: int = 0, limit: int = 20) -> tuple[List[Lorebook], int]:
+        from sqlalchemy import func
+        query = select(Lorebook).options(selectinload(Lorebook.entries)).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        items = result.scalars().all()
+
+        count_query = select(func.count()).select_from(Lorebook)
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar() or 0
+        return list(items), total
+
     async def get_fandom_lorebook(self, fandom_name: str) -> Optional[Lorebook]:
         query = select(Lorebook).where(
             Lorebook.fandom == fandom_name,
@@ -57,6 +68,17 @@ class LorebookEntryRepository(BaseRepository[LorebookEntry]):
         query = select(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id)
         result = await self.db.execute(query)
         return result.scalars().all()
+
+    async def get_by_lorebook_with_count(self, lorebook_id: UUID, skip: int = 0, limit: int = 20) -> tuple[List[LorebookEntry], int]:
+        from sqlalchemy import func
+        query = select(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        items = result.scalars().all()
+
+        count_query = select(func.count()).select_from(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id)
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar() or 0
+        return list(items), total
 
     async def create_bulk(self, lorebook_id: UUID, entries_data: List[dict]) -> List[LorebookEntry]:
         entries = [

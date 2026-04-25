@@ -65,5 +65,5 @@ class UserService(BaseService[UserRepository]):
     async def update_role(self, user: User, role: str) -> User:
         return await self.repository.update(db_obj=user, obj_in={"role": role})
 
-    async def get_all_users(self, skip: int = 0, limit: int = 200) -> list:
-        return await self.repository.get_multi(skip=skip, limit=limit)
+    async def get_all_users(self, skip: int = 0, limit: int = 20) -> tuple[list, int]:
+        return await self.repository.get_multi_with_count(skip=skip, limit=limit)

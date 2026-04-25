@@ -24,7 +24,7 @@ async def _verify_staff_from_token(
 @router.get("/", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
 async def list_all_users(
     skip: int = 0,
-    limit: int = 200,
+    limit: int = 20,
     controller: UserController = Depends(deps.get_user_controller),
 ):
     """Получить список всех пользователей (только для admin/moderator)."""

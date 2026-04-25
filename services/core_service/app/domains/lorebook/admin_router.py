@@ -81,6 +81,8 @@ async def create_lorebook_entries_bulk(
 @router.get("/{lorebook_id}/entries", response_model=BaseResponse)
 async def get_lorebook_entries(
     lorebook_id: uuid.UUID,
+    skip: int = 0,
+    limit: int = 20,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ) -> BaseResponse:
@@ -88,9 +90,9 @@ async def get_lorebook_entries(
     lorebook = await controller.lorebook_service.get_lorebook(lorebook_id)
     if not lorebook:
         return controller.handle_error("Lorebook not found", status_code=status.HTTP_404_NOT_FOUND)
-    entries = await controller.lorebook_service.entry_repository.get_by_lorebook(lorebook_id)
+    entries, total = await controller.lorebook_service.entry_repository.get_by_lorebook_with_count(lorebook_id, skip, limit)
     data = [LorebookEntrySchema.model_validate(e) for e in entries]
-    return controller.handle_success(data=data)
+    return controller.handle_success(data={"items": data, "total": total})
 
 
 @router.patch("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)

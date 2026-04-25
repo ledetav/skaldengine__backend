@@ -8,22 +8,29 @@ from app.domains.character.schemas import CharacterCreate, CharacterUpdate
 from app.core.broadcast import manager
 
 class CharacterService(BaseService[CharacterRepository]):
-    async def get_characters(self, skip: int = 0, limit: int = 20, is_admin: bool = False) -> List[Character]:
+    async def get_characters(self, skip: int = 0, limit: int = 20, is_admin: bool = False) -> tuple[List[Character], int]:
         from sqlalchemy.orm import selectinload
-        from sqlalchemy import select
-        query = select(Character).options(selectinload(Character.lorebooks)).where(
-            Character.is_deleted == False
-        )
+        from sqlalchemy import select, func
+        
+        base_query = select(Character).where(Character.is_deleted == False)
+        count_query = select(func.count()).select_from(Character).where(Character.is_deleted == False)
+        
         if not is_admin:
-            query = query.where(Character.is_public == True)
+            base_query = base_query.where(Character.is_public == True)
+            count_query = count_query.where(Character.is_public == True)
             
-        query = query.offset(skip).limit(limit)
+        query = base_query.options(selectinload(Character.lorebooks)).offset(skip).limit(limit)
+        
         result = await self.repository.db.execute(query)
         characters = list(result.scalars().all())
+        
+        count_result = await self.repository.db.execute(count_query)
+        total = count_result.scalar() or 0
+
         for char in characters:
             char.scenarios_count = await self.repository.get_scenarios_count(char.id)
             char.scenario_chats_count = await self.repository.get_scenario_chats_count(char.id)
-        return characters
+        return characters, total
 
     async def get_character(self, character_id: UUID, is_admin: bool = False) -> Optional[Character]:
         from sqlalchemy.orm import selectinload

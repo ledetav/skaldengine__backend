@@ -21,8 +21,13 @@ class LorebookController(BaseController):
         skip: int = 0,
         limit: int = 20
     ) -> BaseResponse:
-        lorebooks = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit)
-        data = [LorebookWithEntries.model_validate(lb) for lb in lorebooks]
+        result = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit)
+        if isinstance(result, tuple):
+            lorebooks, total = result
+            items = [LorebookWithEntries.model_validate(lb) for lb in lorebooks]
+            return self.handle_success(data={"items": items, "total": total})
+        
+        data = [LorebookWithEntries.model_validate(lb) for lb in result]
         return self.handle_success(data=data)
 
     async def check_fandom(self, fandom_name: str) -> BaseResponse:

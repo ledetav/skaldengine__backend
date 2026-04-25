@@ -22,6 +22,20 @@ class BaseRepository(Generic[ModelType]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def get_multi_with_count(self, skip: int = 0, limit: int = 100) -> tuple[List[ModelType], int]:
+        from sqlalchemy import func
+        # Query for items
+        query = select(self.model).offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        items = result.scalars().all()
+
+        # Query for total count
+        count_query = select(func.count()).select_from(self.model)
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar() or 0
+
+        return list(items), total
+
     async def create(self, obj_in) -> ModelType:
         if isinstance(obj_in, dict):
             db_obj = self.model(**obj_in)

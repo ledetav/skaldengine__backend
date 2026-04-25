@@ -11,13 +11,13 @@ router = APIRouter()
 @router.get("/admin/all", response_model=BaseResponse)
 async def list_all_personas(
     skip: int = 0,
-    limit: int = 200,
+    limit: int = 20,
     controller: UserPersonaController = Depends(deps.get_user_persona_controller),
     current_user: deps.CurrentUser = Depends(deps.verify_staff_role)
 ):
     """[Admin/Moderator] Получить список всех персон всех пользователей."""
-    personas = await controller.persona_service.repository.get_multi(skip=skip, limit=limit)
-    return BaseResponse(success=True, data=personas)
+    personas, total = await controller.persona_service.repository.get_multi_with_count(skip=skip, limit=limit)
+    return BaseResponse(success=True, data={"items": personas, "total": total})
 
 
 @router.delete("/admin/{persona_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
