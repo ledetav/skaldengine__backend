@@ -15,23 +15,23 @@ class ScenarioController(BaseController):
             scenarios = await self.scenario_service.get_by_character(character_id)
         else:
             scenarios = await self.scenario_service.get_scenarios()
-        return self.handle_success(data=scenarios)
+        return self.handle_success(data=[ScenarioResponse.model_validate(s) for s in scenarios])
 
     async def create_scenario(self, scenario_in: ScenarioCreate) -> BaseResponse:
         scenario = await self.scenario_service.create_scenario(scenario_in)
-        return self.handle_success(data=scenario)
+        return self.handle_success(data=ScenarioResponse.model_validate(scenario))
 
     async def get_scenario(self, scenario_id: UUID) -> BaseResponse:
         scenario = await self.scenario_service.repository.get(scenario_id)
         if not scenario:
             self.handle_error("Scenario not found", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=scenario)
+        return self.handle_success(data=ScenarioResponse.model_validate(scenario))
 
     async def update_scenario(self, scenario_id: UUID, scenario_update: ScenarioUpdate) -> BaseResponse:
         scenario = await self.scenario_service.update_scenario(scenario_id, scenario_update)
         if not scenario:
             self.handle_error("Scenario not found", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=scenario)
+        return self.handle_success(data=ScenarioResponse.model_validate(scenario))
 
     async def delete_scenario(self, scenario_id: UUID) -> BaseResponse:
         success = await self.scenario_service.delete_scenario(scenario_id)

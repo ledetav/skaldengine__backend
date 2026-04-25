@@ -29,9 +29,11 @@ class ScenarioCreate(ScenarioBase):
 
 class ScenarioUpdate(BaseModel):
     title: str | None = None
+    location: str | None = None
     description: str | None = None
     start_point: str | None = None
     end_point: str | None = None
+    character_id: UUID | None = None
 
     model_config = {
         "json_schema_extra": {
