@@ -22,6 +22,11 @@ class BaseRepository(Generic[ModelType]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
+    async def get_multi_by_ids(self, ids: List[Any]) -> List[ModelType]:
+        query = select(self.model).where(self.model.id.in_(ids))
+        result = await self.db.execute(query)
+        return result.scalars().all()
+
     async def get_multi_with_count(self, skip: int = 0, limit: int = 100) -> tuple[List[ModelType], int]:
         from sqlalchemy import func
         # Query for items

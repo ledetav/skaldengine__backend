@@ -158,3 +158,15 @@ async def delete_user(
 ):
     """Удалить учетную запись текущего пользователя."""
     return await controller.delete_user(current_user)
+@router.get("/batch", response_model=BaseResponse)
+async def get_users_batch(
+    ids: str,
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Получить публичные профили списка пользователей по их ID (через запятую)."""
+    try:
+        from uuid import UUID
+        user_ids = [UUID(id_str.strip()) for id_str in ids.split(",") if id_str.strip()]
+        return await controller.get_users_by_ids(user_ids)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid UUID in batch: {str(e)}")

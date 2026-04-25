@@ -91,9 +91,11 @@ class CharacterRead(BaseModel):
     nsfw_allowed: bool
     total_chats_count: int
     monthly_chats_count: int
+    creator_id: Optional[UUID] = None
     scenarios_count: int = 0
     scenario_chats_count: int = 0
     lorebook_ids: List[UUID] = []
+    author: Optional[dict] = None
 
     class Config:
         from_attributes = True

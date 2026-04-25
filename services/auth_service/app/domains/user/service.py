@@ -59,6 +59,9 @@ class UserService(BaseService[UserRepository]):
     async def get_by_username(self, username: str) -> Optional[User]:
         return await self.repository.get_by_username(username)
 
+    async def get_by_ids(self, ids: list[Any]) -> list[User]:
+        return await self.repository.get_multi_by_ids(ids)
+
     async def get(self, id: Any) -> Optional[User]:
         return await self.repository.get(id)
 

@@ -1,3 +1,5 @@
+from typing import List
+from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserService
@@ -91,3 +93,8 @@ class UserController(BaseController):
     async def get_all_users(self, skip: int = 0, limit: int = 20) -> BaseResponse:
         users, total = await self.user_service.get_all_users(skip=skip, limit=limit)
         return self.handle_success(data={"items": [UserResponse.model_validate(u) for u in users], "total": total})
+
+    async def get_users_by_ids(self, user_ids: List[UUID]) -> BaseResponse:
+        from .schemas import PublicProfileResponse
+        users = await self.user_service.get_by_ids(user_ids)
+        return self.handle_success(data=[PublicProfileResponse.model_validate(u) for u in users])
