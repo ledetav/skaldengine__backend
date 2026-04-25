@@ -61,7 +61,7 @@ class UserPersonaUpdate(BaseModel):
     }
 
 
-class UserPersona(UserPersonaBase):
+class UserPersonaResponse(UserPersonaBase):
     id: UUID
     owner_id: UUID
     lorebook_count: int = 0

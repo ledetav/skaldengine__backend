@@ -45,7 +45,7 @@ class ChatUpdate(BaseModel):
     active_leaf_id: UUID | None = None
 
 
-class Chat(ChatBase):
+class ChatResponse(ChatBase):
     id: UUID
     user_id: UUID
     mode: str

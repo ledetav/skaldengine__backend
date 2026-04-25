@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.api import deps
 from .controller import UserPersonaController
-from .schemas import UserPersonaCreate, UserPersonaUpdate, UserPersona
+from .schemas import UserPersonaCreate, UserPersonaUpdate, UserPersonaResponse
 from shared.schemas.response import BaseResponse
 
 router = APIRouter()
@@ -17,7 +17,10 @@ async def list_all_personas(
 ):
     """[Admin/Moderator] Получить список всех персон всех пользователей."""
     personas, total = await controller.persona_service.repository.get_multi_with_count(skip=skip, limit=limit)
-    return BaseResponse(success=True, data={"items": personas, "total": total})
+    return BaseResponse(success=True, data={
+        "items": [UserPersonaResponse.model_validate(p) for p in personas], 
+        "total": total
+    })
 
 
 @router.delete("/admin/{persona_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)

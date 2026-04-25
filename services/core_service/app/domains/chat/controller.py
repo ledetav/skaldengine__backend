@@ -3,7 +3,7 @@ from fastapi import BackgroundTasks, status
 from uuid import UUID
 from shared.base.controller import BaseController
 from .service import ChatService
-from .schemas import ChatCreate, ChatUpdate
+from .schemas import ChatCreate, ChatUpdate, ChatResponse
 from shared.schemas.response import BaseResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,25 +14,25 @@ class ChatController(BaseController):
     async def create_chat(self, chat_in: ChatCreate, user_id: UUID, background_tasks: BackgroundTasks, db: AsyncSession) -> BaseResponse:
         try:
             chat = await self.chat_service.create_chat(chat_in, user_id, background_tasks, db)
-            return self.handle_success(data=chat)
+            return self.handle_success(data=ChatResponse.model_validate(chat))
         except (ValueError, PermissionError) as e:
             self.handle_error(str(e))
 
     async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> BaseResponse:
         chats = await self.chat_service.get_user_chats(user_id, skip, limit)
-        return self.handle_success(data=chats)
+        return self.handle_success(data=[ChatResponse.model_validate(c) for c in chats])
 
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> BaseResponse:
         chat = await self.chat_service.get_chat(chat_id, user_id)
         if not chat:
             self.handle_error("Chat not found", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=chat)
+        return self.handle_success(data=ChatResponse.model_validate(chat))
 
     async def update_chat(self, chat_id: UUID, chat_update: ChatUpdate, user_id: UUID) -> BaseResponse:
         chat = await self.chat_service.update_chat(chat_id, chat_update, user_id)
         if not chat:
             self.handle_error("Chat not found", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=chat)
+        return self.handle_success(data=ChatResponse.model_validate(chat))
 
     async def delete_chat(self, chat_id: UUID, user_id: UUID) -> BaseResponse:
         success = await self.chat_service.delete_chat(chat_id, user_id)

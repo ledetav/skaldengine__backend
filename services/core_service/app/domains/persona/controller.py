@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserPersonaService
-from .schemas import UserPersonaCreate, UserPersonaUpdate
+from .schemas import UserPersonaCreate, UserPersonaUpdate, UserPersonaResponse
 from app.domains.persona.schemas import UserStatistics
 from shared.schemas.response import BaseResponse
 
@@ -13,23 +13,23 @@ class UserPersonaController(BaseController):
 
     async def get_my_personas(self, user_id: UUID) -> BaseResponse:
         personas = await self.persona_service.get_user_personas(user_id)
-        return self.handle_success(data=personas)
+        return self.handle_success(data=[UserPersonaResponse.model_validate(p) for p in personas])
 
     async def create_persona(self, persona_in: UserPersonaCreate, user_id: UUID) -> BaseResponse:
         persona = await self.persona_service.create_persona(persona_in, user_id)
-        return self.handle_success(data=persona)
+        return self.handle_success(data=UserPersonaResponse.model_validate(persona))
 
     async def get_persona(self, persona_id: UUID, user_id: UUID) -> BaseResponse:
         persona = await self.persona_service.get_persona(persona_id, user_id)
         if not persona:
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=persona)
+        return self.handle_success(data=UserPersonaResponse.model_validate(persona))
 
     async def update_persona(self, persona_id: UUID, persona_update: UserPersonaUpdate, user_id: UUID) -> BaseResponse:
         persona = await self.persona_service.update_persona(persona_id, persona_update, user_id)
         if not persona:
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=persona)
+        return self.handle_success(data=UserPersonaResponse.model_validate(persona))
 
     async def delete_persona(self, persona_id: UUID, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         success = await self.persona_service.delete_persona(persona_id, user_id, is_admin=is_admin)

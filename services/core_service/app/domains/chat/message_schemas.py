@@ -41,7 +41,7 @@ class MessageRegenerate(BaseModel):
     }
 
 
-class Message(MessageBase):
+class MessageResponse(MessageBase):
     id: UUID
     chat_id: UUID
     parent_id: UUID | None = None
