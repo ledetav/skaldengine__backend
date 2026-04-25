@@ -26,10 +26,14 @@ class UserPersonaService(BaseService[UserPersonaRepository]):
             return None
         return await self.repository.update(db_obj=persona, obj_in=persona_update)
 
-    async def delete_persona(self, persona_id: UUID, owner_id: UUID) -> bool:
-        persona = await self.get_persona(persona_id, owner_id)
+    async def delete_persona(self, persona_id: UUID, owner_id: UUID, is_admin: bool = False) -> bool:
+        persona = await self.repository.get(persona_id)
         if not persona:
             return False
+        
+        if not is_admin and str(persona.owner_id) != str(owner_id):
+            return False
+            
         await self.repository.delete(id=persona_id)
         return True
 

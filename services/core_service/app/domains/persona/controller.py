@@ -31,8 +31,8 @@ class UserPersonaController(BaseController):
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=persona)
 
-    async def delete_persona(self, persona_id: UUID, user_id: UUID) -> BaseResponse:
-        success = await self.persona_service.delete_persona(persona_id, user_id)
+    async def delete_persona(self, persona_id: UUID, user_id: UUID, is_admin: bool = False) -> BaseResponse:
+        success = await self.persona_service.delete_persona(persona_id, user_id, is_admin=is_admin)
         if not success:
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=None)

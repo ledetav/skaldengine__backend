@@ -20,6 +20,16 @@ async def list_all_personas(
     return BaseResponse(success=True, data=personas)
 
 
+@router.delete("/admin/{persona_id}", response_model=BaseResponse, status_code=status.HTTP_200_OK)
+async def delete_persona_admin(
+    persona_id: UUID,
+    controller: UserPersonaController = Depends(deps.get_user_persona_controller),
+    current_user: deps.CurrentUser = Depends(deps.verify_admin_role)
+):
+    """[Admin] Удалить любую персону."""
+    return await controller.delete_persona(persona_id, current_user.id, is_admin=True)
+
+
 @router.get("/", response_model=BaseResponse)
 async def list_personas(
     user_id: UUID | None = None,
