@@ -1,6 +1,7 @@
 import uuid
+import enum
 from datetime import datetime
-from sqlalchemy import String, Text, Boolean, Index, ForeignKey, Column, Table, DateTime
+from sqlalchemy import String, Text, Boolean, Index, ForeignKey, Column, Table, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -15,6 +16,9 @@ character_lorebook_association = Table(
     Column("lorebook_id", ForeignKey("lorebooks.id", ondelete="CASCADE"), primary_key=True),
 )
 
+class CharacterType(str, enum.Enum):
+    FANDOM = "fandom"
+    ORIGINAL = "original"
 
 class Character(Base):
     """
@@ -26,6 +30,9 @@ class Character(Base):
 
     # Создатель персонажа (raw UUID — владелец в auth_db)
     creator_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+
+    # Тип персонажа (Requirement 2026-04-25: FANDOM or ORIGINAL)
+    type: Mapped[CharacterType] = mapped_column(Enum(CharacterType), default=CharacterType.FANDOM, index=True)
 
     # Публичная информация (каталог)
     name: Mapped[str] = mapped_column(String)

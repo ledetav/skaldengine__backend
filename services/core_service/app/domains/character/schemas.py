@@ -1,11 +1,12 @@
 from pydantic import BaseModel
 from uuid import UUID
 from typing import Optional, List
-
+from app.domains.character.models import CharacterType
 
 class CharacterBase(BaseModel):
     name: str
     description: str | None = None
+    type: CharacterType = CharacterType.FANDOM
     fandom: str | None = None
     avatar_url: str | None = None
     card_image_url: str | None = None
@@ -25,6 +26,7 @@ class CharacterCreate(CharacterBase):
                 {
                     "name": "Eldritch",
                     "description": "An ancient being of cosmic horror.",
+                    "type": "fandom",
                     "fandom": "Cthulhu Mythos",
                     "avatar_url": "https://example.com/avatar.jpg",
                     "card_image_url": "https://example.com/card.jpg",
@@ -43,6 +45,7 @@ class CharacterCreate(CharacterBase):
 class CharacterUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
+    type: CharacterType | None = None
     fandom: str | None = None
     avatar_url: str | None = None
     card_image_url: str | None = None
@@ -59,7 +62,8 @@ class CharacterUpdate(BaseModel):
                 {
                     "name": "Eldritch (Updated)",
                     "description": "Updated description",
-                    "fandom": "Updated Fandom",
+                    "type": "original",
+                    "fandom": None,
                     "avatar_url": "https://example.com/avatar_new.jpg",
                     "card_image_url": "https://example.com/card_new.jpg",
                     "appearance": "More tentacles",
@@ -78,6 +82,7 @@ class CharacterRead(BaseModel):
     id: UUID
     name: str
     description: str | None = None
+    type: CharacterType
     fandom: str | None = None
     avatar_url: str | None = None
     card_image_url: str | None = None
@@ -121,4 +126,3 @@ class Character(CharacterBase):
 
 # Alias for response schema
 CharacterResponse = CharacterRead
-
