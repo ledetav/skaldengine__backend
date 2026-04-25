@@ -59,19 +59,26 @@ class CharacterService(BaseService[CharacterRepository]):
 
         created = await self.repository.create(obj_in=character)
         
-        # Автоматическое создание базового лорбука для "original" персонажа
+        # Автоматическое создание/назначение базового лорбука для "original" персонажа
         is_original = created.fandom and (created.fandom.lower() == "original" or created.fandom.lower() == "оригинальный")
         if is_original:
             try:
                 from app.domains.lorebook.models import Lorebook, LorebookType
                 
-                # Ensure lorebooks are loaded to avoid MissingGreenlet
+                # Ensure lorebooks are loaded
                 await self.repository.db.refresh(created, ["lorebooks"])
                 
-                # Check if character already has an associated character-type lorebook
-                has_personal_lb = any(lb.type == LorebookType.CHARACTER for lb in created.lorebooks)
+                # Filter out shared fandom lorebooks if any (Requirement: unbind fandom lbs for original chars)
+                # Note: On creation, there shouldn't be many, but just in case.
+                fandom_lbs = [lb for lb in created.lorebooks if lb.type == LorebookType.FANDOM]
+                if fandom_lbs:
+                    created.lorebooks = [lb for lb in created.lorebooks if lb.type != LorebookType.FANDOM]
+                    await self.repository.db.flush()
+
+                # Find existing character-type lorebooks
+                personal_lbs = [lb for lb in created.lorebooks if lb.type == LorebookType.CHARACTER]
                 
-                if not has_personal_lb:
+                if not personal_lbs:
                     from app.domains.lorebook.repository import LorebookRepository
                     
                     db_session = self.repository.db
@@ -87,23 +94,21 @@ class CharacterService(BaseService[CharacterRepository]):
                     )
                     lorebook.characters = [created] # Link via M2M table
                     await lorebook_repo.create(obj_in=lorebook)
-                    # Refresh created to include new lorebook in broadcast
+                    # Refresh created to include new lorebook
                     await self.repository.db.refresh(created, ["lorebooks"])
                 else:
-                    # Если персональный лорбук уже есть, убедимся что у него есть тег main
-                    personal_lbs = [lb for lb in created.lorebooks if lb.type == LorebookType.CHARACTER]
+                    # Если есть персональные лорбуки, убедимся что первый из них имеет тег main
                     has_main = any("main" in (getattr(lb, "tags", []) or []) for lb in personal_lbs)
-                    if not has_main and personal_lbs:
+                    if not has_main:
                          lb = personal_lbs[0]
                          if lb.tags is None: lb.tags = []
                          if "main" not in lb.tags:
                               lb.tags = list(lb.tags) + ["main"]
-                              # No explicit save here, it will be saved downstream or we can flush
                               await self.repository.db.flush()
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.error(f"Failed to create default lorebook for original character {created.id}: {e}")
+                logger.error(f"Failed to manage lorebook for original character {created.id}: {e}")
 
         # Ensure lorebooks are loaded for broadcast
         await self.repository.db.refresh(created, ["lorebooks"])
@@ -151,16 +156,37 @@ class CharacterService(BaseService[CharacterRepository]):
             character.lorebooks = new_lorebooks
         
         # Handle "Original" fandom logic for updates
-        fandom_val = update_data.get("fandom") or character.fandom
-        is_original = fandom_val and (fandom_val.lower() == "original" or fandom_val.lower() == "оригинальный")
+        old_fandom = character.fandom
+        new_fandom = update_data.get("fandom") or character.fandom
+        
+        is_original = new_fandom and (new_fandom.lower() == "original" or new_fandom.lower() == "оригинальный")
         
         if is_original:
             from app.domains.lorebook.models import Lorebook, LorebookType
-            # Check if character already has an associated character-type lorebook
-            personal_lbs = [lb for lb in character.lorebooks if lb.type == LorebookType.CHARACTER and lb.character_id == character.id]
             
-            if not personal_lbs:
-                # Create default personal lorebook
+            # 1. Отвязываем все фандомные лорбуки
+            character.lorebooks = [lb for lb in character.lorebooks if lb.type != LorebookType.FANDOM]
+            
+            # 2. Ищем существующие персональные лорбуки
+            personal_lbs = [lb for lb in character.lorebooks if lb.type == LorebookType.CHARACTER]
+            
+            if personal_lbs:
+                # Берем первый (сортируем по дате создания, если поле есть в БД)
+                if hasattr(personal_lbs[0], 'created_at'):
+                    personal_lbs.sort(key=lambda x: getattr(x, 'created_at', x.id))
+                
+                # Делаем его основным (ставим тег main)
+                target_lb = personal_lbs[0]
+                has_main = any("main" in (getattr(lb, "tags", []) or []) for lb in personal_lbs)
+                
+                if not has_main:
+                    if target_lb.tags is None: target_lb.tags = []
+                    if "main" not in target_lb.tags:
+                        target_lb.tags = list(target_lb.tags) + ["main"]
+                        await self.repository.db.flush()
+                # Мы НЕ создаем новый лорбук, так как персональные лорбуки уже есть
+            else:
+                # 3. Если лорбуков персонажа нет, создаем новый
                 new_lb = Lorebook(
                     name=f"Основной {update_data.get('name') or character.name}",
                     type=LorebookType.CHARACTER,
@@ -173,15 +199,6 @@ class CharacterService(BaseService[CharacterRepository]):
                 await self.repository.db.flush()
                 # Link it
                 character.lorebooks.append(new_lb)
-            else:
-                # Убедимся, что хотя бы один персональный лорбук имеет тег main
-                has_main = any("main" in (getattr(lb, "tags", []) or []) for lb in personal_lbs)
-                if not has_main:
-                    first_lb = personal_lbs[0]
-                    if first_lb.tags is None: first_lb.tags = []
-                    if "main" not in first_lb.tags:
-                        first_lb.tags = list(first_lb.tags) + ["main"]
-                        await self.repository.db.flush()
         
         updated = await self.repository.update(db_obj=character, obj_in=update_data)
 

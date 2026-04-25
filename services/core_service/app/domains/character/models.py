@@ -1,6 +1,8 @@
 import uuid
-from sqlalchemy import String, Text, Boolean, Index, ForeignKey, Column, Table
+from datetime import datetime
+from sqlalchemy import String, Text, Boolean, Index, ForeignKey, Column, Table, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from app.db.base import Base
 
@@ -49,6 +51,8 @@ class Character(Base):
     # Доступность
     is_public: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
     attributes: Mapped[list["CharacterAttribute"]] = relationship(

@@ -1,6 +1,8 @@
 import uuid
-from sqlalchemy import String, Text, Integer, ForeignKey, ARRAY, Index
+from sqlalchemy import String, Text, Integer, ForeignKey, ARRAY, Index, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+from datetime import datetime
 
 from app.db.base import Base
 
@@ -39,6 +41,8 @@ class Lorebook(Base):
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
     characters: Mapped[list["Character"]] = relationship(
@@ -70,6 +74,8 @@ class LorebookEntry(Base):
 
     content: Mapped[str] = mapped_column(Text)
     priority: Mapped[int] = mapped_column(Integer, default=0)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
     lorebook: Mapped["Lorebook"] = relationship("Lorebook", back_populates="entries")
