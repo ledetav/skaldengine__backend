@@ -153,3 +153,6 @@ class LorebookService(BaseService[LorebookRepository]):
             "data": {"lorebook_id": str(lorebook_id)}
         })
         return True
+
+    async def get_entries_by_lorebook(self, lorebook_id: UUID, skip: int = 0, limit: int = 20) -> tuple[List[LorebookEntry], int]:
+        return await self.entry_repository.get_by_lorebook_with_count(lorebook_id, skip=skip, limit=limit)

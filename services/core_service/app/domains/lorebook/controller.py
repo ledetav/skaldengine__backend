@@ -102,3 +102,8 @@ class LorebookController(BaseController):
         if not success:
             self.handle_error("Entry not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=None)
+
+    async def get_entries(self, lorebook_id: UUID, skip: int = 0, limit: int = 20) -> BaseResponse:
+        entries, total = await self.lorebook_service.get_entries_by_lorebook(lorebook_id, skip=skip, limit=limit)
+        items = [LorebookEntrySchema.model_validate(e) for e in entries]
+        return self.handle_success(data={"items": items, "total": total})

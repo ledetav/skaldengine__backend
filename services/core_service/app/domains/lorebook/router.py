@@ -102,6 +102,18 @@ async def delete_entry(
     return await controller.delete_entry(entry_id)
 
 
+@router.get("/{lorebook_id}/entries", response_model=BaseResponse)
+async def list_entries(
+    lorebook_id: UUID,
+    skip: int = 0,
+    limit: int = 20,
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Получить список записей лорбука (пагинированный)."""
+    return await controller.get_entries(lorebook_id, skip=skip, limit=limit)
+
+
 @router.get("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)
 async def read_entry(
     lorebook_id: UUID,
