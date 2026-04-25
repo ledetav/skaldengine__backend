@@ -98,8 +98,16 @@ class PromptPipeline:
             raise ValueError(f"Chat {self.chat_id} not found")
 
         # Загружаем связанные объекты
-        self.character = await self.db.get(Character, self.chat.character_id)
+        from sqlalchemy.orm import selectinload
+        char_res = await self.db.execute(
+            select(Character)
+            .options(selectinload(Character.lorebooks))
+            .where(Character.id == self.chat.character_id)
+        )
+        self.character = char_res.scalar_one_or_none()
+        
         self.persona = await self.db.get(UserPersona, self.chat.user_persona_id)
+
         if self.chat.scenario_id:
             self.scenario = await self.db.get(Scenario, self.chat.scenario_id)
 
@@ -167,17 +175,26 @@ class PromptPipeline:
                             all_stems.add(s)
                 persona_attr_keyword_stems.append((attr, kw_sets))
 
-        # --- 2. Обработка ЛОРБУКА (Character + Fandom + Persona Override) ---
-        lore_filters = [
-            Lorebook.character_id == self.character.id,
-            Lorebook.fandom == self.character.fandom
-        ]
+        # --- 2. Обработка ЛОРБУКА (Association links + Persona Override) ---
+        relevant_lb_ids = [lb.id for lb in self.character.lorebooks]
+        
+        if relevant_lb_ids:
+            # Если есть явные привязки (M2M), используем их как приоритетный источник
+            lore_filters = [Lorebook.id.in_(relevant_lb_ids)]
+        else:
+            # Legacy fallback для старых персонажей
+            lore_filters = [
+                Lorebook.character_id == self.character.id,
+                Lorebook.fandom == self.character.fandom
+            ]
+
         if hasattr(self.chat, 'persona_lorebook_id') and self.chat.persona_lorebook_id:
             lore_filters.append(Lorebook.id == self.chat.persona_lorebook_id)
             
         query = select(LorebookEntry).join(Lorebook).where(
             or_(*lore_filters)
         )
+
         result = await self.db.execute(query)
         entries = result.scalars().all()
 

@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from uuid import UUID
+from typing import Optional, List
 
 
 class CharacterBase(BaseModel):
@@ -14,6 +15,7 @@ class CharacterBase(BaseModel):
     # Новые поля
     gender: str | None = None
     nsfw_allowed: bool = True
+    lorebook_ids: List[UUID] | None = None
 
 
 class CharacterCreate(CharacterBase):
@@ -30,7 +32,8 @@ class CharacterCreate(CharacterBase):
                     "personality": "Unfathomable, cold, indifferent",
                     "is_public": True,
                     "gender": "other",
-                    "nsfw_allowed": True
+                    "nsfw_allowed": True,
+                    "lorebook_ids": []
                 }
             ]
         }
@@ -48,6 +51,7 @@ class CharacterUpdate(BaseModel):
     is_public: bool | None = None
     gender: str | None = None
     nsfw_allowed: bool | None = None
+    lorebook_ids: List[UUID] | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -62,7 +66,8 @@ class CharacterUpdate(BaseModel):
                     "personality": "Even more indifferent",
                     "is_public": False,
                     "gender": "other",
-                    "nsfw_allowed": False
+                    "nsfw_allowed": False,
+                    "lorebook_ids": ["123e4567-e89b-12d3-a456-426614174000"]
                 }
             ]
         }
@@ -83,9 +88,16 @@ class CharacterRead(BaseModel):
     monthly_chats_count: int
     scenarios_count: int = 0
     scenario_chats_count: int = 0
+    lorebook_ids: List[UUID] = []
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        if hasattr(obj, 'lorebooks'):
+            setattr(obj, 'lorebook_ids', [lb.id for lb in obj.lorebooks])
+        return super().model_validate(obj, **kwargs)
 
 
 class CharacterAdminRead(CharacterRead):
@@ -109,3 +121,4 @@ class Character(CharacterBase):
 
 # Alias for response schema
 CharacterResponse = CharacterRead
+

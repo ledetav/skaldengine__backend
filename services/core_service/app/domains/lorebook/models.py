@@ -40,8 +40,13 @@ class Lorebook(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Связи
-    character: Mapped["Character | None"] = relationship("Character", back_populates="lorebooks")
+    characters: Mapped[list["Character"]] = relationship(
+        "Character", 
+        secondary="character_lorebook_association",
+        back_populates="lorebooks"
+    )
     user_persona: Mapped["UserPersona | None"] = relationship("UserPersona")
+
     entries: Mapped[list["LorebookEntry"]] = relationship(
         "LorebookEntry", back_populates="lorebook", cascade="all, delete-orphan"
     )

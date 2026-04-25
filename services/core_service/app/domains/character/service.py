@@ -9,14 +9,26 @@ from app.core.broadcast import manager
 
 class CharacterService(BaseService[CharacterRepository]):
     async def get_characters(self, skip: int = 0, limit: int = 20) -> List[Character]:
-        characters = await self.repository.get_active_characters(skip, limit)
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import select
+        query = select(Character).options(selectinload(Character.lorebooks)).where(
+            Character.is_deleted == False,
+            Character.is_public == True
+        ).offset(skip).limit(limit)
+        result = await self.repository.db.execute(query)
+        characters = list(result.scalars().all())
         for char in characters:
             char.scenarios_count = await self.repository.get_scenarios_count(char.id)
             char.scenario_chats_count = await self.repository.get_scenario_chats_count(char.id)
         return characters
 
     async def get_character(self, character_id: UUID) -> Optional[Character]:
-        character = await self.repository.get(character_id)
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import select
+        query = select(Character).options(selectinload(Character.lorebooks)).where(Character.id == character_id)
+        result = await self.repository.db.execute(query)
+        character = result.scalar_one_or_none()
+        
         if not character or character.is_deleted or not character.is_public:
             return None
         
@@ -24,18 +36,29 @@ class CharacterService(BaseService[CharacterRepository]):
         character.scenario_chats_count = await self.repository.get_scenario_chats_count(character.id)
         return character
 
+
     async def create_character(self, character_in: CharacterCreate, creator_id: UUID) -> Character:
-        character = Character(**character_in.model_dump(), creator_id=creator_id)
+        data = character_in.model_dump(exclude={"lorebook_ids"})
+        lorebook_ids = character_in.lorebook_ids or []
+        
+        character = Character(**data, creator_id=creator_id)
+        
+        # Load lorebooks to associate
+        if lorebook_ids:
+            from app.domains.lorebook.models import Lorebook
+            from sqlalchemy import select
+            query = select(Lorebook).where(Lorebook.id.in_(lorebook_ids))
+            result = await self.repository.db.execute(query)
+            character.lorebooks = list(result.scalars().all())
+
         created = await self.repository.create(obj_in=character)
         
-        # Автоматическое создание базового лорбука для "original" персонаже
+        # Автоматическое создание базового лорбука для "original" персонажа
         if created.fandom and created.fandom.lower() == "original":
             try:
                 from app.domains.lorebook.models import Lorebook, LorebookType
                 from app.domains.lorebook.repository import LorebookRepository
                 
-                # Для этого нужен LorebookRepository
-                # Вариант с Session
                 db_session = self.repository.db
                 lorebook_repo = LorebookRepository(db_session)
                 
@@ -45,9 +68,11 @@ class CharacterService(BaseService[CharacterRepository]):
                     character_id=created.id,
                     description=f"Базовый лорбук персонажа {created.name}",
                 )
+                lorebook.characters = [created] # Link via M2M table
                 await lorebook_repo.create(obj_in=lorebook)
+                # Refresh created to include new lorebook in broadcast
+                await self.repository.db.refresh(created, ["lorebooks"])
             except Exception as e:
-                # Лучше залогировать ошибку, но не прерывать создание персонажа
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to create default lorebook for original character {created.id}: {e}")
@@ -60,13 +85,50 @@ class CharacterService(BaseService[CharacterRepository]):
         return created
 
     async def update_character(self, character_id: UUID, character_update: CharacterUpdate, creator_id: Optional[UUID] = None) -> Optional[Character]:
-        character = await self.repository.get(character_id)
+        from sqlalchemy.orm import selectinload
+        from sqlalchemy import select
+        
+        # Need to load with lorebooks to update them
+        query = select(Character).where(Character.id == character_id).options(selectinload(Character.lorebooks))
+        result = await self.repository.db.execute(query)
+        character = result.scalar_one_or_none()
+        
         if not character:
             return None
         if creator_id and str(character.creator_id) != str(creator_id):
             return None
         
-        updated = await self.repository.update(db_obj=character, obj_in=character_update)
+        update_data = character_update.model_dump(exclude={"lorebook_ids"}, exclude_unset=True)
+        lorebook_ids = character_update.lorebook_ids
+        
+        if lorebook_ids is not None:
+            from app.domains.lorebook.models import Lorebook
+            lb_query = select(Lorebook).where(Lorebook.id.in_(lorebook_ids))
+            lb_result = await self.repository.db.execute(lb_query)
+            character.lorebooks = list(lb_result.scalars().all())
+        
+        # Handle "Original" fandom logic for updates
+        if "fandom" in update_data and update_data["fandom"] == "Оригинальный":
+            from app.domains.lorebook.models import Lorebook, LorebookType
+            # Check if character already has an associated character-type lorebook
+            has_personal_lb = any(lb.type == LorebookType.CHARACTER and lb.character_id == character.id for lb in character.lorebooks)
+            
+            if not has_personal_lb:
+                # Create default personal lorebook
+                new_lb = Lorebook(
+                    name=f"Основной {update_data.get('name') or character.name}",
+                    type=LorebookType.CHARACTER,
+                    character_id=character.id,
+                    description=f"Основной лорбук персонажа {update_data.get('name') or character.name}",
+                    fandom="Оригинальный"
+                )
+                self.repository.db.add(new_lb)
+                await self.repository.db.flush()
+                # Link it
+                character.lorebooks.append(new_lb)
+        
+        updated = await self.repository.update(db_obj=character, obj_in=update_data)
+
         
         # Broadcast update
         await manager.broadcast({
@@ -107,6 +169,7 @@ class CharacterService(BaseService[CharacterRepository]):
             
         return f"/static/{unique_filename}"
 
+
     def _format_broadcast_data(self, character: Character) -> dict:
         return {
             "id": str(character.id),
@@ -119,5 +182,7 @@ class CharacterService(BaseService[CharacterRepository]):
             "nsfw_allowed": character.nsfw_allowed,
             "created_at": character.created_at.isoformat() if hasattr(character, 'created_at') and character.created_at else None,
             "total_chats_count": getattr(character, "total_chats_count", 0),
-            "monthly_chats_count": getattr(character, "monthly_chats_count", 0)
+            "monthly_chats_count": getattr(character, "monthly_chats_count", 0),
+            "lorebook_ids": [str(lb.id) for lb in character.lorebooks] if hasattr(character, 'lorebooks') else []
         }
+

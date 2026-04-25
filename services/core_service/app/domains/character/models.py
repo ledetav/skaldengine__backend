@@ -1,8 +1,17 @@
 import uuid
-from sqlalchemy import String, Text, Boolean, Index
+from sqlalchemy import String, Text, Boolean, Index, ForeignKey, Column, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+# Таблица для связи "Многие ко многим" между персонажами и лорбуками
+character_lorebook_association = Table(
+    "character_lorebook_association",
+    Base.metadata,
+    Column("character_id", ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True),
+    Column("lorebook_id", ForeignKey("lorebooks.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Character(Base):
@@ -45,8 +54,11 @@ class Character(Base):
     attributes: Mapped[list["CharacterAttribute"]] = relationship(
         "CharacterAttribute", back_populates="character", cascade="all, delete-orphan"
     )
+    # Многие ко многим для гибкого управления лорбуками (фандомные + персональные)
     lorebooks: Mapped[list["Lorebook"]] = relationship(
-        "Lorebook", back_populates="character", cascade="all, delete-orphan"
+        "Lorebook", 
+        secondary=character_lorebook_association,
+        back_populates="characters"
     )
     scenarios: Mapped[list["Scenario"]] = relationship(
         "Scenario", back_populates="character"
