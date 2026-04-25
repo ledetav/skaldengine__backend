@@ -66,7 +66,8 @@ class CharacterService(BaseService[CharacterRepository]):
         
         # Автоматическое создание/назначение базового лорбука для "original" персонажа
         from app.domains.character.models import CharacterType
-        if created.type == CharacterType.ORIGINAL:
+        char_type = str(created.type.value).lower() if hasattr(created.type, 'value') else str(created.type).lower()
+        if char_type == "original":
             try:
                 from app.domains.lorebook.models import Lorebook, LorebookType
                 
@@ -152,7 +153,8 @@ class CharacterService(BaseService[CharacterRepository]):
 
         # Handle "Original" fandom logic for updates
         from app.domains.character.models import CharacterType
-        if updated.type == CharacterType.ORIGINAL:
+        char_type = str(updated.type.value).lower() if hasattr(updated.type, 'value') else str(updated.type).lower()
+        if char_type == "original":
             from app.domains.lorebook.models import Lorebook, LorebookType
             
             # 1. Отвязываем все фандомные лорбуки

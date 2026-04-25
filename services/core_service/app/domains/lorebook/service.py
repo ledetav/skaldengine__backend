@@ -54,7 +54,8 @@ class LorebookService(BaseService[LorebookRepository]):
                 "fandom": created.fandom,
                 "character_id": str(created.character_id) if created.character_id else None,
                 "user_persona_id": str(created.user_persona_id) if created.user_persona_id else None,
-                "entries_count": 0
+                "entries_count": 0,
+                "tags": created.tags or []
             }
         })
         return created
@@ -81,6 +82,7 @@ class LorebookService(BaseService[LorebookRepository]):
                 "fandom": updated.fandom,
                 "character_id": str(updated.character_id) if updated.character_id else None,
                 "user_persona_id": str(updated.user_persona_id) if updated.user_persona_id else None,
+                "tags": updated.tags or []
             }
         })
         return updated
