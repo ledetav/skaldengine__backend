@@ -45,6 +45,9 @@ class CharacterService(BaseService[CharacterRepository]):
 
     async def create_character(self, character_in: CharacterCreate, creator_id: UUID) -> Character:
         data = character_in.model_dump(exclude={"lorebook_ids"})
+        if not data.get("avatar_url"):
+            data["avatar_url"] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={data.get('name', 'default')}"
+        
         lorebook_ids = character_in.lorebook_ids or []
         
         character = Character(**data, creator_id=creator_id)

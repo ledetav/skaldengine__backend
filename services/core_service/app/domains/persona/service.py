@@ -11,6 +11,9 @@ class UserPersonaService(BaseService[UserPersonaRepository]):
 
     async def create_persona(self, persona_in: UserPersonaCreate, owner_id: UUID) -> UserPersona:
         persona_data = persona_in.model_dump()
+        if not persona_data.get("avatar_url"):
+            persona_data["avatar_url"] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={persona_data.get('name', 'default')}"
+            
         persona_data["owner_id"] = owner_id
         return await self.repository.create(obj_in=persona_data)
 
