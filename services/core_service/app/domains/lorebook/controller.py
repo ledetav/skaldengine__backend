@@ -19,9 +19,10 @@ class LorebookController(BaseController):
         persona_id: Optional[UUID] = None, 
         user_id: Optional[UUID] = None,
         skip: int = 0,
-        limit: int = 20
+        limit: int = 20,
+        lb_type: Optional[str] = None
     ) -> BaseResponse:
-        result = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit)
+        result = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit, lb_type=lb_type)
         if isinstance(result, tuple):
             lorebooks, total = result
             items = [LorebookWithEntries.model_validate(lb) for lb in lorebooks]

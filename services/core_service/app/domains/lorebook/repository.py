@@ -40,13 +40,20 @@ class LorebookRepository(BaseRepository[Lorebook]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_multi_with_count(self, skip: int = 0, limit: int = 20) -> tuple[List[Lorebook], int]:
+    async def get_multi_with_count(self, skip: int = 0, limit: int = 20, lb_type: Optional[str] = None) -> tuple[List[Lorebook], int]:
         from sqlalchemy import func
-        query = select(Lorebook).options(selectinload(Lorebook.entries)).offset(skip).limit(limit)
+        query = select(Lorebook).options(selectinload(Lorebook.entries))
+        if lb_type:
+            query = query.where(Lorebook.type == lb_type)
+        
+        query = query.offset(skip).limit(limit)
         result = await self.db.execute(query)
         items = result.scalars().all()
 
         count_query = select(func.count()).select_from(Lorebook)
+        if lb_type:
+            count_query = count_query.where(Lorebook.type == lb_type)
+            
         count_result = await self.db.execute(count_query)
         total = count_result.scalar() or 0
         return list(items), total

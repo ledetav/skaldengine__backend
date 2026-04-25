@@ -26,11 +26,12 @@ async def list_lorebooks(
     user_id: UUID | None = None,
     skip: int = 0,
     limit: int = 20,
+    type: str | None = None,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
     current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user)
 ):
     """Получить список лорбуков (с фильтрацией)."""
-    return await controller.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit)
+    return await controller.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit, lb_type=type)
 
 
 @router.get("/{lorebook_id}", response_model=BaseResponse)
