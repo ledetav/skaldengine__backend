@@ -4,7 +4,7 @@ from fastapi import BackgroundTasks
 from shared.base.service import BaseService
 from .repository import ChatRepository
 from .models import Chat
-from app.domains.chat.schemas import ChatCreate, ChatUpdate
+from app.domains.chat.schemas import ChatCreate, ChatUpdate, ChatResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -73,7 +73,7 @@ class ChatService(BaseService[ChatRepository]):
             joinedload(Chat.active_leaf)
         ).order_by(Chat.updated_at.desc()).offset(skip).limit(limit)
         
-        result = await self.db.execute(query)
+        result = await self.repository.db.execute(query)
         chats = result.unique().scalars().all()
         
         responses = []
