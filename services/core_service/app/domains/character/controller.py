@@ -13,14 +13,14 @@ class CharacterController(BaseController):
         self.lorebook_service = lorebook_service
 
     async def get_characters(self, skip: int = 0, limit: int = 20, is_admin: bool = False) -> BaseResponse:
-        characters = await self.character_service.get_characters(skip, limit)
+        characters = await self.character_service.get_characters(skip, limit, is_admin=is_admin)
         schema = CharacterAdminRead if is_admin else CharacterRead
         # Приводим к соответствующим схемам для фильтрации полей
         data = [schema.model_validate(c) for c in characters]
         return self.handle_success(data=data)
 
     async def get_character(self, character_id: UUID, is_admin: bool = False) -> BaseResponse:
-        character = await self.character_service.get_character(character_id)
+        character = await self.character_service.get_character(character_id, is_admin=is_admin)
         if not character:
             self.handle_error("Character not found", status_code=status.HTTP_404_NOT_FOUND)
         
