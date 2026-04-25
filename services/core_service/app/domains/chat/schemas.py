@@ -52,6 +52,11 @@ class ChatResponse(ChatBase):
     active_leaf_id: UUID | None = None
     created_at: datetime
     updated_at: datetime | None = None
+    
+    # Enriched fields for list view
+    character_name: str | None = None
+    user_persona_name: str | None = None
+    last_message_preview: str | None = None
 
     class Config:
         from_attributes = True

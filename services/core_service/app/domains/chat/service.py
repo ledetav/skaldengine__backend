@@ -65,8 +65,27 @@ class ChatService(BaseService[ChatRepository]):
 
         return created_chat
 
-    async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> List[Chat]:
-        return await self.repository.get_by_user(user_id, skip, limit)
+    async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> List[Any]:
+        from sqlalchemy.orm import joinedload
+        query = select(Chat).where(Chat.user_id == user_id).options(
+            joinedload(Chat.character),
+            joinedload(Chat.persona),
+            joinedload(Chat.active_leaf)
+        ).order_by(Chat.updated_at.desc()).offset(skip).limit(limit)
+        
+        result = await self.db.execute(query)
+        chats = result.unique().scalars().all()
+        
+        responses = []
+        for chat in chats:
+            resp = ChatResponse.model_validate(chat)
+            resp.character_name = chat.character.name if chat.character else "Unknown"
+            resp.user_persona_name = chat.persona.name if chat.persona else "Unknown"
+            if chat.active_leaf:
+                resp.last_message_preview = chat.active_leaf.content[:100] + ("..." if len(chat.active_leaf.content) > 100 else "")
+            responses.append(resp)
+            
+        return responses
 
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> Optional[Chat]:
         chat = await self.repository.get(chat_id)

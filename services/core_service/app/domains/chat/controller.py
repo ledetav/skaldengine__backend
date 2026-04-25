@@ -20,7 +20,7 @@ class ChatController(BaseController):
 
     async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> BaseResponse:
         chats = await self.chat_service.get_user_chats(user_id, skip, limit)
-        return self.handle_success(data=[ChatResponse.model_validate(c) for c in chats])
+        return self.handle_success(data=chats)
 
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> BaseResponse:
         chat = await self.chat_service.get_chat(chat_id, user_id)
