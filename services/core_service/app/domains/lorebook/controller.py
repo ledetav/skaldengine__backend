@@ -3,7 +3,11 @@ from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import LorebookService
-from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate, LorebookEntryBulkCreate, Lorebook as LorebookSchema, LorebookEntry as LorebookEntrySchema
+from .schemas import (
+    LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate, 
+    LorebookEntryBulkCreate, Lorebook as LorebookSchema, 
+    LorebookWithEntries, LorebookEntry as LorebookEntrySchema
+)
 from shared.schemas.response import BaseResponse
 
 class LorebookController(BaseController):
@@ -18,7 +22,7 @@ class LorebookController(BaseController):
         limit: int = 20
     ) -> BaseResponse:
         lorebooks = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit)
-        data = [LorebookSchema.model_validate(lb) for lb in lorebooks]
+        data = [LorebookWithEntries.model_validate(lb) for lb in lorebooks]
         return self.handle_success(data=data)
 
     async def check_fandom(self, fandom_name: str) -> BaseResponse:
@@ -32,6 +36,7 @@ class LorebookController(BaseController):
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         lorebook = await self.lorebook_service.create_lorebook(lorebook_in)
+        # We use LorebookSchema (metadata only) because entries are not loaded here and are expected to be empty anyway
         return self.handle_success(data=LorebookSchema.model_validate(lorebook))
 
     async def get_lorebook(self, lorebook_id: UUID) -> BaseResponse:
@@ -39,7 +44,7 @@ class LorebookController(BaseController):
         if not lorebook:
             self.handle_error("Lorebook not found", status_code=status.HTTP_404_NOT_FOUND)
         
-        data = LorebookSchema.model_validate(lorebook)
+        data = LorebookWithEntries.model_validate(lorebook)
         return self.handle_success(data=data)
 
     async def update_lorebook(self, lorebook_id: UUID, lorebook_update: LorebookUpdate, is_admin: bool = False) -> BaseResponse:
@@ -51,6 +56,7 @@ class LorebookController(BaseController):
             self.handle_error("Moderators cannot edit fandom-wide lorebooks", status_code=status.HTTP_403_FORBIDDEN)
             
         updated = await self.lorebook_service.update_lorebook(lorebook_id, lorebook_update)
+        # metadata only to avoid lazy loading issues
         return self.handle_success(data=LorebookSchema.model_validate(updated))
 
     async def delete_lorebook(self, lorebook_id: UUID, is_admin: bool = False) -> BaseResponse:

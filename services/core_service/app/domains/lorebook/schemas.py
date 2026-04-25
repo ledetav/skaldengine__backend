@@ -107,8 +107,12 @@ class LorebookUpdate(BaseModel):
 
 class Lorebook(LorebookBase):
     id: UUID
-    entries: list[LorebookEntry] = []
     entries_count: int = 0
 
     class Config:
         from_attributes = True
+
+
+class LorebookWithEntries(Lorebook):
+    entries: list[LorebookEntry] = []
+
