@@ -49,7 +49,6 @@ class CharacterService(BaseService[CharacterRepository]):
         
         character = Character(**data, creator_id=creator_id)
         
-        # Load lorebooks to associate
         if lorebook_ids:
             from app.domains.lorebook.models import Lorebook
             from sqlalchemy import select
@@ -58,6 +57,9 @@ class CharacterService(BaseService[CharacterRepository]):
             character.lorebooks = list(result.scalars().all())
 
         created = await self.repository.create(obj_in=character)
+        
+        # Reload to ensure M2M relationship is properly handled after commit
+        await self.repository.db.refresh(created, ["lorebooks"])
         
         # Автоматическое создание/назначение базового лорбука для "original" персонажа
         from app.domains.character.models import CharacterType
@@ -73,7 +75,7 @@ class CharacterService(BaseService[CharacterRepository]):
                 fandom_lbs = [lb for lb in created.lorebooks if lb.type == LorebookType.FANDOM]
                 if fandom_lbs:
                     created.lorebooks = [lb for lb in created.lorebooks if lb.type != LorebookType.FANDOM]
-                    await self.repository.db.flush()
+                    await self.repository.db.commit()
 
                 # Find existing character-type lorebooks
                 personal_lbs = [lb for lb in created.lorebooks if lb.type == LorebookType.CHARACTER]
@@ -104,7 +106,7 @@ class CharacterService(BaseService[CharacterRepository]):
                          if lb.tags is None: lb.tags = []
                          if "main" not in lb.tags:
                               lb.tags = list(lb.tags) + ["main"]
-                              await self.repository.db.flush()
+                              await self.repository.db.commit()
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
@@ -141,7 +143,7 @@ class CharacterService(BaseService[CharacterRepository]):
             from app.domains.lorebook.models import Lorebook
             lb_query = select(Lorebook).where(Lorebook.id.in_(lorebook_ids))
             lb_result = await self.repository.db.execute(lb_query)
-            new_lorebooks = list(lb_result.scalars().all())
+            character.lorebooks = list(lb_result.scalars().all())
             
         updated = await self.repository.update(db_obj=character, obj_in=update_data)
 
@@ -169,7 +171,7 @@ class CharacterService(BaseService[CharacterRepository]):
                     if target_lb.tags is None: target_lb.tags = []
                     if "main" not in target_lb.tags:
                         target_lb.tags = list(target_lb.tags) + ["main"]
-                        await self.repository.db.flush()
+                        await self.repository.db.commit()
                 # Мы НЕ создаем новый лорбук, так как персональные лорбуки уже есть
             else:
                 # 3. Если лорбуков персонажа нет, создаем новый
@@ -182,11 +184,13 @@ class CharacterService(BaseService[CharacterRepository]):
                     tags=["main"]
                 )
                 self.repository.db.add(new_lb)
-                await self.repository.db.flush()
+                await self.repository.db.commit()
                 # Link it
                 updated.lorebooks.append(new_lb)
+            
+            # Commit changes made in the ORIGINAL logic block
+            await self.repository.db.commit()
 
-        
         # Ensure lorebooks are loaded for broadcast
         await self.repository.db.refresh(updated, ["lorebooks"])
         
