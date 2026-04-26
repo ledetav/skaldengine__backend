@@ -37,7 +37,7 @@ async def delete_persona_admin(
 async def list_personas(
     user_id: UUID | None = None,
     controller: UserPersonaController = Depends(deps.get_user_persona_controller),
-    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Получить список всех персон (своих или указанного пользователя)."""
     target_id = user_id or (current_user.id if current_user else None)
@@ -48,7 +48,7 @@ async def list_personas(
 @router.get("/stats", response_model=BaseResponse)
 async def get_user_stats(
     user_id: UUID | None = None,
-    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user),
     controller: UserPersonaController = Depends(deps.get_user_persona_controller)
 ):
     """Получить агрегированную статистику пользователя (чаты, персоны, лорбуки)."""

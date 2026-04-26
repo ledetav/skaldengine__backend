@@ -89,40 +89,6 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
         raise HTTPException(status_code=403, detail="Could not validate credentials")
 
 
-async def get_optional_current_user(token_auth: HTTPAuthorizationCredentials | None = Depends(security)) -> CurrentUser | None:
-    """Get current user if token is provided, return None otherwise."""
-    if token_auth is None:
-        return None
-    token = token_auth.credentials
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        token_data = payload.get("sub")
-        if token_data is None:
-            return None
-        
-        # Parse birth_date
-        birth_date_str = payload.get("birth_date")
-        birth_date_val = None
-        if birth_date_str:
-            try:
-                birth_date_val = date.fromisoformat(birth_date_str)
-            except ValueError:
-                pass
-
-        return CurrentUser(
-            id=UUID(token_data),
-            role=payload.get("role", "user"),
-            login=payload.get("login"),
-            username=payload.get("username"),
-            full_name=payload.get("full_name"),
-            birth_date=birth_date_val,
-            polza_api_key=payload.get("polza_api_key")
-        )
-    except (JWTError, ValueError):
-        return None
-
 async def get_fresh_current_user(token_auth: HTTPAuthorizationCredentials = Depends(security)) -> CurrentUser:
     base_user = await get_current_user(token_auth)
     # Fetch real role from auth service

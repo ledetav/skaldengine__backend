@@ -28,7 +28,7 @@ async def list_lorebooks(
     limit: int = 20,
     type: str | None = None,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
-    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Получить список лорбуков (с фильтрацией)."""
     return await controller.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit, lb_type=type)
