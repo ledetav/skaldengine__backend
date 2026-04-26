@@ -15,6 +15,7 @@ class CharacterBase(BaseModel):
     is_public: bool = False
     # Новые поля
     gender: str | None = None
+    age: str | None = None
     nsfw_allowed: bool = True
     lorebook_ids: List[UUID] | None = None
 
@@ -53,6 +54,7 @@ class CharacterUpdate(BaseModel):
     personality: str | None = None
     is_public: bool | None = None
     gender: str | None = None
+    age: str | None = None
     nsfw_allowed: bool | None = None
     lorebook_ids: List[UUID] | None = None
 
@@ -88,6 +90,7 @@ class CharacterRead(BaseModel):
     card_image_url: str | None = None
     is_public: bool
     gender: str | None = None
+    age: str | None = None
     nsfw_allowed: bool
     total_chats_count: int
     monthly_chats_count: int

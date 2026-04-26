@@ -8,6 +8,8 @@ class LorebookEntryBase(BaseModel):
     keywords: list[str] = []
     content: str
     priority: int = 0
+    category: str = "general"
+    is_always_included: bool = False
 
 
 class LorebookEntryCreate(LorebookEntryBase):
@@ -32,6 +34,8 @@ class LorebookEntryUpdate(BaseModel):
     keywords: list[str] | None = None
     content: str | None = None
     priority: int | None = None
+    category: str | None = None
+    is_always_included: bool | None = None
 
     model_config = {
         "json_schema_extra": {
@@ -65,6 +69,7 @@ class LorebookBase(BaseModel):
     user_persona_id: UUID | None = None
     fandom: str | None = None
     description: str | None = None
+    category: str = "general"
     tags: list[str] = []
 
 
@@ -93,6 +98,7 @@ class LorebookUpdate(BaseModel):
     fandom: str | None = None
     character_id: UUID | None = None
     user_persona_id: UUID | None = None
+    category: str | None = None
     tags: list[str] | None = None
 
     model_config = {

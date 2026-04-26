@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from uuid import UUID
 from datetime import datetime
 
@@ -7,11 +7,18 @@ class UserPersonaBase(BaseModel):
     name: str
     description: str | None = None
     avatar_url: str | None = None
-    age: int | None = None
+    age: str | None = None
     appearance: str | None = None
     personality: str | None = None
     gender: str | None = None
     facts: str | None = None
+
+    @field_validator("age", mode="before")
+    @classmethod
+    def age_to_str(cls, v):
+        if v is None:
+            return None
+        return str(v)
 
 
 class UserPersonaCreate(UserPersonaBase):
@@ -37,7 +44,7 @@ class UserPersonaUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     avatar_url: str | None = None
-    age: int | None = None
+    age: str | None = None
     appearance: str | None = None
     personality: str | None = None
     gender: str | None = None

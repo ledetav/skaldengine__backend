@@ -6,7 +6,6 @@ from app.domains.lorebook import router as lorebooks
 from app.domains.scenario import router as scenarios
 from app.domains.chat import message_router as messages
 from app.domains.character import admin_router as admin_characters
-from app.domains.character import attribute_router as admin_attributes
 from app.domains.lorebook import admin_router as admin_lorebooks
 
 # Temporary/Shared endpoints
@@ -25,5 +24,4 @@ api_router.include_router(ws.router,            prefix="/ws",          tags=["Re
 
 # Admin Endpoints (Require valid JWT with admin/moderator role)
 api_router.include_router(admin_characters.router, prefix="/admin/characters", tags=["Admin Characters"])
-api_router.include_router(admin_attributes.router, prefix="/admin/attributes", tags=["Admin Attributes"])
 api_router.include_router(admin_lorebooks.router, prefix="/admin/lorebooks",   tags=["Admin Lorebooks"])

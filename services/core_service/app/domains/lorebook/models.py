@@ -40,6 +40,7 @@ class Lorebook(Base):
 
     name: Mapped[str] = mapped_column(String)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String, index=True, default="general")
     tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
