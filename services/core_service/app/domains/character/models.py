@@ -64,9 +64,6 @@ class Character(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
-    attributes: Mapped[list["CharacterAttribute"]] = relationship(
-        "CharacterAttribute", back_populates="character", cascade="all, delete-orphan"
-    )
     # Многие ко многим для гибкого управления лорбуками (фандомные + персональные)
     lorebooks: Mapped[list["Lorebook"]] = relationship(
         "Lorebook", 
