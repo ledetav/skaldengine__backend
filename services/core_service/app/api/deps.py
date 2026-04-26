@@ -22,7 +22,6 @@ from app.domains.chat.message_repository import MessageRepository
 from app.domains.scenario.repository import ScenarioRepository
 from app.domains.persona.repository import UserPersonaRepository
 from app.domains.lorebook.repository import LorebookRepository, LorebookEntryRepository
-from app.domains.character.attribute_repository import CharacterAttributeRepository
 
 # Services
 from app.domains.character.service import CharacterService
@@ -31,7 +30,6 @@ from app.domains.chat.message_service import MessageService
 from app.domains.scenario.service import ScenarioService
 from app.domains.persona.service import UserPersonaService
 from app.domains.lorebook.service import LorebookService
-from app.domains.character.attribute_service import CharacterAttributeService
 
 # Controllers
 from app.domains.character.controller import CharacterController
@@ -40,7 +38,6 @@ from app.domains.chat.message_controller import MessageController
 from app.domains.scenario.controller import ScenarioController
 from app.domains.persona.controller import UserPersonaController
 from app.domains.lorebook.controller import LorebookController
-from app.domains.character.attribute_controller import CharacterAttributeController
 
 class CurrentUser(BaseModel):
     id: UUID
@@ -184,13 +181,3 @@ async def get_user_persona_service(repo: UserPersonaRepository = Depends(get_use
 
 async def get_user_persona_controller(service: UserPersonaService = Depends(get_user_persona_service)) -> UserPersonaController:
     return UserPersonaController(service)
-
-# DI for CharacterAttribute
-async def get_character_attribute_repository(db: AsyncSession = Depends(get_db)) -> CharacterAttributeRepository:
-    return CharacterAttributeRepository(db)
-
-async def get_character_attribute_service(repo: CharacterAttributeRepository = Depends(get_character_attribute_repository)) -> CharacterAttributeService:
-    return CharacterAttributeService(repo)
-
-async def get_character_attribute_controller(service: CharacterAttributeService = Depends(get_character_attribute_service)) -> CharacterAttributeController:
-    return CharacterAttributeController(service)

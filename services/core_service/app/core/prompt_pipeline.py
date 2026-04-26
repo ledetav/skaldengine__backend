@@ -17,7 +17,6 @@ from app.domains.chat.message_models import Message
 from app.domains.lorebook.models import Lorebook, LorebookEntry
 from app.domains.chat.models import ChatCheckpoint
 from app.domains.chat.models import EpisodicMemory
-from app.domains.character.attribute_models import CharacterAttribute
 from app.core import rag
 
 
@@ -43,9 +42,7 @@ class PromptPipeline:
         self.persona: Optional[UserPersona] = None
         self.scenario: Optional[Scenario] = None
         
-        # Коллекции атрибутов и лора
-        self.all_attributes_query: Any = None
-        self.all_attributes: List[CharacterAttribute] = []
+        # Коллекции лора
         self.lore_fragments: List[str] = []
         self.memories: List[str] = []
         self.history: List[Dict[str, str]] = []
@@ -113,17 +110,6 @@ class PromptPipeline:
 
         if self.chat.scenario_id:
             self.scenario = await self.db.get(Scenario, self.chat.scenario_id)
-
-        # Атрибуты теперь подгружаются ситуативно в _stage_2
-        # Загружаем атрибуты как персонажа, так и персоны пользователя
-        self.char_attributes_query = select(CharacterAttribute).where(CharacterAttribute.character_id == self.character.id)
-        self.persona_attributes_query = select(CharacterAttribute).where(CharacterAttribute.user_persona_id == self.persona.id)
-        
-        c_res = await self.db.execute(self.char_attributes_query)
-        self.all_attributes = list(c_res.scalars().all())
-        
-        p_res = await self.db.execute(self.persona_attributes_query)
-        self.persona_attributes = list(p_res.scalars().all())
 
     def _get_stems(self, text: str) -> List[str]:
         """Упрощенное стеммирование для русского и английского: берем корни слов."""
