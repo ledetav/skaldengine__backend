@@ -25,7 +25,9 @@ async def generate_chat_stream(
     buffer = ""
 
     try:
-        response_stream = await _client.chat.completions.create(**payload)
+        api_key = state.get("polza_api_key") or settings.POLZA_API_KEY
+        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key)
+        response_stream = await client.chat.completions.create(**payload)
         
         async for chunk in response_stream:
             if chunk.choices and len(chunk.choices) > 0:
@@ -43,12 +45,12 @@ async def generate_chat_stream(
                             # Start thinking: send everything BEFORE the tag
                             pre_thought, post_tag = buffer.split("<Internal_Analysis>", 1)
                             if pre_thought:
-                                yield f"event: token\ndata: {json.dumps({'text': pre_thought}, ensure_ascii=False)}\n\n"
+                                yield f"event: token\ndata: {json.dumps({'content': pre_thought}, ensure_ascii=False)}\n\n"
                             buffer = post_tag
                             is_thinking = True
                         else:
                             # Not thinking and no tag yet: send the whole buffer
-                            yield f"event: token\ndata: {json.dumps({'text': buffer}, ensure_ascii=False)}\n\n"
+                            yield f"event: token\ndata: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
                             buffer = ""
                             break
                     else:
@@ -66,7 +68,7 @@ async def generate_chat_stream(
             
     except Exception as e:
         error_msg = "(System Error: Neural network unavailable)"
-        yield f"event: token\ndata: {json.dumps({'text': error_msg}, ensure_ascii=False)}\n\n"
+        yield f"event: token\ndata: {json.dumps({'content': error_msg}, ensure_ascii=False)}\n\n"
         full_text += error_msg
 
     # Окончание стрима

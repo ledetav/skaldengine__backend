@@ -57,6 +57,8 @@ class Lorebook(Base):
     )
 
 
+from pgvector.sqlalchemy import Vector
+
 class LorebookEntry(Base):
     """
     Лор-запись — конкретный факт мира с ключевыми словами для триггера.
@@ -69,11 +71,20 @@ class LorebookEntry(Base):
         ForeignKey("lorebooks.id", ondelete="CASCADE")
     )
 
+    # Категория факта: fact, appearance, mindset, speech, inventory, secret
+    category: Mapped[str] = mapped_column(String, index=True, default="fact")
+    
+    # Если True — факт всегда подтягивается в промпт (для ключевых черт)
+    is_always_included: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
     # TEXT[] — лексические триггеры вставки ["меч", "магия"]
     keywords: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
 
     content: Mapped[str] = mapped_column(Text)
     priority: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Эмбеддинг для семантического поиска (позволяет найти "паука" по слову "арахнид")
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 

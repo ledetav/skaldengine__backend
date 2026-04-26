@@ -84,7 +84,7 @@ class EpisodicMemory(Base):
     chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
     summary: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(Vector(768))
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
 
     chat: Mapped["Chat"] = relationship("Chat", back_populates="episodic_memories")
     message: Mapped["Message"] = relationship("Message", back_populates="episodic_memory")

@@ -54,6 +54,7 @@ class Character(Base):
 
     # Среда и контент
     gender: Mapped[str | None] = mapped_column(String(50), nullable=True) # мужской, женский, другой
+    age: Mapped[str | None] = mapped_column(String(50), nullable=True)   # возраст персонажа (может быть строкой, например "Около 300 лет")
     nsfw_allowed: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Доступность
