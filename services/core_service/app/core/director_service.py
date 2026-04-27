@@ -18,6 +18,11 @@ class DirectorService:
 
     async def initialize_scenario(self, chat_id: uuid.UUID, checkpoints_count: int = 3):
         """Фаза 1: Генерация маршрута (чекпоинтов) при создании чата."""
+        import random
+        from sqlalchemy import func, or_
+        from app.domains.lorebook.models import Lorebook, LorebookEntry, LorebookType
+        from app.domains.character.models import character_lorebook_association
+
         async with AsyncSessionLocal() as db:
             # 1. Получаем данные чата
             result = await db.execute(
@@ -33,21 +38,113 @@ class DirectorService:
 
             chat, character, persona, scenario = row
 
-            # 2. Form prompt for scenario generation
-            prompt = f"""You are a Professional RPG Scenario Writer.
-Your task is to plot a logical narrative path from Point A (Inciting Incident) to Point B (Finale) for two characters.
+            # --- Lorebook Enrichment ---
+            lore_facts = []
+            
+            # 2. Get Potential Lorebooks for Fandom & Character
+            # Filters: 
+            # - type=FANDOM and fandom matching character.fandom
+            # - type=CHARACTER and character_id matching character.id
+            # - associated via character_lorebook_association
+            
+            fandom_q = select(Lorebook).where(
+                Lorebook.type == LorebookType.FANDOM,
+                Lorebook.fandom == character.fandom
+            )
+            char_direct_q = select(Lorebook).where(
+                Lorebook.type == LorebookType.CHARACTER,
+                Lorebook.character_id == character.id
+            )
+            assoc_q = select(Lorebook).join(
+                character_lorebook_association, 
+                Lorebook.id == character_lorebook_association.c.lorebook_id
+            ).where(character_lorebook_association.c.character_id == character.id)
+            
+            # Combine potential lorebooks
+            l_res_f = await db.execute(fandom_q)
+            l_res_c = await db.execute(char_direct_q)
+            l_res_a = await db.execute(assoc_q)
+            
+            potential_books = list(set(
+                list(l_res_f.scalars().all()) + 
+                list(l_res_c.scalars().all()) + 
+                list(l_res_a.scalars().all())
+            ))
+            
+            # Select up to 3 random books
+            if len(potential_books) > 3:
+                selected_books = random.sample(potential_books, 3)
+            else:
+                selected_books = potential_books
+                
+            # Fetch up to 6 random entries from these books
+            if selected_books:
+                book_ids = [b.id for b in selected_books]
+                entries_q = select(LorebookEntry).where(
+                    LorebookEntry.lorebook_id.in_(book_ids)
+                ).order_by(func.random()).limit(6)
+                e_res = await db.execute(entries_q)
+                lore_facts.extend([e.content for e in e_res.scalars().all()])
 
-[AI CHARACTER]: {character.name} - {character.description or 'No description'}
-[USER CHARACTER]: {persona.name} - {persona.facts or 'No facts provided'}
-[RELATIONSHIP DYNAMIC]: {chat.relationship_dynamic or 'Initial meeting'}
+            # 3. Persona Enrichment (if acquainted)
+            persona_facts = []
+            if chat.is_acquainted:
+                pers_books_q = select(Lorebook).where(
+                    Lorebook.type == LorebookType.PERSONA,
+                    Lorebook.user_persona_id == persona.id
+                )
+                p_res = await db.execute(pers_books_q)
+                p_books = p_res.scalars().all()
+                if p_books:
+                    p_book = random.choice(p_books)
+                    p_entries_q = select(LorebookEntry).where(
+                        LorebookEntry.lorebook_id == p_book.id
+                    ).order_by(func.random()).limit(3)
+                    pe_res = await db.execute(p_entries_q)
+                    persona_facts.extend([e.content for e in pe_res.scalars().all()])
+
+            # --- Build Prompt ---
+            lore_section = "\n".join([f"- {f}" for f in lore_facts]) if lore_facts else "No specific world lore provided."
+            persona_lore_section = "\n".join([f"- {f}" for f in persona_facts]) if persona_facts else ""
+            
+            relationship_info = f"[RELATIONSHIP]: {chat.relationship_dynamic}" if chat.relationship_dynamic else ""
+            if chat.is_acquainted:
+                relationship_info = f"[RELATIONSHIP STATUS]: Characters are already acquainted.\n{relationship_info}"
+            else:
+                relationship_info = "[RELATIONSHIP STATUS]: First meeting."
+
+            scenario_context = scenario.internal_description or scenario.description or "No general description"
+
+            prompt = f"""You are a Professional RPG Scenario Writer.
+Your task is to plot a logical narrative path from Point A (Inciting Incident) to Point B (Finale).
+
+[SCENARIO DESCRIPTION]:
+{scenario_context}
+
+[AI CHARACTER]: {character.name}
+- Personality: {character.personality or 'Internal role instructions'}
+- Appearance: {character.appearance or 'Varies'}
+- Context/Bio: {character.description or 'No description'}
+
+[USER CHARACTER]: {persona.name}
+- Personality: {persona.personality or 'Varies'}
+- Appearance: {persona.appearance or 'Varies'}
+- Facts/Bio: {persona.facts or 'No facts provided'}
+{persona_lore_section}
+
+{relationship_info}
 
 [POINT A (Start)]: {scenario.start_point}
 [POINT B (End)]: {scenario.end_point}
 
-Create EXACTLY {checkpoints_count} intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
+[WORLD/CHARACTER LORE FACTS (Randomly selected for uniqueness)]:
+{lore_section}
+
+Based on this context, create EXACTLY {checkpoints_count} intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
 Each goal must be formulated as a hidden directive for the AI actor (what they should push the player to do, or what event must occur).
 
-Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written strictly in English, regardless of the characters' primary language. Each goal should be a concise narrative milestone. Example: "Character A admits their secret to Character B." or "The group reaches the abandoned temple."
+Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written strictly in English, regardless of the characters' primary language. Each goal should be a concise narrative milestone. 
+Example: "Character A admits their secret to Character B." or "The group reaches the abandoned temple."
 """
 
             try:
@@ -69,7 +166,7 @@ Return a JSON object with a "checkpoints" key containing an array of objects wit
                     checkpoints_list = []
 
                 # 3. Сохраняем в БД
-                for i, cp_data in enumerate(checkpoints_list):
+                for i, cp_data in enumerate(checkpoints_list[:checkpoints_count]):
                     goal = cp_data.get("goal_description")
                     if goal:
                         checkpoint = ChatCheckpoint(

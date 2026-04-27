@@ -82,6 +82,13 @@ class MessageService(BaseService[MessageRepository]):
         from app.api.endpoints.stream_utils import generate_chat_stream
         from app.core.config import settings
         state = {"polza_api_key": current_user.polza_api_key or settings.POLZA_API_KEY}
+        
+        # Trigger Director check in background if in scenario mode
+        if chat.mode == "scenario":
+            from app.core.director_service import DirectorService
+            director = DirectorService()
+            background_tasks.add_task(director.check_progress, chat.id)
+
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
     async def regenerate_stream(self, parent_id: UUID, current_user: Any, db: AsyncSession):

@@ -314,8 +314,8 @@ class PromptPipeline:
         
         if checkpoint:
             base_goal = checkpoint.goal_description
-            if checkpoint.messages_spent >= 15:
-                self.scenario_directive = f"""[CRITICAL SYSTEM INTERVENTION]: The plot is stalled. You MUST push the story forward: [{base_goal}]."""
+            if checkpoint.messages_spent >= 8:
+                self.scenario_directive = f"""[CRITICAL NARRATIVE INTERVENTION]: The story has stalled for too long. Break the loop! You MUST immediately take a bold action or introduce a dramatic event to achieve this goal: [{base_goal}]. No more subtle guidance—make it happen NOW."""
             else:
                 self.scenario_directive = f"CURRENT SCENARIO GOAL: {base_goal}. Subtly guide the dialogue towards this."
         else:
@@ -382,19 +382,39 @@ class PromptPipeline:
         
         memory_section = "\n".join([f"- {m}" for m in self.memories]) or "No previous records."
         
-        # Use the scenario location if it exists, otherwise use the custom location from the chat, or default to "Unknown"
-        current_location = "Unknown"
-        if self.scenario and getattr(self.scenario, 'location', None):
-            current_location = self.scenario.location
-        elif self.chat and getattr(self.chat, 'custom_location', None):
-            current_location = self.chat.custom_location
-            
-        scenario_context = "None"
-        if self.scenario and getattr(self.scenario, 'start_point', None):
-            scenario_context = self.scenario.start_point
-        elif self.chat and getattr(self.chat, 'custom_plot_hook', None):
-            scenario_context = self.chat.custom_plot_hook
-            
+        # --- STRUCTURED NARRATIVE BLOCK ---
+        # 1. Location
+        location_line = "Unknown"
+        if self.chat.mode == "scenario" and self.scenario:
+            location_line = self.scenario.location or "Unknown"
+        elif self.chat.custom_location:
+            location_line = self.chat.custom_location
+
+        # 2. Context & Plot Hook
+        context_line = "None"
+        plot_hook_line = ""
+        
+        if self.chat.mode == "scenario" and self.scenario:
+            context_line = self.scenario.internal_description or self.scenario.description or "None"
+            # Plot hook for scenario is the current goal from stage 4
+            if "CURRENT SCENARIO GOAL:" in self.scenario_directive:
+                plot_hook_line = self.scenario_directive.replace("CURRENT SCENARIO GOAL: ", "")
+            elif "[CRITICAL SYSTEM INTERVENTION]:" in self.scenario_directive:
+                 # If we have a kick, it effectively becomes the urgent plot hook
+                 plot_hook_line = self.scenario_directive
+        else:
+            # Sandbox: Context is the user's initial setup
+            context_line = self.chat.custom_plot_hook or "Free-form adventure."
+            # No plot hook in sandbox
+        
+        # 3. Current Situation (Last 6 messages summary)
+        # We take first 6 messages from the tail of history
+        situation_history = self.history[-6:] if self.history else []
+        situation_text = "The story is just beginning."
+        if situation_history:
+            situation_text = "\n".join([f"{m['role'].upper()}: {m['content'][:200]}..." for m in situation_history])
+
+        # 4. Final Assemble
         safety_overrides = []
         if not self.character.nsfw_allowed:
             safety_overrides.append("[CHARACTER CONSTRAINT]: This character is strictly SFW. No NSFW or erotic content allowed.")
@@ -469,9 +489,11 @@ EPISODIC MEMORY:
 {self.scenario_directive if self.chat.mode == 'scenario' else ''}
 
 ****
-Location: {current_location}
-Context & Plot Hook: {scenario_context}
-Current Situation: Review the latest interactions in the chat history.
+Location: {location_line}
+Context: {context_line}
+{f'Plot Hook: {plot_hook_line}' if plot_hook_line else ''}
+Current Situation: 
+{situation_text}
 
 Initiate the <Internal_Analysis> immediately. Be messy, be raw, evaluate the pacing and proactivity. Then output your response in {self.chat.language}."""
 
