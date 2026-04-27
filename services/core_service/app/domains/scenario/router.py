@@ -40,7 +40,7 @@ async def read_scenario(
     return await controller.get_scenario(scenario_id)
 
 
-@router.put("/{scenario_id}", response_model=BaseResponse)
+@router.patch("/{scenario_id}", response_model=BaseResponse)
 async def update_scenario(
     scenario_id: UUID,
     scenario_in: ScenarioUpdate,
