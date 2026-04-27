@@ -35,7 +35,7 @@ class MessageService(BaseService[MessageRepository]):
         if not chat.title and not message_in.parent_id:
             from app.core.title_service import ChatTitleService
             title_service = ChatTitleService()
-            background_tasks.add_task(title_service.generate_and_update_title, db, chat.id, message_in.content)
+            background_tasks.add_task(title_service.generate_and_update_title, chat.id, message_in.content)
 
         await db.commit()
         await db.refresh(user_msg)

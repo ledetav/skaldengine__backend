@@ -12,11 +12,12 @@ class ChatTitleService:
             api_key=settings.POLZA_API_KEY
         )
 
-    async def generate_and_update_title(self, db: AsyncSession, chat_id: uuid.UUID, first_message: str):
+    async def generate_and_update_title(self, chat_id: uuid.UUID, first_message: str):
         """
         Генерирует короткое название чата на основе первого сообщения пользователя
-        и обновляет его в базе данных.
+        и обновляет его в базе данных. Использует свою сессию для работы в фоне.
         """
+        from app.db.base import AsyncSessionLocal
         try:
             prompt = (
                 "Проанализируй первое сообщение пользователя в ролевом чате и придумай "
@@ -25,6 +26,7 @@ class ChatTitleService:
                 f"Сообщение пользователя: {first_message}"
             )
 
+            # 1. Генерируем название через ИИ
             response = await self.client.chat.completions.create(
                 model=settings.POLZA_TITLE_MODEL,
                 messages=[{"role": "user", "content": prompt}],
@@ -33,15 +35,16 @@ class ChatTitleService:
             )
 
             title = response.choices[0].message.content.strip()
-            # Убираем кавычки если ИИ их добавил
-            title = title.strip('"').strip("'")
+            title = title.strip('"').strip("'").strip()
 
-            # Обновляем в БД
-            chat = await db.get(Chat, chat_id)
-            if chat:
-                chat.title = title
-                await db.commit()
-                return title
+            # 2. Сохраняем в БД в новой сессии
+            async with AsyncSessionLocal() as db:
+                chat = await db.get(Chat, chat_id)
+                if chat:
+                    chat.title = title
+                    await db.commit()
+                    print(f"[INFO] Chat {chat_id} title generated: {title}")
+                    return title
         except Exception as e:
             print(f"[ERROR] Failed to generate chat title: {e}")
             return None
