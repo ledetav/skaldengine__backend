@@ -28,6 +28,8 @@ class Chat(Base):
     scenario_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scenarios.id"), nullable=True
     )
+    custom_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    custom_plot_hook: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Настройки отношений
     is_acquainted: Mapped[bool] = mapped_column(Boolean, default=False)

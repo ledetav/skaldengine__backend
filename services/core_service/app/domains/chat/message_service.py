@@ -40,6 +40,20 @@ class MessageService(BaseService[MessageRepository]):
         await db.commit()
         await db.refresh(user_msg)
 
+        # Increment message count for the current checkpoint
+        from .models import ChatCheckpoint
+        cp_stmt = (
+            select(ChatCheckpoint)
+            .where(ChatCheckpoint.chat_id == chat.id, ChatCheckpoint.is_completed == False)
+            .order_by(ChatCheckpoint.order_num)
+        )
+        cp_res = await db.execute(cp_stmt)
+        active_cp = cp_res.scalars().first()
+        if active_cp:
+            active_cp.messages_spent += 1
+            db.add(active_cp)
+            await db.commit()
+
         # Build payload
         from app.core.prompt_pipeline import PromptPipeline
         pipeline = PromptPipeline(db, chat_id, current_user=current_user, parent_id=message_in.parent_id)

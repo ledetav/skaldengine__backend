@@ -382,9 +382,19 @@ class PromptPipeline:
         
         memory_section = "\n".join([f"- {m}" for m in self.memories]) or "No previous records."
         
-        current_location = self.scenario.location if self.scenario and hasattr(self.scenario, 'location') else "Unknown"
-        scenario_context = self.scenario.start_point if self.scenario and hasattr(self.scenario, 'start_point') else "None"
-
+        # Use the scenario location if it exists, otherwise use the custom location from the chat, or default to "Unknown"
+        current_location = "Unknown"
+        if self.scenario and getattr(self.scenario, 'location', None):
+            current_location = self.scenario.location
+        elif self.chat and getattr(self.chat, 'custom_location', None):
+            current_location = self.chat.custom_location
+            
+        scenario_context = "None"
+        if self.scenario and getattr(self.scenario, 'start_point', None):
+            scenario_context = self.scenario.start_point
+        elif self.chat and getattr(self.chat, 'custom_plot_hook', None):
+            scenario_context = self.chat.custom_plot_hook
+            
         safety_overrides = []
         if not self.character.nsfw_allowed:
             safety_overrides.append("[CHARACTER CONSTRAINT]: This character is strictly SFW. No NSFW or erotic content allowed.")

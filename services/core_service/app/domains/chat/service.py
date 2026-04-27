@@ -41,6 +41,8 @@ class ChatService(BaseService[ChatRepository]):
             mode="scenario" if scenario else "sandbox",
             is_acquainted=chat_in.is_acquainted,
             relationship_dynamic=chat_in.relationship_dynamic,
+            custom_location=chat_in.custom_location,
+            custom_plot_hook=chat_in.custom_plot_hook,
             language=chat_in.language,
             narrative_voice=chat_in.narrative_voice,
         )

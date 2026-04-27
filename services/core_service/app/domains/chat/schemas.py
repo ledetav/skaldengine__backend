@@ -10,6 +10,8 @@ class ChatBase(BaseModel):
     title: str | None = None
     is_acquainted: bool = False
     relationship_dynamic: str | None = None
+    custom_location: str | None = None
+    custom_plot_hook: str | None = None
     language: str = "ru"
     narrative_voice: str = "third"  # "first" | "second" | "third"
     persona_lorebook_id: UUID | None = None
