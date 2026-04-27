@@ -8,7 +8,7 @@ class ScenarioBase(BaseModel):
     description: str
     start_point: str
     end_point: str
-    character_id: UUID | None = None
+    character_id: UUID
 
 
 class ScenarioCreate(ScenarioBase):
@@ -55,10 +55,11 @@ class ScenarioUpdate(BaseModel):
 
 class ScenarioShort(BaseModel):
     id: UUID
-    character_id: UUID | None = None
+    character_id: UUID
     title: str
     location: str | None = None
     description: str
+    chats_count: int = 0
 
     class Config:
         from_attributes = True
@@ -66,6 +67,7 @@ class ScenarioShort(BaseModel):
 
 class Scenario(ScenarioBase):
     id: UUID
+    chats_count: int = 0
 
     class Config:
         from_attributes = True

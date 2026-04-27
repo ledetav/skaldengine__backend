@@ -30,7 +30,7 @@ class ScenarioController(BaseController):
         return self.handle_success(data=ScenarioFull.model_validate(scenario))
 
     async def get_scenario(self, scenario_id: UUID) -> BaseResponse:
-        scenario = await self.scenario_service.repository.get(scenario_id)
+        scenario = await self.scenario_service.repository.get_with_count(scenario_id)
         if not scenario:
             self.handle_error("Scenario not found", status_code=status.HTTP_404_NOT_FOUND)
         
