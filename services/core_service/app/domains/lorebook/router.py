@@ -119,11 +119,12 @@ async def list_entries(
     lorebook_id: UUID,
     skip: int = 0,
     limit: int = 20,
+    sort_by: str = "created_at",
     controller: LorebookController = Depends(deps.get_lorebook_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Получить список записей лорбука (пагинированный)."""
-    return await controller.get_entries(lorebook_id, skip=skip, limit=limit)
+    return await controller.get_entries(lorebook_id, skip=skip, limit=limit, sort_by=sort_by)
 
 
 @router.get("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)

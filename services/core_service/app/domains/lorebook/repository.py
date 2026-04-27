@@ -76,9 +76,16 @@ class LorebookEntryRepository(BaseRepository[LorebookEntry]):
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_by_lorebook_with_count(self, lorebook_id: UUID, skip: int = 0, limit: int = 20) -> tuple[List[LorebookEntry], int]:
-        from sqlalchemy import func
-        query = select(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id).offset(skip).limit(limit)
+    async def get_by_lorebook_with_count(self, lorebook_id: UUID, skip: int = 0, limit: int = 20, sort_by: str = "created_at") -> tuple[List[LorebookEntry], int]:
+        from sqlalchemy import func, desc
+        query = select(LorebookEntry).where(LorebookEntry.lorebook_id == lorebook_id)
+        
+        if sort_by == "priority":
+            query = query.order_by(desc(LorebookEntry.priority), desc(LorebookEntry.created_at))
+        else:
+            query = query.order_by(desc(LorebookEntry.created_at))
+            
+        query = query.offset(skip).limit(limit)
         result = await self.db.execute(query)
         items = result.scalars().all()
 
