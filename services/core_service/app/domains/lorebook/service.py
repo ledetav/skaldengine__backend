@@ -53,6 +53,8 @@ class LorebookService(BaseService[LorebookRepository]):
                 "name": created.name,
                 "type": created.type,
                 "fandom": created.fandom,
+                "description": created.description,
+                "category": created.category,
                 "character_id": str(created.character_id) if created.character_id else None,
                 "user_persona_id": str(created.user_persona_id) if created.user_persona_id else None,
                 "entries_count": 0,
@@ -81,6 +83,8 @@ class LorebookService(BaseService[LorebookRepository]):
                 "name": updated.name,
                 "type": updated.type,
                 "fandom": updated.fandom,
+                "description": updated.description,
+                "category": updated.category,
                 "character_id": str(updated.character_id) if updated.character_id else None,
                 "user_persona_id": str(updated.user_persona_id) if updated.user_persona_id else None,
                 "tags": updated.tags or []
@@ -103,8 +107,15 @@ class LorebookService(BaseService[LorebookRepository]):
 
     # Entry methods
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> LorebookEntry:
+        from app.core import rag
         entry_data = entry_in.model_dump()
         entry_data["lorebook_id"] = lorebook_id
+        
+        # Generate embedding for content
+        embedding = await rag.get_embedding(entry_in.content)
+        if embedding:
+            entry_data["embedding"] = embedding
+            
         created = await self.entry_repository.create(obj_in=entry_data)
         
         # Broadcast entry update (refresh needed for this lorebook)
@@ -115,7 +126,16 @@ class LorebookService(BaseService[LorebookRepository]):
         return created
 
     async def create_entries_bulk(self, lorebook_id: UUID, entries_in: List[LorebookEntryCreate]) -> List[LorebookEntry]:
-        entries_data = [e.model_dump() for e in entries_in]
+        from app.core import rag
+        entries_data = []
+        for e in entries_in:
+            data = e.model_dump()
+            data["lorebook_id"] = lorebook_id
+            embedding = await rag.get_embedding(e.content)
+            if embedding:
+                data["embedding"] = embedding
+            entries_data.append(data)
+            
         created_entries = await self.entry_repository.create_bulk(lorebook_id, entries_data)
         
         # Broadcast entry update
@@ -126,10 +146,20 @@ class LorebookService(BaseService[LorebookRepository]):
         return created_entries
 
     async def update_entry(self, entry_id: UUID, entry_update: LorebookEntryUpdate) -> Optional[LorebookEntry]:
+        from app.core import rag
         entry = await self.entry_repository.get(entry_id)
         if not entry:
             return None
-        updated = await self.entry_repository.update(db_obj=entry, obj_in=entry_update)
+            
+        update_data = entry_update.model_dump(exclude_unset=True)
+        
+        # If content changed, regenerate embedding
+        if "content" in update_data:
+            embedding = await rag.get_embedding(update_data["content"])
+            if embedding:
+                update_data["embedding"] = embedding
+                
+        updated = await self.entry_repository.update(db_obj=entry, obj_in=update_data)
         
         if updated:
             await manager.broadcast({

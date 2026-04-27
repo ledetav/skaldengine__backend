@@ -147,9 +147,28 @@ class PromptPipeline:
             self._add_lore_to_collections(entry, is_core=True)
 
         # 2. Гибридный поиск (Keywords + Semantic)
-        # Генерируем эмбеддинг запроса ОДИН РАЗ для всех этапов
-        api_key = self.current_user.polza_api_key or settings.POLZA_API_KEY
-        self.query_vector = await rag.get_query_embedding(user_text, api_key=api_key)
+        # Генерируем эмбеддинг запроса только если есть по чему искать вектором
+        
+        # Проверяем, есть ли в лорбуках записи с эмбеддингами
+        lb_has_vectors = False
+        vector_check_query = select(LorebookEntry.id).where(and_(
+            LorebookEntry.lorebook_id.in_(relevant_lb_ids),
+            LorebookEntry.embedding != None
+        )).limit(1)
+        lb_vec_res = await self.db.execute(vector_check_query)
+        if lb_vec_res.scalar():
+            lb_has_vectors = True
+
+        # Проверяем, есть ли эпизодическая память (RAG) для этого чата
+        has_episodes = False
+        memo_check_query = select(EpisodicMemory.id).where(EpisodicMemory.chat_id == self.chat_id).limit(1)
+        memo_vec_res = await self.db.execute(memo_check_query)
+        if memo_vec_res.scalar():
+            has_episodes = True
+
+        if lb_has_vectors or has_episodes:
+            api_key = self.current_user.polza_api_key or settings.POLZA_API_KEY
+            self.query_vector = await rag.get_query_embedding(user_text, api_key=api_key)
         
         found_entries_ids = set()
 
