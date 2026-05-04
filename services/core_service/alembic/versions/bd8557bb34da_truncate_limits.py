@@ -55,5 +55,8 @@ def upgrade() -> None:
     op.execute("UPDATE scenarios SET end_point = LEFT(end_point, 500) WHERE end_point IS NOT NULL AND LENGTH(end_point) > 500;")
     op.execute("UPDATE scenarios SET internal_description = LEFT(internal_description, 1000) WHERE internal_description IS NOT NULL AND LENGTH(internal_description) > 1000;")
 
+    # messages
+    op.execute("UPDATE messages SET content = LEFT(content, 4000) WHERE content IS NOT NULL AND LENGTH(content) > 4000;")
+
 def downgrade() -> None:
     pass
