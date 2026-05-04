@@ -1,17 +1,17 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from uuid import UUID
 from datetime import datetime
 
 
 class UserPersonaBase(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(..., max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = None
-    age: str | None = None
-    appearance: str | None = None
-    personality: str | None = None
-    gender: str | None = None
-    facts: str | None = None
+    age: str | None = Field(default=None, max_length=100)
+    appearance: str | None = Field(default=None, max_length=2000)
+    personality: str | None = Field(default=None, max_length=2000)
+    gender: str | None = Field(default=None, max_length=100)
+    facts: str | None = Field(default=None, max_length=2000)
 
     @field_validator("age", mode="before")
     @classmethod
@@ -41,14 +41,14 @@ class UserPersonaCreate(UserPersonaBase):
 
 
 class UserPersonaUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = None
-    age: str | None = None
-    appearance: str | None = None
-    personality: str | None = None
-    gender: str | None = None
-    facts: str | None = None
+    age: str | None = Field(default=None, max_length=100)
+    appearance: str | None = Field(default=None, max_length=2000)
+    personality: str | None = Field(default=None, max_length=2000)
+    gender: str | None = Field(default=None, max_length=100)
+    facts: str | None = Field(default=None, max_length=2000)
 
     model_config = {
         "json_schema_extra": {

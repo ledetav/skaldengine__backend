@@ -108,6 +108,12 @@ class LorebookService(BaseService[LorebookRepository]):
     # Entry methods
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> LorebookEntry:
         from app.core import rag
+        from fastapi import HTTPException
+        
+        _, current_count = await self.entry_repository.get_by_lorebook_with_count(lorebook_id, limit=1)
+        if current_count >= 100:
+            raise HTTPException(status_code=400, detail="Lorebook cannot have more than 100 entries.")
+            
         entry_data = entry_in.model_dump()
         entry_data["lorebook_id"] = lorebook_id
         
@@ -127,6 +133,12 @@ class LorebookService(BaseService[LorebookRepository]):
 
     async def create_entries_bulk(self, lorebook_id: UUID, entries_in: List[LorebookEntryCreate]) -> List[LorebookEntry]:
         from app.core import rag
+        from fastapi import HTTPException
+        
+        _, current_count = await self.entry_repository.get_by_lorebook_with_count(lorebook_id, limit=1)
+        if current_count + len(entries_in) > 100:
+            raise HTTPException(status_code=400, detail=f"Cannot add {len(entries_in)} entries. Lorebook would exceed the maximum limit of 100 entries. Current count: {current_count}")
+            
         entries_data = []
         for e in entries_in:
             data = e.model_dump()

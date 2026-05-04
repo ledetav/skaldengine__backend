@@ -1,12 +1,13 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Annotated
 from uuid import UUID
 
 
 # ─── LorebookEntry ─────────────────────────────────────────────────────────── #
 
 class LorebookEntryBase(BaseModel):
-    keywords: list[str] = []
-    content: str
+    keywords: list[Annotated[str, Field(max_length=150)]] = Field(default=[], max_length=10)
+    content: str = Field(..., max_length=2000)
     priority: int = 0
     category: str = "general"
     is_always_included: bool = False
@@ -31,8 +32,8 @@ class LorebookEntryBulkCreate(BaseModel):
 
 
 class LorebookEntryUpdate(BaseModel):
-    keywords: list[str] | None = None
-    content: str | None = None
+    keywords: list[Annotated[str, Field(max_length=150)]] | None = Field(default=None, max_length=10)
+    content: str | None = Field(default=None, max_length=2000)
     priority: int | None = None
     category: str | None = None
     is_always_included: bool | None = None
@@ -63,12 +64,12 @@ class LorebookEntry(LorebookEntryBase):
 from app.domains.lorebook.models import LorebookType
 
 class LorebookBase(BaseModel):
-    name: str
+    name: str = Field(..., max_length=200)
     type: LorebookType = LorebookType.FANDOM
     character_id: UUID | None = None
     user_persona_id: UUID | None = None
-    fandom: str | None = None
-    description: str | None = None
+    fandom: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     category: str = "general"
     tags: list[str] = []
 
@@ -92,10 +93,10 @@ class LorebookCreate(LorebookBase):
 
 
 class LorebookUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     type: LorebookType | None = None
-    fandom: str | None = None
+    fandom: str | None = Field(default=None, max_length=200)
     character_id: UUID | None = None
     user_persona_id: UUID | None = None
     category: str | None = None

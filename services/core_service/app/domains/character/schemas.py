@@ -1,21 +1,21 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from typing import Optional, List
 from app.domains.character.models import CharacterType
 
 class CharacterBase(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(..., max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     type: CharacterType = CharacterType.FANDOM
-    fandom: str | None = None
+    fandom: str | None = Field(default=None, max_length=200)
     avatar_url: str | None = None
     card_image_url: str | None = None
-    appearance: str | None = None
-    personality: str | None = None
+    appearance: str | None = Field(default=None, max_length=2000)
+    personality: str | None = Field(default=None, max_length=2000)
     is_public: bool = False
     # Новые поля
-    gender: str | None = None
-    age: str | None = None
+    gender: str | None = Field(default=None, max_length=100)
+    age: str | None = Field(default=None, max_length=100)
     nsfw_allowed: bool = True
     lorebook_ids: List[UUID] | None = None
 
@@ -44,17 +44,17 @@ class CharacterCreate(CharacterBase):
 
 
 class CharacterUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     type: CharacterType | None = None
-    fandom: str | None = None
+    fandom: str | None = Field(default=None, max_length=200)
     avatar_url: str | None = None
     card_image_url: str | None = None
-    appearance: str | None = None
-    personality: str | None = None
+    appearance: str | None = Field(default=None, max_length=2000)
+    personality: str | None = Field(default=None, max_length=2000)
     is_public: bool | None = None
-    gender: str | None = None
-    age: str | None = None
+    gender: str | None = Field(default=None, max_length=100)
+    age: str | None = Field(default=None, max_length=100)
     nsfw_allowed: bool | None = None
     lorebook_ids: List[UUID] | None = None
 

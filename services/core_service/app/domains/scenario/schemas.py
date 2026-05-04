@@ -1,18 +1,18 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 
 
 class ScenarioBase(BaseModel):
-    title: str
-    location: str | None = None
-    description: str
-    start_point: str
-    end_point: str
+    title: str = Field(..., max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    description: str = Field(..., max_length=500)
+    start_point: str = Field(..., max_length=500)
+    end_point: str = Field(..., max_length=500)
     character_id: UUID | None = None
 
 
 class ScenarioCreate(ScenarioBase):
-    internal_description: str | None = None
+    internal_description: str | None = Field(default=None, max_length=1000)
 
     model_config = {
         "json_schema_extra": {
@@ -31,12 +31,12 @@ class ScenarioCreate(ScenarioBase):
 
 
 class ScenarioUpdate(BaseModel):
-    title: str | None = None
-    location: str | None = None
-    description: str | None = None
-    internal_description: str | None = None
-    start_point: str | None = None
-    end_point: str | None = None
+    title: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
+    internal_description: str | None = Field(default=None, max_length=1000)
+    start_point: str | None = Field(default=None, max_length=500)
+    end_point: str | None = Field(default=None, max_length=500)
     character_id: UUID | None = None
 
     model_config = {
@@ -74,7 +74,7 @@ class Scenario(ScenarioBase):
 
 
 class ScenarioFull(Scenario):
-    internal_description: str | None = None
+    internal_description: str | None = Field(default=None, max_length=1000)
 
 
 # Alias for response schema
