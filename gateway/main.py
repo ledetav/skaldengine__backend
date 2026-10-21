@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response, JSONResponse, StreamingResponse
 import httpx
@@ -40,6 +41,36 @@ def get_env_list(key, default):
     except:
         return [raw]
 
+def is_origin_allowed(origin: str, allowed_origins: list, allowed_suffixes: list) -> bool:
+    if not origin:
+        return False
+    if origin in allowed_origins:
+        return True
+    try:
+        parsed = urlsplit(origin)
+        hostname = (parsed.hostname or "").lower()
+    except Exception:
+        return False
+
+    if not hostname:
+        return False
+
+    if hostname in allowed_origins or hostname in ("localhost", "127.0.0.1"):
+        return True
+
+    for suffix in allowed_suffixes:
+        clean_suffix = suffix.lower()
+        if clean_suffix in ("localhost", "127.0.0.1"):
+            if hostname == clean_suffix:
+                return True
+        else:
+            if not clean_suffix.startswith("."):
+                clean_suffix = "." + clean_suffix
+            if hostname.endswith(clean_suffix):
+                return True
+
+    return False
+
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
@@ -48,10 +79,7 @@ async def cors_middleware(request: Request, call_next):
     allowed_origins = get_env_list("BACKEND_CORS_ORIGINS", [])
     allowed_suffixes = get_env_list("BACKEND_CORS_ALLOWED_SUFFIXES", [".replit.dev", ".replit.app", "localhost", "127.0.0.1"])
 
-    is_allowed = origin and (
-        origin in allowed_origins 
-        or any(origin.endswith(s) or s in origin for s in allowed_suffixes)
-    )
+    is_allowed = is_origin_allowed(origin, allowed_origins, allowed_suffixes)
 
     # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
