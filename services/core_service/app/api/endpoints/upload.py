@@ -14,6 +14,9 @@ ALLOWED_MIME_TYPES = {
     "image/webp": "webp"
 }
 
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
 @router.post("/", response_model=dict)
 async def upload_file(
     file: UploadFile = File(...),
@@ -35,11 +38,24 @@ async def upload_file(
     unique_filename = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(settings.UPLOAD_DIR, unique_filename)
     
+    total_bytes = 0
     try:
         async with aiofiles.open(file_path, 'wb') as out_file:
             while content := await file.read(1024 * 1024):
+                total_bytes += len(content)
+                if total_bytes > MAX_FILE_SIZE:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File exceeds maximum allowed size of {MAX_FILE_SIZE // (1024 * 1024)}MB."
+                    )
                 await out_file.write(content)
+    except HTTPException:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
     except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
         
     url = f"/static/{unique_filename}"
