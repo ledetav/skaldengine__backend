@@ -28,6 +28,8 @@ class Chat(Base):
     scenario_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("scenarios.id"), nullable=True
     )
+    custom_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    custom_plot_hook: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Настройки отношений
     is_acquainted: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -84,7 +86,7 @@ class EpisodicMemory(Base):
     chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
     summary: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(Vector(768))
+    embedding: Mapped[list[float]] = mapped_column(Vector(1536))
 
     chat: Mapped["Chat"] = relationship("Chat", back_populates="episodic_memories")
     message: Mapped["Message"] = relationship("Message", back_populates="episodic_memory")

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
             return v.replace("postgresql://", "postgresql+asyncpg://", 1)
         return v
 
+    AUTH_BASE_URL: str = Field("http://auth:8001", validation_alias="AUTH_BASE_URL")
+
 
     # Polza.ai (OpenAI wrapper)
     POLZA_API_KEY: str
