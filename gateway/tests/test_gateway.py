@@ -114,3 +114,46 @@ async def test_proxy_upstream_error_502():
             assert "Bad Gateway" in res.json()["detail"]
     finally:
         gw_main.httpx.AsyncClient = _RealAsyncClient
+
+
+def test_cors_origin_security_unit():
+    """Unit tests for is_origin_allowed helper."""
+    from gateway.main import is_origin_allowed
+    suffixes = [".replit.dev", ".replit.app", "localhost", "127.0.0.1"]
+    origins = ["https://custom.app"]
+
+    # Allowed
+    assert is_origin_allowed("http://localhost:3000", origins, suffixes) is True
+    assert is_origin_allowed("http://127.0.0.1:8080", origins, suffixes) is True
+    assert is_origin_allowed("https://my-app.replit.dev", origins, suffixes) is True
+    assert is_origin_allowed("https://sub.my-app.replit.app", origins, suffixes) is True
+    assert is_origin_allowed("https://custom.app", origins, suffixes) is True
+
+    # Attack/Phishing vectors that should be REJECTED
+    assert is_origin_allowed("https://attacker-localhost.com", origins, suffixes) is False
+    assert is_origin_allowed("https://localhost.attacker.com", origins, suffixes) is False
+    assert is_origin_allowed("https://fake127.0.0.1.org", origins, suffixes) is False
+    assert is_origin_allowed("https://evil-replit.dev.attacker.com", origins, suffixes) is False
+    assert is_origin_allowed("https://notreplit.dev", origins, suffixes) is False
+    assert is_origin_allowed("", origins, suffixes) is False
+
+
+def test_cors_middleware_preflight_security():
+    """Test CORS preflight OPTIONS request rejects malicious origins."""
+    client = TestClient(app)
+
+    # Legitimate origin
+    res_ok = client.options("/health", headers={
+        "Origin": "http://localhost:3000",
+        "Access-Control-Request-Method": "GET"
+    })
+    assert res_ok.status_code == 200
+    assert res_ok.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+    # Malicious substring origin
+    res_evil = client.options("/health", headers={
+        "Origin": "https://attacker-localhost.com",
+        "Access-Control-Request-Method": "GET"
+    })
+    assert res_evil.status_code == 200
+    assert "access-control-allow-origin" not in res_evil.headers
