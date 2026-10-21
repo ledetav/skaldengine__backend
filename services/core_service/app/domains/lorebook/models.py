@@ -1,6 +1,8 @@
 import uuid
-from sqlalchemy import String, Text, Integer, ForeignKey, ARRAY, Index
+from sqlalchemy import String, Text, Integer, ForeignKey, ARRAY, Index, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+from datetime import datetime
 
 from app.db.base import Base
 
@@ -37,14 +39,26 @@ class Lorebook(Base):
     fandom: Mapped[str | None] = mapped_column(String, index=True, nullable=True)
 
     name: Mapped[str] = mapped_column(String)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category: Mapped[str] = mapped_column(String, index=True, default="general")
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
-    character: Mapped["Character | None"] = relationship("Character", back_populates="lorebooks")
+    characters: Mapped[list["Character"]] = relationship(
+        "Character", 
+        secondary="character_lorebook_association",
+        back_populates="lorebooks"
+    )
     user_persona: Mapped["UserPersona | None"] = relationship("UserPersona")
+
     entries: Mapped[list["LorebookEntry"]] = relationship(
         "LorebookEntry", back_populates="lorebook", cascade="all, delete-orphan"
     )
 
+
+from pgvector.sqlalchemy import Vector
 
 class LorebookEntry(Base):
     """
@@ -58,11 +72,22 @@ class LorebookEntry(Base):
         ForeignKey("lorebooks.id", ondelete="CASCADE")
     )
 
+    # Категория факта: fact, appearance, mindset, speech, inventory, secret
+    category: Mapped[str] = mapped_column(String, index=True, default="fact")
+    
+    # Если True — факт всегда подтягивается в промпт (для ключевых черт)
+    is_always_included: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
     # TEXT[] — лексические триггеры вставки ["меч", "магия"]
     keywords: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
 
     content: Mapped[str] = mapped_column(Text)
     priority: Mapped[int] = mapped_column(Integer, default=0)
+
+    # Эмбеддинг для семантического поиска (позволяет найти "паука" по слову "арахнид")
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     # Связи
     lorebook: Mapped["Lorebook"] = relationship("Lorebook", back_populates="entries")

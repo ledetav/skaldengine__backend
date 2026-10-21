@@ -1,17 +1,24 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, Field
 from uuid import UUID
 from datetime import datetime
 
 
 class UserPersonaBase(BaseModel):
-    name: str
-    description: str | None = None
+    name: str = Field(..., max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = None
-    age: int | None = None
-    appearance: str | None = None
-    personality: str | None = None
-    gender: str | None = None
-    facts: str | None = None
+    age: str | None = Field(default=None, max_length=100)
+    appearance: str | None = Field(default=None, max_length=2000)
+    personality: str | None = Field(default=None, max_length=2000)
+    gender: str | None = Field(default=None, max_length=100)
+    facts: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("age", mode="before")
+    @classmethod
+    def age_to_str(cls, v):
+        if v is None:
+            return None
+        return str(v)
 
 
 class UserPersonaCreate(UserPersonaBase):
@@ -34,14 +41,14 @@ class UserPersonaCreate(UserPersonaBase):
 
 
 class UserPersonaUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = None
-    age: int | None = None
-    appearance: str | None = None
-    personality: str | None = None
-    gender: str | None = None
-    facts: str | None = None
+    age: str | None = Field(default=None, max_length=100)
+    appearance: str | None = Field(default=None, max_length=2000)
+    personality: str | None = Field(default=None, max_length=2000)
+    gender: str | None = Field(default=None, max_length=100)
+    facts: str | None = Field(default=None, max_length=2000)
 
     model_config = {
         "json_schema_extra": {
@@ -61,7 +68,7 @@ class UserPersonaUpdate(BaseModel):
     }
 
 
-class UserPersona(UserPersonaBase):
+class UserPersonaResponse(UserPersonaBase):
     id: UUID
     owner_id: UUID
     lorebook_count: int = 0
@@ -74,3 +81,4 @@ class UserStatistics(BaseModel):
     total_personas: int = 0
     total_lorebooks: int = 0
     total_chats: int = 0
+    total_messages: int = 0

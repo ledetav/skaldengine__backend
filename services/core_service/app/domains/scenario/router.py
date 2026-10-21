@@ -11,11 +11,13 @@ router = APIRouter()
 @router.get("/", response_model=BaseResponse)
 async def list_scenarios(
     character_id: UUID | None = None,
+    skip: int = 0,
+    limit: int = 20,
     controller: ScenarioController = Depends(deps.get_scenario_controller),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Получить список сценариев (с фильтром по персонажу)."""
-    return await controller.get_scenarios(character_id)
+    return await controller.get_scenarios(character_id, skip, limit)
 
 
 @router.post("/", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
@@ -38,7 +40,7 @@ async def read_scenario(
     return await controller.get_scenario(scenario_id)
 
 
-@router.put("/{scenario_id}", response_model=BaseResponse)
+@router.patch("/{scenario_id}", response_model=BaseResponse)
 async def update_scenario(
     scenario_id: UUID,
     scenario_in: ScenarioUpdate,

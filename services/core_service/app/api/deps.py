@@ -5,6 +5,7 @@ from jose import jwt, JWTError
 from pydantic import BaseModel
 from uuid import UUID
 import logging
+import httpx
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +22,6 @@ from app.domains.chat.message_repository import MessageRepository
 from app.domains.scenario.repository import ScenarioRepository
 from app.domains.persona.repository import UserPersonaRepository
 from app.domains.lorebook.repository import LorebookRepository, LorebookEntryRepository
-from app.domains.character.attribute_repository import CharacterAttributeRepository
 
 # Services
 from app.domains.character.service import CharacterService
@@ -30,7 +30,6 @@ from app.domains.chat.message_service import MessageService
 from app.domains.scenario.service import ScenarioService
 from app.domains.persona.service import UserPersonaService
 from app.domains.lorebook.service import LorebookService
-from app.domains.character.attribute_service import CharacterAttributeService
 
 # Controllers
 from app.domains.character.controller import CharacterController
@@ -39,7 +38,6 @@ from app.domains.chat.message_controller import MessageController
 from app.domains.scenario.controller import ScenarioController
 from app.domains.persona.controller import UserPersonaController
 from app.domains.lorebook.controller import LorebookController
-from app.domains.character.attribute_controller import CharacterAttributeController
 
 class CurrentUser(BaseModel):
     id: UUID
@@ -87,53 +85,29 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
     except (JWTError, ValueError):
         raise HTTPException(status_code=403, detail="Could not validate credentials")
 
-async def verify_staff_role(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
-    """Allow both admins and moderators."""
-    if current_user.role not in ["admin", "moderator"]:
-        raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
-    return current_user
 
-async def get_optional_current_user(token_auth: HTTPAuthorizationCredentials | None = Depends(security)) -> CurrentUser | None:
-    """Get current user if token is provided, return None otherwise."""
-    if token_auth is None:
-        return None
-    token = token_auth.credentials
+async def get_fresh_current_user(token_auth: HTTPAuthorizationCredentials = Depends(security)) -> CurrentUser:
+    base_user = await get_current_user(token_auth)
+    # Fetch real role from auth service
+    auth_url = f"{settings.AUTH_BASE_URL}{settings.API_V1_STR}/users/me"
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        token_data = payload.get("sub")
-        if token_data is None:
-            return None
-        
-        # Parse birth_date
-        birth_date_str = payload.get("birth_date")
-        birth_date_val = None
-        if birth_date_str:
-            try:
-                birth_date_val = date.fromisoformat(birth_date_str)
-            except ValueError:
-                pass
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(auth_url, headers={"Authorization": f"Bearer {token_auth.credentials}"}, timeout=2.0)
+            if resp.status_code == 200:
+                data = resp.json().get("data", {})
+                if "role" in data:
+                    base_user.role = data["role"]
+    except Exception as e:
+        logger.error(f"Failed to fetch fresh user info from auth_service: {e}")
+    return base_user
 
-        return CurrentUser(
-            id=UUID(token_data),
-            role=payload.get("role", "user"),
-            login=payload.get("login"),
-            username=payload.get("username"),
-            full_name=payload.get("full_name"),
-            birth_date=birth_date_val,
-            polza_api_key=payload.get("polza_api_key")
-        )
-    except (JWTError, ValueError):
-        return None
-
-async def verify_staff_role(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+async def verify_staff_role(current_user: CurrentUser = Depends(get_fresh_current_user)) -> CurrentUser:
     """Allow both admins and moderators."""
     if current_user.role not in ["admin", "moderator"]:
         raise HTTPException(status_code=403, detail="The user doesn't have enough privileges")
     return current_user
 
-async def verify_admin_role(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+async def verify_admin_role(current_user: CurrentUser = Depends(get_fresh_current_user)) -> CurrentUser:
     """Allow ONLY admins."""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="This operation requires Administrator privileges")
@@ -207,13 +181,3 @@ async def get_user_persona_service(repo: UserPersonaRepository = Depends(get_use
 
 async def get_user_persona_controller(service: UserPersonaService = Depends(get_user_persona_service)) -> UserPersonaController:
     return UserPersonaController(service)
-
-# DI for CharacterAttribute
-async def get_character_attribute_repository(db: AsyncSession = Depends(get_db)) -> CharacterAttributeRepository:
-    return CharacterAttributeRepository(db)
-
-async def get_character_attribute_service(repo: CharacterAttributeRepository = Depends(get_character_attribute_repository)) -> CharacterAttributeService:
-    return CharacterAttributeService(repo)
-
-async def get_character_attribute_controller(service: CharacterAttributeService = Depends(get_character_attribute_service)) -> CharacterAttributeController:
-    return CharacterAttributeController(service)

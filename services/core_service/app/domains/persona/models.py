@@ -22,7 +22,7 @@ class UserPersona(Base):
     avatar_url: Mapped[str | None] = mapped_column(String, nullable=True)
 
     # Игровые характеристики персоны
-    age: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    age: Mapped[str | None] = mapped_column(String(50), nullable=True)
     appearance: Mapped[str | None] = mapped_column(Text, nullable=True)
     personality: Mapped[str | None] = mapped_column(Text, nullable=True)
     gender: Mapped[str | None] = mapped_column(String(50), nullable=True)  # мужской, женский, другой

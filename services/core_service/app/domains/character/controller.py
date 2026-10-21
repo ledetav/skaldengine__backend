@@ -6,6 +6,8 @@ from .service import CharacterService
 from app.domains.lorebook.service import LorebookService
 from app.domains.character.schemas import CharacterCreate, CharacterUpdate, CharacterRead, CharacterAdminRead
 from shared.schemas.response import BaseResponse
+import httpx
+from app.core.config import settings
 
 class CharacterController(BaseController):
     def __init__(self, character_service: CharacterService, lorebook_service: LorebookService):
@@ -13,20 +15,52 @@ class CharacterController(BaseController):
         self.lorebook_service = lorebook_service
 
     async def get_characters(self, skip: int = 0, limit: int = 20, is_admin: bool = False) -> BaseResponse:
-        characters = await self.character_service.get_characters(skip, limit)
+        characters, total = await self.character_service.get_characters(skip, limit, is_admin=is_admin)
         schema = CharacterAdminRead if is_admin else CharacterRead
         # Приводим к соответствующим схемам для фильтрации полей
-        data = [schema.model_validate(c) for c in characters]
-        return self.handle_success(data=data)
+        items = [schema.model_validate(c) for c in characters]
+        
+        # Обогащаем данными авторов
+        await self._enrich_with_authors(items)
+        
+        return self.handle_success(data={"items": items, "total": total})
 
     async def get_character(self, character_id: UUID, is_admin: bool = False) -> BaseResponse:
-        character = await self.character_service.get_character(character_id)
+        character = await self.character_service.get_character(character_id, is_admin=is_admin)
         if not character:
             self.handle_error("Character not found", status_code=status.HTTP_404_NOT_FOUND)
         
         schema = CharacterAdminRead if is_admin else CharacterRead
         data = schema.model_validate(character)
+        
+        # Обогащаем данными автора
+        await self._enrich_with_authors([data])
+        
         return self.handle_success(data=data)
+
+    async def _enrich_with_authors(self, items: List[Any]) -> None:
+        """Внутренний метод для обогащения персонажей данными об авторах из auth_service."""
+        creator_ids = list(set([item.creator_id for item in items if hasattr(item, "creator_id") and item.creator_id]))
+        if not creator_ids:
+            return
+
+        try:
+            ids_str = ",".join([str(uid) for uid in creator_ids])
+            auth_url = f"{settings.AUTH_BASE_URL}{settings.API_V1_STR}/users/batch?ids={ids_str}"
+            
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(auth_url, timeout=5.0)
+                if resp.status_code == 200:
+                    authors_data = resp.json().get("data", [])
+                    authors_map = {str(auth["id"]): auth for auth in authors_data}
+                    
+                    for item in items:
+                        if hasattr(item, "creator_id") and str(item.creator_id) in authors_map:
+                            item.author = authors_map[str(item.creator_id)]
+        except Exception as e:
+            # Логируем, но не прерываем основной запрос (персонажи без авторов лучше чем 500 ошибка)
+            import logging
+            logging.getLogger("core").error(f"Failed to enrich characters with authors: {e}")
 
     async def create_character(self, character_in: CharacterCreate, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         # Если это не админ (модератор), проверяем наличие фандомного лорбука
@@ -41,14 +75,16 @@ class CharacterController(BaseController):
                 )
 
         character = await self.character_service.create_character(character_in, user_id)
-        return self.handle_success(data=character)
+        return self.handle_success(data=CharacterAdminRead.model_validate(character))
 
     async def update_character(self, character_id: UUID, character_update: CharacterUpdate, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         creator_id = None if is_admin else user_id
         character = await self.character_service.update_character(character_id, character_update, creator_id)
         if not character:
             self.handle_error("Character not found or access denied", status_code=status.HTTP_404_NOT_FOUND)
-        return self.handle_success(data=character)
+        
+        schema = CharacterAdminRead if is_admin else CharacterRead
+        return self.handle_success(data=schema.model_validate(character))
 
     async def delete_character(self, character_id: UUID, user_id: UUID, is_admin: bool = False) -> BaseResponse:
         creator_id = None if is_admin else user_id

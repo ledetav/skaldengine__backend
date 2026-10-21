@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from app.api import deps
 from .controller import LorebookController
 from shared.schemas.response import BaseResponse
-from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
+from .schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate, LorebookEntryBulkCreate
 
 router = APIRouter()
 
@@ -24,11 +24,14 @@ async def list_lorebooks(
     character_id: UUID | None = None,
     persona_id: UUID | None = None,
     user_id: UUID | None = None,
+    skip: int = 0,
+    limit: int = 20,
+    type: str | None = None,
     controller: LorebookController = Depends(deps.get_lorebook_controller),
-    current_user: deps.CurrentUser | None = Depends(deps.get_optional_current_user)
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
     """Получить список лорбуков (с фильтрацией)."""
-    return await controller.get_lorebooks(character_id, persona_id, user_id)
+    return await controller.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit, lb_type=type)
 
 
 @router.get("/{lorebook_id}", response_model=BaseResponse)
@@ -77,6 +80,17 @@ async def create_entry(
     return await controller.create_entry(lorebook_id, entry_in)
 
 
+@router.post("/{lorebook_id}/entries/bulk", response_model=BaseResponse, status_code=status.HTTP_201_CREATED)
+async def create_entries_bulk(
+    lorebook_id: UUID,
+    bulk_in: LorebookEntryBulkCreate,
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Добавить сразу несколько записей в лорбук."""
+    return await controller.create_entries_bulk(lorebook_id, bulk_in)
+
+
 @router.patch("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)
 async def update_entry(
     lorebook_id: UUID,
@@ -98,6 +112,19 @@ async def delete_entry(
 ):
     """Удалить запись из лорбука."""
     return await controller.delete_entry(entry_id)
+
+
+@router.get("/{lorebook_id}/entries", response_model=BaseResponse)
+async def list_entries(
+    lorebook_id: UUID,
+    skip: int = 0,
+    limit: int = 20,
+    sort_by: str = "created_at",
+    controller: LorebookController = Depends(deps.get_lorebook_controller),
+    current_user: deps.CurrentUser = Depends(deps.get_current_user)
+):
+    """Получить список записей лорбука (пагинированный)."""
+    return await controller.get_entries(lorebook_id, skip=skip, limit=limit, sort_by=sort_by)
 
 
 @router.get("/{lorebook_id}/entries/{entry_id}", response_model=BaseResponse)
