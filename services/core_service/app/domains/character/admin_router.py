@@ -15,7 +15,7 @@ async def create_character(
     current_user: deps.CurrentUser = Depends(deps.get_current_user),
 ) -> BaseResponse:
     """Создать нового персонажа (через админку)."""
-    return await controller.create_character(character_in, current_user.id)
+    return await controller.create_character(character_in, current_user.id, is_admin=True)
 
 
 @router.patch("/{character_id}", response_model=BaseResponse)

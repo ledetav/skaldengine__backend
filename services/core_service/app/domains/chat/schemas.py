@@ -10,6 +10,8 @@ class ChatBase(BaseModel):
     title: str | None = None
     is_acquainted: bool = False
     relationship_dynamic: str | None = None
+    custom_location: str | None = None
+    custom_plot_hook: str | None = None
     language: str = "ru"
     narrative_voice: str = "third"  # "first" | "second" | "third"
     persona_lorebook_id: UUID | None = None
@@ -45,13 +47,18 @@ class ChatUpdate(BaseModel):
     active_leaf_id: UUID | None = None
 
 
-class Chat(ChatBase):
+class ChatResponse(ChatBase):
     id: UUID
     user_id: UUID
     mode: str
     active_leaf_id: UUID | None = None
     created_at: datetime
     updated_at: datetime | None = None
+    
+    # Enriched fields for list view
+    character_name: str | None = None
+    user_persona_name: str | None = None
+    last_message_preview: str | None = None
 
     class Config:
         from_attributes = True

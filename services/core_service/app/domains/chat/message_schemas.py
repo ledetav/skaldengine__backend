@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
@@ -6,12 +6,12 @@ from typing import Optional
 
 class MessageBase(BaseModel):
     role: str
-    content: str
+    content: str = Field(..., max_length=4000)
 
 
 class MessageCreate(BaseModel):
     """Входящее сообщение от пользователя."""
-    content: str
+    content: str = Field(..., max_length=4000)
     parent_id: UUID | None = None  # Для ветвления (swipe)
 
     model_config = {
@@ -41,7 +41,7 @@ class MessageRegenerate(BaseModel):
     }
 
 
-class Message(MessageBase):
+class MessageResponse(MessageBase):
     id: UUID
     chat_id: UUID
     parent_id: UUID | None = None

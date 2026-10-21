@@ -1,5 +1,6 @@
 import re
-from pydantic import BaseModel, EmailStr, field_validator
+from typing import Literal
+from pydantic import BaseModel, EmailStr, field_validator, Field
 from uuid import UUID
 from datetime import date, datetime
 
@@ -8,8 +9,8 @@ class UserBase(BaseModel):
     email: EmailStr
     login: str
     username: str
-    full_name: str | None = None
-    about: str | None = None
+    full_name: str | None = Field(default=None, max_length=200)
+    about: str | None = Field(default=None, max_length=500)
     birth_date: date
 
     @field_validator("login")
@@ -94,13 +95,13 @@ class EmailUpdate(BaseModel):
 
 
 class FullNameUpdate(BaseModel):
-    full_name: str | None = None
+    full_name: str | None = Field(default=None, max_length=200)
 
 
 class ProfileUpdate(BaseModel):
     avatar_url: str | None = None
     cover_url: str | None = None
-    about: str | None = None
+    about: str | None = Field(default=None, max_length=500)
     polza_api_key: str | None = None
 
 
@@ -108,8 +109,8 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = None
     login: str | None = None
     username: str | None = None
-    full_name: str | None = None
-    about: str | None = None
+    full_name: str | None = Field(default=None, max_length=200)
+    about: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = None
     cover_url: str | None = None
     polza_api_key: str | None = None
@@ -137,6 +138,10 @@ class PasswordUpdate(BaseModel):
     @classmethod
     def validate_password(cls, v: str) -> str:
         return UserCreate.validate_password(v)
+
+
+class RoleUpdate(BaseModel):
+    role: Literal["user", "moderator", "admin"]
 
 
 class UserResponse(UserBase):

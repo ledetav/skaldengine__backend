@@ -1,8 +1,9 @@
 import os
 import json
 import logging
+from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, Response, JSONResponse
+from fastapi.responses import HTMLResponse, Response, JSONResponse, StreamingResponse
 import httpx
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -40,6 +41,36 @@ def get_env_list(key, default):
     except:
         return [raw]
 
+def is_origin_allowed(origin: str, allowed_origins: list, allowed_suffixes: list) -> bool:
+    if not origin:
+        return False
+    if origin in allowed_origins:
+        return True
+    try:
+        parsed = urlsplit(origin)
+        hostname = (parsed.hostname or "").lower()
+    except Exception:
+        return False
+
+    if not hostname:
+        return False
+
+    if hostname in allowed_origins or hostname in ("localhost", "127.0.0.1"):
+        return True
+
+    for suffix in allowed_suffixes:
+        clean_suffix = suffix.lower()
+        if clean_suffix in ("localhost", "127.0.0.1"):
+            if hostname == clean_suffix:
+                return True
+        else:
+            if not clean_suffix.startswith("."):
+                clean_suffix = "." + clean_suffix
+            if hostname.endswith(clean_suffix):
+                return True
+
+    return False
+
 @app.middleware("http")
 async def cors_middleware(request: Request, call_next):
     origin = request.headers.get("origin", "")
@@ -48,10 +79,7 @@ async def cors_middleware(request: Request, call_next):
     allowed_origins = get_env_list("BACKEND_CORS_ORIGINS", [])
     allowed_suffixes = get_env_list("BACKEND_CORS_ALLOWED_SUFFIXES", [".replit.dev", ".replit.app", "localhost", "127.0.0.1"])
 
-    is_allowed = origin and (
-        origin in allowed_origins 
-        or any(origin.endswith(s) or s in origin for s in allowed_suffixes)
-    )
+    is_allowed = is_origin_allowed(origin, allowed_origins, allowed_suffixes)
 
     # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
@@ -132,21 +160,69 @@ async def _fetch(path: str, target_base: str, request: Request) -> httpx.Respons
 
 
 async def _proxy(path: str, target_base: str, request: Request) -> Response:
+    url = httpx.URL(target_base + path, params=request.query_params)
+    excluded_headers = {"host", "origin", "referer", "content-length"}
+    headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
+    body = await request.body()
+    
+    logger.info(f"Proxying {request.method} request to: {url}")
+    
+    # 120s connect/write timeout, infinite read timeout for SSE streams
+    client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0, read=None))
     try:
-        resp = await _fetch(path, target_base, request)
-        excluded = {"content-encoding", "transfer-encoding", "content-length"}
-        headers = {k: v for k, v in resp.headers.items() if k.lower() not in excluded}
-        return Response(
-            content=resp.content,
-            status_code=resp.status_code,
+        req = client.build_request(
+            method=request.method,
+            url=url,
             headers=headers,
-            media_type=resp.headers.get("content-type"),
+            content=body,
         )
+        upstream_resp = await client.send(req, stream=True, follow_redirects=True)
+        
+        excluded_resp = {"content-encoding", "transfer-encoding", "content-length"}
+        resp_headers = {k: v for k, v in upstream_resp.headers.items() if k.lower() not in excluded_resp}
+        content_type = upstream_resp.headers.get("content-type", "")
+        
+        is_stream = "text/event-stream" in content_type or path.endswith("/stream")
+        
+        if is_stream:
+            # Prevent buffering in reverse proxies (Caddy, Nginx)
+            resp_headers["X-Accel-Buffering"] = "no"
+            resp_headers["Cache-Control"] = "no-cache, no-transform"
+            
+            async def body_stream():
+                try:
+                    async for chunk in upstream_resp.aiter_raw():
+                        yield chunk
+                finally:
+                    await upstream_resp.aclose()
+                    await client.aclose()
+            
+            return StreamingResponse(
+                body_stream(),
+                status_code=upstream_resp.status_code,
+                headers=resp_headers,
+                media_type=content_type or "text/event-stream",
+            )
+        else:
+            try:
+                content = await upstream_resp.aread()
+            finally:
+                await upstream_resp.aclose()
+                await client.aclose()
+                
+            return Response(
+                content=content,
+                status_code=upstream_resp.status_code,
+                headers=resp_headers,
+                media_type=content_type,
+            )
     except httpx.RequestError as e:
+        await client.aclose()
         error_msg = f"Network error proxying to {target_base}{path}: {e}"
         logger.error(error_msg, exc_info=True)
         return JSONResponse(status_code=502, content={"detail": f"Bad Gateway: {e.__class__.__name__} - {str(e)}"})
     except Exception as e:
+        await client.aclose()
         error_msg = f"Unexpected error proxying to {target_base}{path}: {e}"
         logger.error(error_msg, exc_info=True)
         return JSONResponse(status_code=500, content={"detail": f"Internal Gateway Server Error: {e.__class__.__name__} - {str(e)}"})
