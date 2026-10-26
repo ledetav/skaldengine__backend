@@ -161,7 +161,16 @@ class PromptPipeline:
 
         # Проверяем, есть ли эпизодическая память (RAG) для этого чата
         has_episodes = False
-        memo_check_query = select(EpisodicMemory.id).where(EpisodicMemory.chat_id == self.chat_id).limit(1)
+        memo_check_query = (
+            select(EpisodicMemory.id)
+            .where(
+                and_(
+                    EpisodicMemory.chat_id == self.chat_id,
+                    EpisodicMemory.summary != rag.EMPTY_FACTS_SENTINEL
+                )
+            )
+            .limit(1)
+        )
         memo_vec_res = await self.db.execute(memo_check_query)
         if memo_vec_res.scalar():
             has_episodes = True
@@ -286,6 +295,7 @@ class PromptPipeline:
             .where(and_(
                 EpisodicMemory.chat_id == self.chat_id,
                 EpisodicMemory.message_id.in_(ancestor_ids),
+                EpisodicMemory.summary != rag.EMPTY_FACTS_SENTINEL,
                 distance < max_distance
             ))
             .order_by(distance.asc())
@@ -312,7 +322,8 @@ class PromptPipeline:
         best_memories = scored_candidates[:5]
         
         for _, m in best_memories:
-            self.memories.append(m.summary)
+            if m.summary != rag.EMPTY_FACTS_SENTINEL:
+                self.memories.append(m.summary)
 
     async def _stage_4_scenario(self):
         """Этап 4: Получение текущей сценарной цели (Supervisor)."""
