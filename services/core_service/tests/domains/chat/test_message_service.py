@@ -1,3 +1,7 @@
+"""
+Модульные тесты для сервиса обработки сообщений (MessageService).
+"""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -12,11 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.fixture
 def mock_repo():
+    """Фикстура мока MessageRepository."""
     return AsyncMock()
 
 
 @pytest.fixture
 def message_service(mock_repo):
+    """Фикстура экземпляра MessageService."""
     return MessageService(repository=mock_repo)
 
 
@@ -26,6 +32,7 @@ def message_service(mock_repo):
 async def test_send_message_stream_scenario_does_not_call_director_prematurely(
     mock_pipeline_cls, mock_stream_func, message_service
 ):
+    """Тест отправки сообщения в сценарном режиме без преждевременного вызова Режиссера."""
     chat_id = uuid4()
     user_id = uuid4()
 

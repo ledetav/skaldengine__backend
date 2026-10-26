@@ -1,3 +1,7 @@
+"""
+Модели данных сообщений ролевого диалога (Message) с древовидной структурой веток.
+"""
+
 import uuid
 from datetime import datetime
 from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime, Index
@@ -9,7 +13,7 @@ from app.db.base import Base
 
 class Message(Base):
     """
-    Сообщения чата. Поддерживает древовидную структуру (parent_id).
+    Сообщения чата. Поддерживает древовидную структуру ветвления (parent_id).
     """
     __tablename__ = "messages"
 

@@ -1,3 +1,7 @@
+"""
+Административный роутер для управления справочниками мира (Lorebook) и их записями.
+"""
+
 import uuid
 from fastapi import APIRouter, Depends, status
 

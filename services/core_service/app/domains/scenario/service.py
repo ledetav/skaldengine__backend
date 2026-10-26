@@ -1,3 +1,7 @@
+"""
+Сервисный слой для бизнес-логики сценариев (Scenario).
+"""
+
 from typing import Optional, List
 from uuid import UUID
 from shared.base.service import BaseService
@@ -5,14 +9,22 @@ from .repository import ScenarioRepository
 from .models import Scenario
 from app.domains.scenario.schemas import ScenarioCreate, ScenarioUpdate
 
+
 class ScenarioService(BaseService[ScenarioRepository]):
+    """
+    Сервис сценариев: создание, обновление, удаление и уведомление клиентов
+    через систему WebSocket-бродкаста.
+    """
     async def get_scenarios(self, skip: int = 0, limit: int = 100) -> List[Scenario]:
+        """Получить список сценариев с пагинацией."""
         return await self.repository.get_multi_with_counts(skip=skip, limit=limit)
 
     async def get_by_character(self, character_id: UUID) -> List[Scenario]:
+        """Получить сценарии персонажа."""
         return await self.repository.get_by_character(character_id)
 
     async def create_scenario(self, scenario_in: ScenarioCreate) -> Scenario:
+        """Создать сценарий и разослать событие NEW_SCENARIO через WebSocket."""
         scenario = await self.repository.create(obj_in=scenario_in)
         scenario.chats_count = 0
         
@@ -34,12 +46,13 @@ class ScenarioService(BaseService[ScenarioRepository]):
         return scenario
 
     async def update_scenario(self, scenario_id: UUID, scenario_update: ScenarioUpdate) -> Optional[Scenario]:
+        """Обновить сценарий и разослать событие UPDATE_SCENARIO."""
         scenario = await self.repository.get(scenario_id)
         if not scenario:
             return None
         updated_obj = await self.repository.update(db_obj=scenario, obj_in=scenario_update)
         
-        # Fetch with count after update to be sure
+        # Загрузка актуального объекта со счетчиком после обновления
         updated = await self.repository.get_with_count(scenario_id)
         
         from app.core.broadcast import manager
@@ -61,6 +74,7 @@ class ScenarioService(BaseService[ScenarioRepository]):
         return updated
 
     async def delete_scenario(self, scenario_id: UUID) -> bool:
+        """Удалить сценарий и разослать событие DELETE_SCENARIO."""
         scenario = await self.repository.get(scenario_id)
         if not scenario:
             return False
@@ -72,3 +86,4 @@ class ScenarioService(BaseService[ScenarioRepository]):
             "data": {"id": str(scenario_id)}
         })
         return True
+

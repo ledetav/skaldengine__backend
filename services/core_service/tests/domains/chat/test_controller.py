@@ -1,3 +1,7 @@
+"""
+Модульные тесты для контроллера чатов (ChatController).
+"""
+
 import pytest
 import uuid
 from unittest.mock import AsyncMock, MagicMock
@@ -8,20 +12,28 @@ from app.domains.chat.service import ChatService
 from shared.schemas.response import BaseResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 @pytest.fixture
 def chat_service_mock():
+    """Фикстура мока ChatService."""
     return AsyncMock(spec=ChatService)
+
 
 @pytest.fixture
 def db_session_mock():
+    """Фикстура мока сессии базы данных AsyncSession."""
     return AsyncMock(spec=AsyncSession)
+
 
 @pytest.fixture
 def controller(chat_service_mock):
+    """Фикстура экземпляра ChatController с мок-сервисом."""
     return ChatController(chat_service=chat_service_mock)
+
 
 @pytest.mark.asyncio
 async def test_get_history_success(controller, chat_service_mock, db_session_mock):
+    """Тест успешного получения истории сообщений чата."""
     # Arrange
     chat_id = uuid.uuid4()
     user_id = uuid.uuid4()

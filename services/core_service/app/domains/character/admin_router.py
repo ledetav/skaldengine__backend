@@ -1,3 +1,7 @@
+"""
+Административный роутер для управления персонажами и загрузки медиа-файлов.
+"""
+
 import uuid
 from fastapi import APIRouter, Depends, status, UploadFile, File
 

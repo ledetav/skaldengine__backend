@@ -1,3 +1,7 @@
+"""
+Роутер эндпоинтов для управления персонами пользователей (UserPersona).
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 

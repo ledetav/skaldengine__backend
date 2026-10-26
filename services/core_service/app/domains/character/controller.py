@@ -1,20 +1,30 @@
+"""
+Контроллер API для работы с персонажами (Character).
+"""
+
 from typing import List, Optional, Any
 from uuid import UUID
+import httpx
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import CharacterService
 from app.domains.lorebook.service import LorebookService
 from app.domains.character.schemas import CharacterCreate, CharacterUpdate, CharacterRead, CharacterAdminRead
 from shared.schemas.response import BaseResponse
-import httpx
 from app.core.config import settings
 
+
 class CharacterController(BaseController):
+    """
+    Контроллер запросов для управления персонажами: чтение каталога,
+    создание, редактирование, удаление, загрузка изображений и обогащение авторами.
+    """
     def __init__(self, character_service: CharacterService, lorebook_service: LorebookService):
         self.character_service = character_service
         self.lorebook_service = lorebook_service
 
     async def get_characters(self, skip: int = 0, limit: int = 20, is_admin: bool = False) -> BaseResponse:
+        """Получить список персонажей с фильтрацией по правам доступа и обогащением авторами."""
         characters, total = await self.character_service.get_characters(skip, limit, is_admin=is_admin)
         schema = CharacterAdminRead if is_admin else CharacterRead
         # Приводим к соответствующим схемам для фильтрации полей
@@ -26,6 +36,7 @@ class CharacterController(BaseController):
         return self.handle_success(data={"items": items, "total": total})
 
     async def get_character(self, character_id: UUID, is_admin: bool = False) -> BaseResponse:
+        """Получить персонажа по ID с обогащением данными автора."""
         character = await self.character_service.get_character(character_id, is_admin=is_admin)
         if not character:
             self.handle_error("Character not found", status_code=status.HTTP_404_NOT_FOUND)
@@ -63,6 +74,7 @@ class CharacterController(BaseController):
             logging.getLogger("core").error(f"Failed to enrich characters with authors: {e}")
 
     async def create_character(self, character_in: CharacterCreate, user_id: UUID, is_admin: bool = False) -> BaseResponse:
+        """Создать персонажа с проверкой фандомного лорбука для модераторов."""
         # Если это не админ (модератор), проверяем наличие фандомного лорбука
         if not is_admin and character_in.fandom:
             fandom_lb = await self.lorebook_service.get_fandom_lorebook(character_in.fandom)
@@ -78,6 +90,7 @@ class CharacterController(BaseController):
         return self.handle_success(data=CharacterAdminRead.model_validate(character))
 
     async def update_character(self, character_id: UUID, character_update: CharacterUpdate, user_id: UUID, is_admin: bool = False) -> BaseResponse:
+        """Обновить данные персонажа с проверкой прав."""
         creator_id = None if is_admin else user_id
         character = await self.character_service.update_character(character_id, character_update, creator_id)
         if not character:
@@ -87,6 +100,7 @@ class CharacterController(BaseController):
         return self.handle_success(data=schema.model_validate(character))
 
     async def delete_character(self, character_id: UUID, user_id: UUID, is_admin: bool = False) -> BaseResponse:
+        """Удалить персонажа."""
         creator_id = None if is_admin else user_id
         success = await self.character_service.delete_character(character_id, creator_id)
         if not success:
@@ -94,6 +108,7 @@ class CharacterController(BaseController):
         return self.handle_success(data=None)
 
     async def upload_images(self, character_id: UUID, avatar_file: Any = None, card_file: Any = None) -> BaseResponse:
+        """Загрузить аватар и/или карту персонажа."""
         character = await self.character_service.repository.get(character_id)
         if not character:
             self.handle_error("Character not found", status_code=status.HTTP_404_NOT_FOUND)
@@ -117,3 +132,4 @@ class CharacterController(BaseController):
             await self.character_service.update_character(character_id, CharacterUpdate(**update_data))
             
         return self.handle_success(data=response_urls)
+

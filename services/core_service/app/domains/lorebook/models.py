@@ -1,24 +1,28 @@
+"""
+Модели данных справочников мира (Lorebook) и их записей (LorebookEntry).
+"""
+
 import uuid
-from sqlalchemy import String, Text, Integer, ForeignKey, ARRAY, Index, DateTime, Boolean
+from datetime import datetime
+import enum
+from sqlalchemy import String, Text, Integer, ForeignKey, ARRAY, Index, DateTime, Boolean, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from datetime import datetime
 
 from app.db.base import Base
 
 
-import enum
-from sqlalchemy import Enum
-
 class LorebookType(str, enum.Enum):
+    """Тип лорбука: фандомный, персонажа или персоны пользователя."""
     FANDOM = "fandom"
     CHARACTER = "character"
     PERSONA = "persona"
 
+
 class Lorebook(Base):
     """
     Справочник мира — контейнер для лор-записей.
-    Может быть привязан к персонажу или к фандому целиком.
+    Может быть привязан к персонажу, персоне или к фандому целиком.
     """
     __tablename__ = "lorebooks"
 
