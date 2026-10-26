@@ -110,3 +110,40 @@ async def test_stage_3_rag_exits_early_when_no_query_vector(mock_db, current_use
 
     assert pipeline.memories == []
     mock_db.execute.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_stage_3_rag_filters_out_empty_facts_sentinel(mock_db, current_user):
+    from app.core.rag import EMPTY_FACTS_SENTINEL
+
+    chat_id = uuid4()
+    parent_id = uuid4()
+
+    pipeline = PromptPipeline(db=mock_db, chat_id=chat_id, current_user=current_user, parent_id=parent_id)
+    pipeline.query_vector = [0.1] * 1536
+
+    cte_scalars = MagicMock()
+    cte_scalars.all.return_value = [parent_id]
+    cte_result = MagicMock()
+    cte_result.scalars.return_value = cte_scalars
+
+    sentinel_mem = MagicMock(spec=EpisodicMemory)
+    sentinel_mem.summary = EMPTY_FACTS_SENTINEL
+
+    real_mem = MagicMock(spec=EpisodicMemory)
+    real_mem.summary = "A genuine fact from the past."
+
+    now = datetime.now(timezone.utc)
+    rag_result = MagicMock()
+    rag_result.all.return_value = [
+        (sentinel_mem, 0.20, now),
+        (real_mem, 0.30, now),
+    ]
+
+    mock_db.execute.side_effect = [cte_result, rag_result]
+
+    await pipeline._stage_3_rag(user_text="What happened?")
+
+    assert len(pipeline.memories) == 1
+    assert pipeline.memories[0] == "A genuine fact from the past."
+    assert EMPTY_FACTS_SENTINEL not in pipeline.memories
