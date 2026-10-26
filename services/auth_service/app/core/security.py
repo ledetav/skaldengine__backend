@@ -13,7 +13,6 @@ class TokenPayload:
     username: str | None = None
     full_name: str | None = None
     birth_date: Union[datetime, Any] = None
-    polza_api_key: str | None = None
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -39,8 +38,6 @@ def create_access_token(
         to_encode["full_name"] = payload.full_name
     if payload.birth_date:
         to_encode["birth_date"] = payload.birth_date.isoformat() if hasattr(payload.birth_date, 'isoformat') else str(payload.birth_date)
-    if payload.polza_api_key:
-        to_encode["polza_api_key"] = payload.polza_api_key
         
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt

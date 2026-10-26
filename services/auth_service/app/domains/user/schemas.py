@@ -36,7 +36,6 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    polza_api_key: str | None = None
 
     @field_validator("password")
     @classmethod
@@ -102,7 +101,6 @@ class ProfileUpdate(BaseModel):
     avatar_url: str | None = None
     cover_url: str | None = None
     about: str | None = Field(default=None, max_length=500)
-    polza_api_key: str | None = None
 
 
 class UserUpdate(BaseModel):
@@ -113,7 +111,6 @@ class UserUpdate(BaseModel):
     about: str | None = Field(default=None, max_length=500)
     avatar_url: str | None = None
     cover_url: str | None = None
-    polza_api_key: str | None = None
 
     @field_validator("login")
     @classmethod
@@ -149,7 +146,6 @@ class UserResponse(UserBase):
     role: str
     avatar_url: str | None = None
     cover_url: str | None = None
-    polza_api_key: str | None = None
     created_at: datetime
 
     class Config:
