@@ -8,6 +8,8 @@ from app.core.config import settings
 # Polza client (OpenAI wrapper) default instance
 _default_client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
+EMPTY_FACTS_SENTINEL = "[NO_FACTS]"
+
 
 async def get_embedding(text: str, api_key: Optional[str] = None) -> list[float]:
     """
@@ -118,21 +120,37 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
             except json.JSONDecodeError:
                 facts = []
             
+            saved_any = False
             for fact_text in facts:
-                if not fact_text.strip():
+                if not isinstance(fact_text, str):
+                    continue
+                clean_fact = fact_text.strip()
+                if not clean_fact:
                     continue
                     
-                embedding = await get_embedding(fact_text, api_key=api_key)
+                embedding = await get_embedding(clean_fact, api_key=api_key)
                 if embedding:
                     mem = EpisodicMemory(
                         chat_id=chat_id,
                         message_id=chunk_to_process[-1].id,
-                        summary=fact_text,
+                        summary=clean_fact,
                         embedding=embedding
                     )
                     db.add(mem)
+                    saved_any = True
             
-            if facts:
-                await db.commit()
+            if not saved_any:
+                # Mark chunk as processed with sentinel so we don't re-summarize in an infinite loop
+                dummy_vector = [0.0] * 1536
+                dummy_vector[0] = 1.0
+                sentinel_mem = EpisodicMemory(
+                    chat_id=chat_id,
+                    message_id=chunk_to_process[-1].id,
+                    summary=EMPTY_FACTS_SENTINEL,
+                    embedding=dummy_vector
+                )
+                db.add(sentinel_mem)
+
+            await db.commit()
         except Exception as e:
             print(f"[RAG] Error in process_sliding_window: {e}")
