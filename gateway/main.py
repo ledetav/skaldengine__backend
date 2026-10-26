@@ -1,25 +1,19 @@
-import os
-import json
-import logging
-from urllib.parse import urlsplit
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, Response, JSONResponse, StreamingResponse
+import traceback
+from fastapi import FastAPI, Request, WebSocket
+from fastapi.responses import JSONResponse
 import httpx
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("gateway")
-
-AUTH_BASE = os.getenv("AUTH_BASE_URL", "http://127.0.0.1:8001")
-CORE_BASE = os.getenv("CORE_BASE_URL", "http://127.0.0.1:8000")
-
-
-AUTH_PREFIXES = ("/api/v1/auth", "/api/v1/users")
+from gateway.config import AUTH_BASE, CORE_BASE, AUTH_PREFIXES, logger
+from gateway.cors import is_origin_allowed, cors_middleware
+from gateway.proxy import _fetch, _proxy, _proxy_docs
+from gateway.websocket import websocket_proxy_handler
+from gateway.routers import system_router, docs_router
 
 app = FastAPI(title="SKALD Gateway", docs_url=None)
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    import traceback
     logger.error(f"GATEWAY ERROR on {request.method} {request.url.path}: {str(exc)}")
     traceback.print_exc()
     return JSONResponse(
@@ -28,260 +22,15 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# ── Custom CORS Middleware ─────────────────────────────────────────────────────
-# Fully configurable via environment variables.
+# Регистрируем CORS middleware
+app.middleware("http")(cors_middleware)
 
-def get_env_list(key, default):
-    raw = os.getenv(key, "")
-    if not raw:
-        return default
-    try:
-        data = json.loads(raw)
-        return data if isinstance(data, list) else [data]
-    except:
-        return [raw]
-
-def is_origin_allowed(origin: str, allowed_origins: list, allowed_suffixes: list) -> bool:
-    if not origin:
-        return False
-    if origin in allowed_origins:
-        return True
-    try:
-        parsed = urlsplit(origin)
-        hostname = (parsed.hostname or "").lower()
-    except Exception:
-        return False
-
-    if not hostname:
-        return False
-
-    if hostname in allowed_origins or hostname in ("localhost", "127.0.0.1"):
-        return True
-
-    for suffix in allowed_suffixes:
-        clean_suffix = suffix.lower()
-        if clean_suffix in ("localhost", "127.0.0.1"):
-            if hostname == clean_suffix:
-                return True
-        else:
-            if not clean_suffix.startswith("."):
-                clean_suffix = "." + clean_suffix
-            if hostname.endswith(clean_suffix):
-                return True
-
-    return False
-
-@app.middleware("http")
-async def cors_middleware(request: Request, call_next):
-    origin = request.headers.get("origin", "")
-    
-    # Load settings from environment on every request (allows changes in Replit Secrets)
-    allowed_origins = get_env_list("BACKEND_CORS_ORIGINS", [])
-    allowed_suffixes = get_env_list("BACKEND_CORS_ALLOWED_SUFFIXES", [".replit.dev", ".replit.app", "localhost", "127.0.0.1"])
-
-    is_allowed = is_origin_allowed(origin, allowed_origins, allowed_suffixes)
-
-    # Handle preflight OPTIONS request
-    if request.method == "OPTIONS":
-        response = Response(status_code=200)
-        if is_allowed:
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Access-Control-Max-Age"] = "600"
-        return response
-
-    response = await call_next(request)
-
-    if is_allowed:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-
-    return response
+# Подключаем роутеры системных и документационных эндпоинтов
+app.include_router(system_router)
+app.include_router(docs_router)
 
 
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "service": "gateway"}
-
-
-@app.get("/debug/health")
-async def debug_health():
-    """Check connectivity to all backend services."""
-    import asyncio
-    results = {}
-    for name, base in [("auth", AUTH_BASE), ("core", CORE_BASE)]:
-        try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                r = await client.get(f"{base}/health")
-                results[name] = {"status": "ok", "http_status": r.status_code, "url": base}
-        except httpx.ConnectError as e:
-            results[name] = {"status": "unreachable", "error": "Connection refused — service is down", "url": base}
-        except Exception as e:
-            results[name] = {"status": "error", "error": str(e), "url": base}
-    overall = "ok" if all(v["status"] == "ok" for v in results.values()) else "degraded"
-    return {"gateway": "ok", "services": results, "overall": overall}
-
-
-@app.get("/")
-def root():
-    return {
-        "status": "ok",
-        "service": "skald-engine",
-        "docs": {
-            "auth": "/auth/docs",
-            "core": "/core/docs",
-        }
-    }
-
-
-async def _fetch(path: str, target_base: str, request: Request) -> httpx.Response:
-    url = httpx.URL(target_base + path, params=request.query_params)
-    # Remove host, origin and referer to make it look like a clean internal request
-    excluded_headers = {"host", "origin", "referer"}
-    headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
-    body = await request.body()
-    
-    logger.info(f"Proxying {request.method} request to: {url}")
-    
-    async with httpx.AsyncClient(timeout=120) as client:
-        return await client.request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            content=body,
-            follow_redirects=True,
-        )
-
-
-async def _proxy(path: str, target_base: str, request: Request) -> Response:
-    url = httpx.URL(target_base + path, params=request.query_params)
-    excluded_headers = {"host", "origin", "referer", "content-length"}
-    headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
-    body = await request.body()
-    
-    logger.info(f"Proxying {request.method} request to: {url}")
-    
-    # 120s connect/write timeout, infinite read timeout for SSE streams
-    client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0, read=None))
-    try:
-        req = client.build_request(
-            method=request.method,
-            url=url,
-            headers=headers,
-            content=body,
-        )
-        upstream_resp = await client.send(req, stream=True, follow_redirects=True)
-        
-        excluded_resp = {"content-encoding", "transfer-encoding", "content-length"}
-        resp_headers = {k: v for k, v in upstream_resp.headers.items() if k.lower() not in excluded_resp}
-        content_type = upstream_resp.headers.get("content-type", "")
-        
-        is_stream = "text/event-stream" in content_type or path.endswith("/stream")
-        
-        if is_stream:
-            # Prevent buffering in reverse proxies (Caddy, Nginx)
-            resp_headers["X-Accel-Buffering"] = "no"
-            resp_headers["Cache-Control"] = "no-cache, no-transform"
-            
-            async def body_stream():
-                try:
-                    async for chunk in upstream_resp.aiter_raw():
-                        yield chunk
-                finally:
-                    await upstream_resp.aclose()
-                    await client.aclose()
-            
-            return StreamingResponse(
-                body_stream(),
-                status_code=upstream_resp.status_code,
-                headers=resp_headers,
-                media_type=content_type or "text/event-stream",
-            )
-        else:
-            try:
-                content = await upstream_resp.aread()
-            finally:
-                await upstream_resp.aclose()
-                await client.aclose()
-                
-            return Response(
-                content=content,
-                status_code=upstream_resp.status_code,
-                headers=resp_headers,
-                media_type=content_type,
-            )
-    except httpx.RequestError as e:
-        await client.aclose()
-        error_msg = f"Network error proxying to {target_base}{path}: {e}"
-        logger.error(error_msg, exc_info=True)
-        return JSONResponse(status_code=502, content={"detail": f"Bad Gateway: {e.__class__.__name__} - {str(e)}"})
-    except Exception as e:
-        await client.aclose()
-        error_msg = f"Unexpected error proxying to {target_base}{path}: {e}"
-        logger.error(error_msg, exc_info=True)
-        return JSONResponse(status_code=500, content={"detail": f"Internal Gateway Server Error: {e.__class__.__name__} - {str(e)}"})
-
-
-async def _proxy_docs(docs_path: str, openapi_path: str,
-                      target_base: str, prefix: str, request: Request) -> Response:
-    try:
-        resp = await _fetch(docs_path, target_base, request)
-        html = resp.text
-        # Rewrite the openapi.json URL so the browser fetches it through the gateway
-        html = html.replace(
-            f"url: '{openapi_path}'",
-            f"url: '/{prefix}{openapi_path}'"
-        )
-        return HTMLResponse(content=html, status_code=resp.status_code)
-    except Exception as e:
-        error_msg = f"Error proxying docs for {target_base}{docs_path}: {e}"
-        logger.error(error_msg, exc_info=True)
-        return JSONResponse(status_code=502, content={"detail": f"Docs Gateway Error: {e.__class__.__name__} - {str(e)}"})
-
-
-# ── Auth docs ────────────────────────────────────────────────────────────────
-
-@app.get("/auth/docs", include_in_schema=False)
-async def auth_docs(request: Request):
-    return await _proxy_docs(
-        docs_path="/docs",
-        openapi_path="/api/v1/openapi.json",
-        target_base=AUTH_BASE,
-        prefix="auth",
-        request=request,
-    )
-
-
-@app.get("/auth/api/v1/openapi.json", include_in_schema=False)
-async def auth_openapi(request: Request):
-    return await _proxy("/api/v1/openapi.json", AUTH_BASE, request)
-
-
-# ── Core docs ────────────────────────────────────────────────────────────────
-
-@app.get("/core/docs", include_in_schema=False)
-async def core_docs(request: Request):
-    return await _proxy_docs(
-        docs_path="/docs",
-        openapi_path="/api/v1/openapi.json",
-        target_base=CORE_BASE,
-        prefix="core",
-        request=request,
-    )
-
-
-@app.get("/core/api/v1/openapi.json", include_in_schema=False)
-async def core_openapi(request: Request):
-    return await _proxy("/api/v1/openapi.json", CORE_BASE, request)
-
-
-# ── API proxy ────────────────────────────────────────────────────────────────
+# ── Проксирование общих API запросов ──────────────────────────────────────────
 
 @app.api_route(
     "/api/v1/{path:path}",
@@ -293,72 +42,13 @@ async def api_proxy(request: Request, path: str):
     return await _proxy(full_path, target, request)
 
 
-
 @app.api_route("/static/{path:path}", methods=["GET"])
 async def static_proxy(request: Request, path: str):
     return await _proxy("/static/" + path, CORE_BASE, request)
 
 
-# ── WebSocket proxy ───────────────────────────────────────────────────────────
-
-from fastapi import WebSocket, WebSocketDisconnect
-import websockets as ws_lib
-
-def _ws_url(http_base: str, path: str) -> str:
-    """Convert http(s):// base URL to ws(s):// for WebSocket connections."""
-    base = http_base.replace("https://", "wss://").replace("http://", "ws://")
-    return base.rstrip("/") + path
-
+# ── Проксирование WebSocket соединений ────────────────────────────────────────
 
 @app.websocket("/api/v1/ws/{path:path}")
 async def websocket_proxy(websocket: WebSocket, path: str):
-    """Proxy WebSocket connections through to the core service."""
-    target_url = _ws_url(CORE_BASE, f"/api/v1/ws/{path}")
-
-    # Forward query params (e.g. ?token=...)
-    if websocket.query_params:
-        qs = "&".join(f"{k}={v}" for k, v in websocket.query_params.items())
-        target_url = f"{target_url}?{qs}"
-
-    # Forward Authorization header if present
-    extra_headers = {}
-    if auth := websocket.headers.get("authorization"):
-        extra_headers["Authorization"] = auth
-
-    logger.info(f"WS proxy: {target_url}")
-
-    try:
-        async with ws_lib.connect(target_url, additional_headers=extra_headers) as backend_ws:
-            await websocket.accept()
-
-            async def client_to_backend():
-                try:
-                    while True:
-                        data = await websocket.receive_text()
-                        await backend_ws.send(data)
-                except (WebSocketDisconnect, Exception):
-                    pass
-
-            async def backend_to_client():
-                try:
-                    async for message in backend_ws:
-                        if isinstance(message, str):
-                            await websocket.send_text(message)
-                        else:
-                            await websocket.send_bytes(message)
-                except Exception:
-                    pass
-
-            import asyncio
-            await asyncio.gather(client_to_backend(), backend_to_client())
-
-    except ws_lib.exceptions.WebSocketException as e:
-        logger.error(f"WS proxy error connecting to {target_url}: {e}")
-        await websocket.close(code=1011, reason="Backend WebSocket unavailable")
-    except Exception as e:
-        logger.error(f"WS proxy unexpected error: {e}")
-        try:
-            await websocket.close(code=1011)
-        except Exception:
-            pass
-
+    await websocket_proxy_handler(websocket, path)
