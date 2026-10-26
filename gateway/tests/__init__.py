@@ -1,1 +1,1 @@
-# Gateway tests package
+# Пакет тестов для API Gateway

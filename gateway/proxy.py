@@ -1,3 +1,8 @@
+"""Модуль HTTP-проксирования для API Gateway.
+
+Обеспечивает перенаправление обычных HTTP-запросов, проксирование Swagger UI,
+а также передачу потоковых ответов Server-Sent Events (SSE) без буферизации.
+"""
 from fastapi import Request
 from fastapi.responses import HTMLResponse, Response, JSONResponse, StreamingResponse
 import httpx
@@ -36,7 +41,7 @@ async def _proxy(path: str, target_base: str, request: Request) -> Response:
 
     logger.info(f"Proxying {request.method} request to: {url}")
 
-    # 120s connect/write timeout, infinite read timeout for SSE streams
+    # Таймаут подключения 10 сек, таймаут записи 120 сек, бесконечный таймаут чтения для SSE потоков
     client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0, read=None))
     try:
         req = client.build_request(
