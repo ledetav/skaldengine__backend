@@ -80,8 +80,7 @@ class MessageService(BaseService[MessageRepository]):
 
         # Streaming
         from app.api.endpoints.stream_utils import generate_chat_stream
-        from app.core.config import settings
-        state = {"polza_api_key": current_user.polza_api_key or settings.POLZA_API_KEY}
+        state = {}
 
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
@@ -116,8 +115,7 @@ class MessageService(BaseService[MessageRepository]):
         await db.refresh(ai_msg)
 
         from app.api.endpoints.stream_utils import generate_chat_stream
-        from app.core.config import settings
-        state = {"polza_api_key": current_user.polza_api_key or settings.POLZA_API_KEY}
+        state = {}
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
     async def edit_message(self, message_id: UUID, new_content: str, user_id: UUID, db: AsyncSession) -> Message:

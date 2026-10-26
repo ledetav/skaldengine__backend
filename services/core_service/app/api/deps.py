@@ -46,7 +46,6 @@ class CurrentUser(BaseModel):
     username: str | None = None
     full_name: str | None = None
     birth_date: date | None = None
-    polza_api_key: str | None = None
 
 security = HTTPBearer()
 
@@ -79,8 +78,7 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
             login=payload.get("login"),
             username=payload.get("username"),
             full_name=payload.get("full_name"),
-            birth_date=birth_date_val,
-            polza_api_key=payload.get("polza_api_key")
+            birth_date=birth_date_val
         )
     except (JWTError, ValueError):
         raise HTTPException(status_code=403, detail="Could not validate credentials")

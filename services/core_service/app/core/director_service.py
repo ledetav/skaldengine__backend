@@ -14,9 +14,8 @@ from app.domains.chat.message_models import Message
 from app.domains.chat.models import ChatCheckpoint
 
 class DirectorService:
-    def __init__(self, api_key: Optional[str] = None):
-        key = api_key or settings.POLZA_API_KEY
-        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=key)
+    def __init__(self):
+        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
     async def initialize_scenario(self, chat_id: uuid.UUID, checkpoints_count: int = 3):
         """Фаза 1: Генерация маршрута (чекпоинтов) при создании чата."""
@@ -190,11 +189,10 @@ Example: "Character A admits their secret to Character B." or "The group reaches
     async def check_progress(
         self,
         chat_id: uuid.UUID,
-        leaf_id: Optional[uuid.UUID] = None,
-        api_key: Optional[str] = None
+        leaf_id: Optional[uuid.UUID] = None
     ):
         """Фаза 2: Фоновый мониторинг (The Watcher Loop)."""
-        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else self.client
+        client = self.client
 
         async with AsyncSessionLocal() as db:
             # 1. Берем текущую активную цель

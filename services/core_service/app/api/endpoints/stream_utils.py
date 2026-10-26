@@ -25,8 +25,7 @@ async def generate_chat_stream(
     buffer = ""
 
     try:
-        api_key = state.get("polza_api_key") or settings.POLZA_API_KEY
-        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key)
+        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
         response_stream = await client.chat.completions.create(**payload)
         
         async for chunk in response_stream:
@@ -133,8 +132,7 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
         
         # 1. RAG Memory (Sliding Window Ingestion)
         try:
-            api_key = state.get("polza_api_key")
-            await rag.process_sliding_window(db, chat_id, ai_msg_id, api_key=api_key)
+            await rag.process_sliding_window(db, chat_id, ai_msg_id)
         except Exception as e:
             print(f"[RAG] Error adding to memory: {e}")
             
@@ -147,7 +145,7 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
             )
             checkpoint = res.scalars().first()
             if checkpoint and checkpoint.messages_spent > 0 and checkpoint.messages_spent % 3 == 0:
-                director = DirectorService(api_key=api_key)
-                await director.check_progress(chat_id, leaf_id=ai_msg_id, api_key=api_key)
+                director = DirectorService()
+                await director.check_progress(chat_id, leaf_id=ai_msg_id)
         except Exception as e:
             print(f"[Supervisor] Error checking progress: {e}")

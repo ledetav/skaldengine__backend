@@ -11,12 +11,12 @@ _default_client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settin
 EMPTY_FACTS_SENTINEL = "[NO_FACTS]"
 
 
-async def get_embedding(text: str, api_key: Optional[str] = None) -> list[float]:
+async def get_embedding(text: str) -> list[float]:
     """
     Асинхронная генерация эмбеддинга (1536-dim) через text-embedding-3-small.
     Используется для сохранения воспоминаний.
     """
-    client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else _default_client
+    client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
     try:
         response = await client.embeddings.create(
             model=settings.POLZA_EMBEDDING_MODEL,
@@ -30,11 +30,11 @@ async def get_embedding(text: str, api_key: Optional[str] = None) -> list[float]
         return []
 
 
-async def get_query_embedding(query: str, api_key: Optional[str] = None) -> list[float]:
+async def get_query_embedding(query: str) -> list[float]:
     """
     Асинхронная генерация эмбеддинга для поискового запроса.
     """
-    client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else _default_client
+    client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
     try:
         response = await client.embeddings.create(
             model=settings.POLZA_EMBEDDING_MODEL,
@@ -47,7 +47,7 @@ async def get_query_embedding(query: str, api_key: Optional[str] = None) -> list
         return []
 
 
-async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: uuid.UUID, api_key: Optional[str] = None):
+async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: uuid.UUID):
     from app.domains.chat.message_models import Message
     from app.domains.chat.models import EpisodicMemory
     
@@ -104,7 +104,7 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
 """
         
         try:
-            client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else _default_client
+            client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
             response = await client.chat.completions.create(
                 model=settings.POLZA_SUMMARY_MODEL,
                 messages=[{"role": "user", "content": prompt}],
@@ -128,7 +128,7 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
                 if not clean_fact:
                     continue
                     
-                embedding = await get_embedding(clean_fact, api_key=api_key)
+                embedding = await get_embedding(clean_fact)
                 if embedding:
                     mem = EpisodicMemory(
                         chat_id=chat_id,
