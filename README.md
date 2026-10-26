@@ -1,86 +1,116 @@
 # SKALDEngine Backend
 
-**SKALD Engine** — высокопроизводительная платформа для интерактивного сторителлинга и ролевых игр с ИИ-персонажами. Построена с использованием **Предметно-ориентированного проектирования (Domain-Driven Design / Vertical Slices)** и оптимизирована для масштабируемости и использования в продакшене.
-
-## Архитектура
-
-Проект использует архитектуру **Vertical Slices** (Вертикальные срезы), где каждая бизнес-область изолирована в собственной директории. Все сервисы используют общую базовую логику в корневой папке `shared/`.
-
-- **services/auth_service/**: Авторизация, JWT и профили пользователей.
-- **services/core_service/**: Игровая логика, чаты, ИИ-персонажи, RAG и лорбуки.
-- **shared/**: Глобальные базовые классы для репозиториев, сервисов и контроллеров.
+**SKALD Engine** — высокопроизводительная платформа для интерактивного сторителлинга и ролевых игр с ИИ-персонажами. Архитектура построена на принципах **Vertical Slices (Domain-Driven Design)**, разделена на микросервисы и объединена через централизованный асинхронный шлюз **API Gateway**.
 
 ---
 
-## Развертывание локально
+## Архитектура проекта
 
-1. В терминале выполняем команды:
+```
+                         ┌─────────────────────────────────┐
+                         │   Caddy (TLS / Reverse Proxy)   │
+                         └────────────────┬────────────────┘
+                                          │
+                                          ▼
+                         ┌─────────────────────────────────┐
+                         │      Gateway (FastAPI: 8080)    │
+                         └───────┬─────────────────┬───────┘
+                                 │                 │
+               ┌─────────────────┘                 └─────────────────┐
+               ▼                                                     ▼
+┌───────────────────────────────┐                   ┌───────────────────────────────┐
+│  Auth Service (FastAPI: 8001) │                   │  Core Service (FastAPI: 8000) │
+├───────────────────────────────┤                   ├───────────────────────────────┤
+│ • Регистрация и JWT           │                   │ • AI-персонажи и сценарии     │
+│ • Профили пользователей       │                   │ • Древовидные чаты и форки    │
+│ • Роли (admin/moderator/user) │                   │ • Prompt Pipeline (6 стадий)  │
+│ • Управление персоналом       │                   │ • Гибридный RAG & Лорбуки     │
+└──────────────┬────────────────┘                   └───────────────┬───────────────┘
+               ▼                                                    ▼
+┌───────────────────────────────┐                   ┌───────────────────────────────┐
+│     PostgreSQL (auth-db)      │                   │     PostgreSQL + pgvector     │
+│          Порт: 5432           │                   │          Порт: 5433           │
+└───────────────────────────────┘                   └───────────────────────────────┘
+```
 
-    ```bash
-    docker compose up --build -d
-    make migrate-auth m="Actualize db structure"
-    make migrate-core m="Actualize db structure"
-    make upgrade-auth
-    make upgrade-core
-    ```
+### Компоненты системы
 
-2. Для просмотра логов
+1. **[gateway/](gateway/README.md)** (порт 8080):
+   - Единая точка входа в систему (Reverse Proxy на базе `httpx.AsyncClient`).
+   - Автоматическая маршрутизация запросов к `auth_service` (`/api/v1/auth`, `/api/v1/users`) и `core_service` (все остальные эндпоинты `/api/v1/*`).
+   - Двунаправленный прокси WebSocket (`/ws/updates`).
+   - Антибуферизация потоковых ответов LLM (SSE) для корректной передачи чанков через Caddy/Nginx (`X-Accel-Buffering: no`).
+   - Агрегированная Swagger-документация: `/docs`, `/auth/docs`, `/core/docs`.
+   - Подробнее: см. [Документацию Gateway](gateway/README.md).
 
-    ```bash
-    docker compose logs -f
-    # или через make:
-    make logs
-    ```
+2. **`services/auth_service/`** (порт 8001):
+   - Авторизация, регистрация, управление JWT-токенами.
+   - Профили пользователей, смена учетных данных, публичные хэндлы.
+   - Административный доступ и управление ролями.
 
-API доступен через шлюз Gateway по адресу <http://localhost:8080> (или через Caddy на <http://localhost>).
-Шлюз автоматически распределяет запросы между сервисами `auth` и `core`.
+3. **`services/core_service/`** (порт 8000):
+   - Игровой движок, диалоговые сессии, дерево сообщений (Swipe, Edit, Fork).
+   - **[Prompt Pipeline](services/core_service/app/core/prompt_pipeline/README.md)**: 6-стадийный конвейер сборки контекста (`IdentityStage`, `LorebookStage`, `RAGStage`, `ScenarioStage`, `HistoryStage`, `AssemblerStage`).
+   - **Гибридный RAG**: поиск по семантическому сходству в рекурсивном CTE дерева сообщений с временным затуханием (Hybrid Scoring).
+   - **Лорбуки**: стемминг ключевых слов через Aho-Corasick + pgvector embeddings.
+   - Режиссура сюжета (`DirectorService`) и генерация заголовков чатов.
+
+4. **`shared/`**:
+   - Базовые абстракции `BaseRepository`, `BaseService`, `BaseController`.
+   - Единый формат ответа `BaseResponse`.
+   - Централизованное логирование и обработчики исключений.
 
 ---
 
-## Развертывание в продакшене (Docker)
+## Быстрый старт (Docker Compose)
 
-Проект настроен для развертывания с использованием Docker Compose, где сервисы запускаются в виде двух отдельных контейнеров `auth-service` (порт 8001) и `core-service` (порт 8000), а также баз данных `auth-db` и `core-db` с расширением `pgvector`.
-
-### 1. Настройка окружения
-Создайте файл `.env` в корневой директории на основе `.env.example`:
+### 1. Подготовка окружения
+Скопируйте пример переменных окружения:
 ```bash
 cp .env.example .env
 ```
-Заполните необходимые переменные (особенно `SECRET_KEY` и `POLZA_API_KEY`).
+Укажите в `.env` ключи:
+- `SECRET_KEY` (секретный ключ JWT)
+- `AUTH_PASSWORD` и `CORE_PASSWORD` (пароли к базам данных)
+- `POLZA_API_KEY` (ключ к API моделей Polza.ai / OpenAI)
 
-### 2. Сборка и запуск
+### 2. Сборка и запуск контейнеров
 ```bash
-docker compose up -d --build
+docker compose up --build -d
 ```
-Это действие:
-- Соберет единый образ на основе Python 3.11-slim, из которого запускаются оба сервиса.
-- Запустит экземпляры PostgreSQL для обоих сервисов на портах 5432 и 5433 соответственно.
-- Запустит контейнер `auth-service` (доступен на порту 8001).
-- Запустит контейнер `core-service` (доступен на порту 8000).
 
-*Примечание: каждый из контейнеров сервисов также запускает Nginx.*
+### 3. Применение миграций базы данных
+```bash
+make migrate-auth m="Actualize db structure"
+make migrate-core m="Actualize db structure"
+make upgrade-auth
+make upgrade-core
+```
 
-### 3. Точки доступа API
-Для локального доступа при запущенном `core-service` на порту 8000 и `auth-service` на порту 8001:
-- **Auth Service (Авторизация)**: `http://localhost:8001/api/v1/auth/...`, `http://localhost:8001/api/v1/users/...`
-- **Core Service (Ядро)**: `http://localhost:8000/api/v1/chats/...`, `http://localhost:8000/api/v1/personas/...`, и т.д.
-- **Статические файлы (Uploads)**: Доступны по пути `/static/` на любом из сервисов.
+### 4. Просмотр логов
+```bash
+docker compose logs -f
+# или через make:
+make logs
+```
+
+### Точки доступа:
+- **Шлюз Gateway**: `http://localhost:8080/api/v1`
+- **Документация Swagger Gateway**: `http://localhost:8080/docs`
+- **Веб-интерфейс через Caddy**: `http://localhost` (HTTPS при настроенном домене)
 
 ---
 
-## Настройка для локальной разработки (без Docker)
+## Локальная разработка без Docker
 
-Если вам нужно запустить сервисы по отдельности без Docker:
+Если требуется запустить сервисы изолированно на локальной машине:
 
-### 1. Настройка базы данных
-Убедитесь, что у вас есть две базы данных PostgreSQL (например, `auth_db` на порту 5432 и `core_db` на порту 5433). Для их работы потребуется расширение `pgvector`.
+### 1. Требования к базе данных
+Необходимо поднять два инстанса PostgreSQL с расширением `pgvector`:
+- `auth_db`: порт `5432`
+- `core_db`: порт `5433`
 
-### 2. Окружение
-Оба сервиса считывают конфигурацию из корневого файла `.env`.
-Убедитесь, что переменные `AUTH_DATABASE_URL` и `CORE_DATABASE_URL` заданы в корневом `.env`.
-
-### 3. Запуск сервисов
-**Auth Service (Сервис авторизации):**
+### 2. Запуск Auth Service
 ```bash
 cd services/auth_service
 pip install -r requirements.txt
@@ -88,15 +118,38 @@ python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8001
 ```
 
-**Core Service (Основной сервис):**
+### 3. Запуск Core Service
 ```bash
 cd services/core_service
 pip install -r requirements.txt
 python -m alembic upgrade head
-uvicorn app.main:app --reload --port 8002
+uvicorn app.main:app --reload --port 8000
 ```
-*Примечание: Убедитесь, что при запуске `core-service` вручную вы указываете порт 8002 (как показано в примере), или 8000, в зависимости от ваших настроек фронтенда.*
 
-## Документация
-Подробная документация API со всеми эндпоинтами, моделями и ролями безопасности:
-👉 [Документация API](api_documentation.md)
+### 4. Запуск Gateway
+```bash
+cd gateway
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8080
+```
+
+---
+
+## Тестирование
+
+Тесты сервисов запускаются раздельно с использованием корневого конфигурационного файла `pytest.ini`:
+
+```bash
+# Тесты ядра (Core Service) — Prompt Pipeline, RAG, Director, Message Service, Uploads
+pytest -c pytest.ini services/core_service/tests
+
+# Тесты шлюза (Gateway) — Маршрутизация, CORS, SSE-стриминг, Websocket
+pytest -c pytest.ini gateway/tests
+```
+
+---
+
+## Документация API
+
+Полная спецификация всех маршрутов, схем Pydantic, прав доступа и форматов потоковых SSE ответов:
+👉 **[Полная документация API](api_documentation.md)**
