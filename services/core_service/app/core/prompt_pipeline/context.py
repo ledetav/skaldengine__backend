@@ -51,5 +51,4 @@ class PipelineContext:
 
     def __post_init__(self):
         if self.client is None:
-            api_key = self.current_user.polza_api_key or settings.POLZA_API_KEY
-            self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key)
+            self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)

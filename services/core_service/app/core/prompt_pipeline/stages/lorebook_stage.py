@@ -79,8 +79,7 @@ class LorebookStage(PipelineStage):
             has_episodes = True
 
         if lb_has_vectors or has_episodes:
-            api_key = context.current_user.polza_api_key or settings.POLZA_API_KEY
-            context.query_vector = await rag.get_query_embedding(user_text, api_key=api_key)
+            context.query_vector = await rag.get_query_embedding(user_text)
 
         found_entries_ids: Set[Any] = set()
 

@@ -30,7 +30,6 @@ async def test_scenario_stage_detects_stall_intervention():
     db = MagicMock()
     chat_id = uuid4()
     user = MagicMock()
-    user.polza_api_key = "test-key"
 
     context = PipelineContext(db=db, chat_id=chat_id, current_user=user)
     context.chat = MagicMock(spec=Chat)
@@ -57,7 +56,6 @@ async def test_scenario_stage_normal_goal_guidance():
     db = MagicMock()
     chat_id = uuid4()
     user = MagicMock()
-    user.polza_api_key = "test-key"
 
     context = PipelineContext(db=db, chat_id=chat_id, current_user=user)
     context.chat = MagicMock(spec=Chat)
@@ -82,7 +80,6 @@ async def test_assembler_stage_formats_russian_reality_check():
     db = MagicMock()
     chat_id = uuid4()
     user = MagicMock()
-    user.polza_api_key = "test-key"
     user.birth_date = None
 
     context = PipelineContext(db=db, chat_id=chat_id, current_user=user)
