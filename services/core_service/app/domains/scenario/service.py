@@ -21,10 +21,13 @@ class ScenarioService(BaseService[ScenarioRepository]):
             "type": "NEW_SCENARIO",
             "data": {
                 "id": str(scenario.id),
-                "name": scenario.name,
+                "title": scenario.title,
+                "location": scenario.location,
                 "description": scenario.description,
+                "start_point": scenario.start_point,
+                "end_point": scenario.end_point,
                 "internal_description": scenario.internal_description,
-                "character_id": str(scenario.character_id),
+                "character_id": str(scenario.character_id) if scenario.character_id else None,
                 "chats_count": 0
             }
         })
@@ -45,11 +48,14 @@ class ScenarioService(BaseService[ScenarioRepository]):
                 "type": "UPDATE_SCENARIO",
                 "data": {
                     "id": str(updated.id),
-                    "name": updated.name,
+                    "title": updated.title,
+                    "location": updated.location,
                     "description": updated.description,
+                    "start_point": updated.start_point,
+                    "end_point": updated.end_point,
                     "internal_description": updated.internal_description,
-                    "character_id": str(updated.character_id),
-                    "chats_count": updated.chats_count
+                    "character_id": str(updated.character_id) if updated.character_id else None,
+                    "chats_count": getattr(updated, "chats_count", 0)
                 }
             })
         return updated
