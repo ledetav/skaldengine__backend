@@ -84,7 +84,7 @@ async def test_process_sliding_window_empty_facts_inserts_sentinel(mock_db):
     mock_client.chat.completions.create.return_value = mock_response
 
     with patch("app.core.rag.AsyncOpenAI", return_value=mock_client):
-        await process_sliding_window(mock_db, chat_id, last_msg_id, api_key="test-key")
+        await process_sliding_window(mock_db, chat_id, last_msg_id)
 
         # Verify commit was called
         mock_db.commit.assert_awaited_once()
@@ -121,7 +121,7 @@ async def test_process_sliding_window_prevents_loop_when_sentinel_in_summarized_
 
     mock_client = AsyncMock()
     with patch("app.core.rag.AsyncOpenAI", return_value=mock_client):
-        await process_sliding_window(mock_db, chat_id, last_msg_id, api_key="test-key")
+        await process_sliding_window(mock_db, chat_id, last_msg_id)
 
         # Because branch[5] in summarized_ids, unsummarized_chunk was cleared, remaining < 6
         mock_client.chat.completions.create.assert_not_called()
@@ -158,7 +158,7 @@ async def test_process_sliding_window_with_facts_inserts_and_commits(mock_db):
          patch("app.core.rag.get_embedding", new_callable=AsyncMock) as mock_embed:
         mock_embed.return_value = dummy_embed
 
-        await process_sliding_window(mock_db, chat_id, last_msg_id, api_key="test-key")
+        await process_sliding_window(mock_db, chat_id, last_msg_id)
 
         mock_db.commit.assert_awaited_once()
         assert mock_db.add.call_count == 1

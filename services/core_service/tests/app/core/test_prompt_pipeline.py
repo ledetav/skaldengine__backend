@@ -20,7 +20,6 @@ def mock_db():
 def current_user():
     user = MagicMock()
     user.id = uuid4()
-    user.polza_api_key = "test-key"
     user.birth_date = None
     return user
 

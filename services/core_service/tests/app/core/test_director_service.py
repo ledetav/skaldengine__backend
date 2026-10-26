@@ -57,7 +57,7 @@ async def test_check_progress_with_leaf_id_branch_achieved(mock_session_local):
     # Session execute: 1st call for checkpoint, 2nd call for CTE branch messages
     mock_session_local.execute.side_effect = [cp_result, msg_result]
 
-    service = DirectorService(api_key="test-api-key")
+    service = DirectorService()
 
     mock_llm_response = MagicMock()
     mock_choice = MagicMock()
@@ -112,7 +112,7 @@ async def test_check_progress_resolves_active_leaf_when_not_provided(mock_sessio
     # 3. CTE messages query
     mock_session_local.execute.side_effect = [cp_result, chat_leaf_result, msg_result]
 
-    service = DirectorService(api_key="test-api-key")
+    service = DirectorService()
 
     mock_llm_response = MagicMock()
     mock_choice = MagicMock()
@@ -159,7 +159,7 @@ async def test_check_progress_fallback_flat_when_no_leaf(mock_session_local):
 
     mock_session_local.execute.side_effect = [cp_result, chat_leaf_result, msg_result]
 
-    service = DirectorService(api_key="test-api-key")
+    service = DirectorService()
 
     mock_llm_response = MagicMock()
     mock_choice = MagicMock()
@@ -189,7 +189,7 @@ async def test_check_progress_no_active_checkpoint(mock_session_local):
 
     mock_session_local.execute.return_value = cp_result
 
-    service = DirectorService(api_key="test-api-key")
+    service = DirectorService()
 
     with patch.object(service.client.chat.completions, "create", new_callable=AsyncMock) as mock_create:
         await service.check_progress(chat_id=chat_id)

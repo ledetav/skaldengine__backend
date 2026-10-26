@@ -58,7 +58,6 @@ async def test_send_message_stream_scenario_does_not_call_director_prematurely(
 
     current_user = MagicMock()
     current_user.id = user_id
-    current_user.polza_api_key = "test-api-key"
 
     message_in = MessageCreate(content="Hello AI, this is scenario mode.")
 

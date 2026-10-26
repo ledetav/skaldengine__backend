@@ -77,7 +77,6 @@ class TestAuthService(IsolatedAsyncioTestCase):
         user.username = "testusername"
         user.full_name = "Test User"
         user.birth_date = "2000-01-01"
-        user.polza_api_key = "api-key"
 
         self.repository.get_by_email_or_login.return_value = user
         mock_verify_password.return_value = True
@@ -88,10 +87,10 @@ class TestAuthService(IsolatedAsyncioTestCase):
 
         # Assert
         self.repository.get_by_email_or_login.assert_called_once_with(identifier)
-        mock_security.verify_password.assert_called_once_with(password, "hashed_password")
-        mock_security.create_access_token.assert_called_once()
+        mock_verify_password.assert_called_once_with(password, user.password_hash)
+        mock_create_access_token.assert_called_once()
 
-        call_args = mock_security.create_access_token.call_args[1]
+        call_args = mock_create_access_token.call_args[1]
         self.assertIn('payload', call_args)
         self.assertIn('expires_delta', call_args)
         self.assertIsInstance(call_args['payload'], TokenPayload)
