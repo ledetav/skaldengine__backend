@@ -99,6 +99,61 @@ async def test_upload_invalid_image():
         assert exc_info.value.status_code == 400
         assert "File type not allowed" in exc_info.value.detail
 
+@pytest.mark.asyncio
+async def test_upload_file_size_exceeded():
+    mock_app = MagicMock()
+    mock_app_api = MagicMock()
+    mock_deps = MagicMock()
+    mock_deps.CurrentUser = MagicMock
+    mock_deps.get_current_user = MagicMock()
+    sys.modules['app.api.deps'] = mock_deps
+
+    mock_settings = MagicMock()
+    mock_settings.UPLOAD_DIR = "/tmp"
+    mock_config = MagicMock()
+    mock_config.settings = mock_settings
+    sys.modules['app.core.config'] = mock_config
+
+    from app.api.endpoints.upload import upload_file
+    from fastapi import UploadFile, HTTPException
+
+    png_header = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89'
+
+    mock_file = MagicMock(spec=UploadFile)
+    mock_file.filename = "large.png"
+
+    async def mock_seek(*args, **kwargs):
+        pass
+    mock_file.seek = mock_seek
+
+    # Return chunks totaling > 10MB (11MB total)
+    chunk = b'a' * (1024 * 1024)
+    chunks = [chunk] * 11
+    chunk_iter = iter(chunks)
+
+    is_header_read = True
+    async def mock_read(size=-1):
+        nonlocal is_header_read
+        if is_header_read:
+            is_header_read = False
+            return png_header
+        try:
+            return next(chunk_iter)
+        except StopIteration:
+            return b""
+    mock_file.read = mock_read
+
+    with patch("app.api.endpoints.upload.aiofiles.open"):
+        with patch("app.api.endpoints.upload.os.path.exists", return_value=True), \
+             patch("app.api.endpoints.upload.os.remove") as mock_remove:
+
+            with pytest.raises(HTTPException) as exc_info:
+                await upload_file(file=mock_file, current_user=MagicMock())
+
+            assert exc_info.value.status_code == 413
+            assert "File exceeds maximum allowed size" in exc_info.value.detail
+            mock_remove.assert_called_once()
+
 class AsyncMock(MagicMock):
     async def __call__(self, *args, **kwargs):
         return super(AsyncMock, self).__call__(*args, **kwargs)

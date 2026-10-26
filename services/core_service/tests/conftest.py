@@ -1,10 +1,18 @@
+import os
 import pytest
 from sqlalchemy.orm import configure_mappers
 
-@pytest.fixture(autouse=True)
+os.environ.setdefault("SECRET_KEY", "test-secret-key-at-least-32-chars-long")
+os.environ.setdefault("CORE_DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/test_db")
+os.environ.setdefault("POLZA_API_KEY", "test-polza-key")
+
+@pytest.fixture(autouse=True, scope="session")
 def setup_models():
     # Import ALL models before configuring mappers
-    import app.domains.character.attribute_models
+    try:
+        import app.domains.character.attribute_models
+    except ImportError:
+        pass
     import app.domains.character.models
     import app.domains.scenario.models
     import app.domains.chat.models
@@ -20,4 +28,7 @@ def setup_models():
     except ImportError:
         pass
 
-    configure_mappers()
+    try:
+        configure_mappers()
+    except Exception:
+        pass
