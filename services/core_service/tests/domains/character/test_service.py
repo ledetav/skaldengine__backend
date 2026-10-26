@@ -8,8 +8,6 @@ from app.domains.character.repository import CharacterRepository
 
 # Import related models to fix SQLAlchemy mapper registry errors
 from app.domains.lorebook.models import Lorebook
-from app.domains.character.models import Character
-from app.domains.character.attribute_models import CharacterAttribute
 from app.domains.scenario.models import Scenario
 from app.domains.chat.models import Chat
 from app.domains.persona.models import UserPersona
