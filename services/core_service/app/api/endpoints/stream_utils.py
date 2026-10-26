@@ -38,34 +38,57 @@ async def generate_chat_stream(
                 full_text += text_chunk
                 buffer += text_chunk
                 
+                START_TAG = "<Internal_Analysis>"
+                END_TAG = "</Internal_Analysis>"
+                
                 # Logic to hide everything between <Internal_Analysis> and </Internal_Analysis>
-                while True:
+                while buffer:
                     if not is_thinking:
-                        if "<Internal_Analysis>" in buffer:
+                        if START_TAG in buffer:
                             # Start thinking: send everything BEFORE the tag
-                            pre_thought, post_tag = buffer.split("<Internal_Analysis>", 1)
+                            pre_thought, post_tag = buffer.split(START_TAG, 1)
                             if pre_thought:
                                 yield f"event: token\ndata: {json.dumps({'content': pre_thought}, ensure_ascii=False)}\n\n"
                             buffer = post_tag
                             is_thinking = True
                         else:
-                            # Not thinking and no tag yet: send the whole buffer
-                            yield f"event: token\ndata: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
-                            buffer = ""
-                            break
+                            # Check if the end of buffer might be the beginning of START_TAG
+                            matching_prefix_len = 0
+                            max_check = min(len(buffer), len(START_TAG) - 1)
+                            for k in range(max_check, 0, -1):
+                                if buffer.endswith(START_TAG[:k]):
+                                    matching_prefix_len = k
+                                    break
+                            
+                            if matching_prefix_len > 0:
+                                # Send everything up to the matching prefix, keep prefix in buffer
+                                to_emit = buffer[:-matching_prefix_len]
+                                if to_emit:
+                                    yield f"event: token\ndata: {json.dumps({'content': to_emit}, ensure_ascii=False)}\n\n"
+                                buffer = buffer[-matching_prefix_len:]
+                                break
+                            else:
+                                # No partial match: emit the entire buffer
+                                yield f"event: token\ndata: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
+                                buffer = ""
+                                break
                     else:
-                        if "</Internal_Analysis>" in buffer:
+                        if END_TAG in buffer:
                             # End thinking: discard everything until end tag, then continue
-                            _, post_thought = buffer.split("</Internal_Analysis>", 1)
+                            _, post_thought = buffer.split(END_TAG, 1)
                             buffer = post_thought
                             is_thinking = False
                         else:
-                            # Still thinking: keep buffering, but we only need to keep 
-                            # the last few characters to catch the tag if it's split.
-                            if len(buffer) > 20:
-                                buffer = buffer[-20:]
+                            # Still thinking: keep only enough characters to detect END_TAG if split
+                            if len(buffer) > len(END_TAG) - 1:
+                                buffer = buffer[-(len(END_TAG) - 1):]
                             break
             
+        # Flush any remaining buffer if stream finished and we are not thinking
+        if not is_thinking and buffer:
+            yield f"event: token\ndata: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
+            buffer = ""
+
     except Exception as e:
         error_msg = "(System Error: Neural network unavailable)"
         yield f"event: token\ndata: {json.dumps({'content': error_msg}, ensure_ascii=False)}\n\n"
