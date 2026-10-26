@@ -65,7 +65,6 @@ In case of error, `success` is `false`, `data` is `null`, and `message`/`error_c
 | **full_name**| string | Имя и фамилия | Нет | Вручную |
 | **password** | string | Пароль (мин. 8 символов) | Да | Вручную |
 | **birth_date**| string | Дата рождения (YYYY-MM-DD) | Да | Вручную |
-| **polza_api_key**| string | Личный API ключ Polza AI | Нет | Вручную |
 
 #### Пример ввода:
 ```json
@@ -75,8 +74,7 @@ In case of error, `success` is `false`, `data` is `null`, and `message`/`error_c
   "username": "@Skaldik",
   "full_name": "Ivan Ivanov",
   "password": "StrongPassword123!",
-  "birth_date": "1995-04-03",
-  "polza_api_key": "sk-polza-..."
+  "birth_date": "1995-04-03"
 }
 ```
 
@@ -94,7 +92,6 @@ In case of error, `success` is `false`, `data` is `null`, and `message`/`error_c
     "avatar_url": null,
     "cover_url": null,
     "role": "user",
-    "polza_api_key": "sk-polza-...",
     "created_at": "2026-03-27T10:00:00Z"
   },
   "message": "User registered successfully",
@@ -165,7 +162,6 @@ OAuth2-совместимая авторизация и получение JWT �
     "avatar_url": "/static/avatars/user-123.png",
     "cover_url": "/static/covers/cover-123.png",
     "role": "user",
-    "polza_api_key": "sk-polza-...",
     "created_at": "2026-03-27T10:00:00Z"
   }
 }
@@ -185,8 +181,7 @@ OAuth2-совместимая авторизация и получение JWT �
   "full_name": "Ivan Petrov",
   "birth_date": "1995-04-03",
   "avatar_url": "/static/new_avatar.png",
-  "cover_url": "/static/new_cover.png",
-  "polza_api_key": "sk-polza-new"
+  "cover_url": "/static/new_cover.png"
 }
 ```
 
