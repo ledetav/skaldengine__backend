@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     POLZA_TEMPERATURE: float = 1.0
     POLZA_MAX_TOKENS: int = 8000
     POLZA_TITLE_MAX_TOKENS: int = 50
+    POLZA_RAG_MAX_DISTANCE: float = 0.60
 
     # Uploads (аватарки, карточки)
     UPLOAD_DIR: str = Field("./uploads", validation_alias=AliasChoices("CORE_UPLOAD_DIR", "UPLOAD_DIR"))
