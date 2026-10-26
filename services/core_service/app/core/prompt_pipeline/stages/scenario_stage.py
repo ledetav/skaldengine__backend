@@ -1,3 +1,5 @@
+"""Этап 4 пайплайна: инъекция сценарного супервизора и актуальных целей сюжета."""
+
 from sqlalchemy import select, and_
 
 from app.domains.chat.models import ChatCheckpoint
@@ -12,8 +14,10 @@ class ScenarioStage(PipelineStage):
     """
 
     async def process(self, context: PipelineContext, user_text: str = "") -> None:
+        """Определяет текущий чекпоинт сценария и формирует директиву для модели."""
         if not context.chat or context.chat.mode != "scenario":
             return
+
 
         query = (
             select(ChatCheckpoint)

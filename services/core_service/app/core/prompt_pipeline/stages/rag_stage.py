@@ -1,3 +1,5 @@
+"""Этап 3 пайплайна: извлечение эпизодической памяти диалога (RAG)."""
+
 import datetime
 from sqlalchemy import select, and_
 
@@ -17,8 +19,10 @@ class RAGStage(PipelineStage):
     """
 
     async def process(self, context: PipelineContext, user_text: str = "") -> None:
+        """Поиск наиболее релевантных воспоминаний и добавление их в context.memories."""
         if not context.query_vector:
             return
+
 
         ancestor_ids = []
         if context.parent_id:

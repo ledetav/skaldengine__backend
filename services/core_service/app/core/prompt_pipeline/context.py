@@ -1,3 +1,5 @@
+"""Контекст исполнения пайплайна сборки системного промпта."""
+
 import uuid
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
@@ -50,5 +52,7 @@ class PipelineContext:
     query_vector: Optional[List[float]] = None
 
     def __post_init__(self):
+        """Инициализация клиента LLM Polza.ai по умолчанию, если не передан явно."""
         if self.client is None:
             self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
+

@@ -1,3 +1,5 @@
+"""Этап 6 пайплайна: финальная сборка системного промпта и структуры запроса к LLM."""
+
 from datetime import date
 from typing import Dict, Any, List
 
@@ -24,8 +26,10 @@ class AssemblerStage(PipelineStage):
     """
 
     async def process(self, context: PipelineContext, user_text: str = "") -> Dict[str, Any]:
+        """Собирает системный промпт, сообщения и параметры безопасности в словарь payload."""
         if not context.chat or not context.character or not context.persona:
-            raise ValueError("Required data for assembly missing.")
+            raise ValueError("Отсутствуют обязательные данные для сборки промпта.")
+
 
         relationship = (
             context.chat.relationship_dynamic
