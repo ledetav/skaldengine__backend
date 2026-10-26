@@ -278,6 +278,7 @@ class PromptPipeline:
         if not ancestor_ids:
             return
 
+        max_distance = getattr(settings, "POLZA_RAG_MAX_DISTANCE", 0.60)
         distance = EpisodicMemory.embedding.cosine_distance(self.query_vector)
         query = (
             select(EpisodicMemory, distance.label('distance'), Message.created_at)
@@ -285,8 +286,9 @@ class PromptPipeline:
             .where(and_(
                 EpisodicMemory.chat_id == self.chat_id,
                 EpisodicMemory.message_id.in_(ancestor_ids),
-                distance < 0.25
+                distance < max_distance
             ))
+            .order_by(distance.asc())
             .limit(10)
         )
         result = await self.db.execute(query)
