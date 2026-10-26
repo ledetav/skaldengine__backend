@@ -157,3 +157,12 @@ def test_cors_middleware_preflight_security():
     })
     assert res_evil.status_code == 200
     assert "access-control-allow-origin" not in res_evil.headers
+
+
+def test_ws_url_formatting():
+    """Verify conversion of HTTP URLs to WebSocket URLs."""
+    from gateway.websocket import _ws_url
+
+    assert _ws_url("http://127.0.0.1:8000", "/api/v1/ws/chat") == "ws://127.0.0.1:8000/api/v1/ws/chat"
+    assert _ws_url("https://api.skald.io", "/api/v1/ws/chat") == "wss://api.skald.io/api/v1/ws/chat"
+    assert _ws_url("http://localhost:8000/", "/api/v1/ws/chat") == "ws://localhost:8000/api/v1/ws/chat"
