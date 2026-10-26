@@ -27,11 +27,13 @@
 2. Для просмотра логов
 
     ```bash
-    docker logs skald_backend -f
+    docker compose logs -f
+    # или через make:
+    make logs
     ```
 
-API доступен по адресу <http://localhost:8000>  
-Nginx сам раскидает по сервисам
+API доступен через шлюз Gateway по адресу <http://localhost:8080> (или через Caddy на <http://localhost>).
+Шлюз автоматически распределяет запросы между сервисами `auth` и `core`.
 
 ---
 
