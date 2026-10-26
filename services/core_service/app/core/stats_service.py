@@ -20,6 +20,17 @@ class StatsService:
             .where(Character.id == character_id)
             .values(total_chats_count=Character.total_chats_count + 1)
         )
+
+    @staticmethod
+    async def increment_scenario_chats(db: AsyncSession, character_id: uuid.UUID):
+        """
+        Инкрементирует счетчик чатов персонажа по сценариям.
+        """
+        await db.execute(
+            update(Character)
+            .where(Character.id == character_id)
+            .values(scenario_chats_count=Character.scenario_chats_count + 1)
+        )
         # Мы не коммитим здесь, так как это обычно часть бОльшей транзакции
 
     @staticmethod

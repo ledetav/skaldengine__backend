@@ -22,7 +22,7 @@ async def regenerate_message_stream(
     """
     Генерирует альтернативный ответ (Свайп).
     """
-    return await controller.regenerate_stream(parent_id, current_user.id, db)
+    return await controller.regenerate_stream(parent_id, current_user, db)
 
 
 @router.put("/{message_id}", response_model=BaseResponse)

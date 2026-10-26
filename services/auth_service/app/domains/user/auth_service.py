@@ -56,5 +56,6 @@ class AuthService(BaseService[UserRepository]):
             "password_hash": get_password_hash(user_in.password),
             "role": "user",
             "polza_api_key": user_in.polza_api_key,
+            "avatar_url": f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_in.username}"
         }
         return await self.repository.create(obj_in=user_data)

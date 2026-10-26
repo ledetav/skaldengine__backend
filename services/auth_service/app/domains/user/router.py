@@ -5,7 +5,7 @@ from jose import jwt, JWTError
 from app.api import deps
 from .controller import UserController
 from app.domains.user.models import User
-from app.domains.user.schemas import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate
+from app.domains.user.schemas import UserResponse, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, UserUpdate, RoleUpdate
 from shared.schemas.response import BaseResponse
 from app.core.config import settings
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -15,27 +15,42 @@ router = APIRouter()
 _http_bearer = HTTPBearer()
 
 async def _verify_staff_from_token(
-    token_auth: HTTPAuthorizationCredentials = Depends(_http_bearer),
+    current_user: User = Depends(deps.get_current_user),
 ) -> None:
-    """Check that the JWT token belongs to an admin or moderator."""
-    try:
-        payload = jwt.decode(
-            token_auth.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        role = payload.get("role", "user")
-    except (JWTError, ValueError):
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-    if role not in ("admin", "moderator"):
+    """Check that the user is an admin or moderator by checking DB."""
+    if current_user.role not in ("admin", "moderator"):
         raise HTTPException(status_code=403, detail="Not enough privileges")
 
 @router.get("/", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
 async def list_all_users(
     skip: int = 0,
-    limit: int = 200,
+    limit: int = 20,
     controller: UserController = Depends(deps.get_user_controller),
 ):
     """Получить список всех пользователей (только для admin/moderator)."""
     return await controller.get_all_users(skip=skip, limit=limit)
+
+
+@router.delete("/{user_id}", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
+async def admin_delete_user(
+    user_id: str,
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Удалить пользователя по ID (для admin)."""
+    return await controller.admin_delete_user(current_user, user_id)
+
+
+@router.patch("/{user_id}/role", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
+async def admin_update_role(
+    user_id: str,
+    role_update: RoleUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Изменить роль пользователя (для admin)."""
+    return await controller.admin_update_role(current_user, user_id, role_update.role)
+
 
 
 @router.get("/me", response_model=BaseResponse)
@@ -143,3 +158,15 @@ async def delete_user(
 ):
     """Удалить учетную запись текущего пользователя."""
     return await controller.delete_user(current_user)
+@router.get("/batch", response_model=BaseResponse)
+async def get_users_batch(
+    ids: str,
+    controller: UserController = Depends(deps.get_user_controller)
+):
+    """Получить публичные профили списка пользователей по их ID (через запятую)."""
+    try:
+        from uuid import UUID
+        user_ids = [UUID(id_str.strip()) for id_str in ids.split(",") if id_str.strip()]
+        return await controller.get_users_by_ids(user_ids)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid UUID in batch: {str(e)}")

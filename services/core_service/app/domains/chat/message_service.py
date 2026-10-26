@@ -35,10 +35,24 @@ class MessageService(BaseService[MessageRepository]):
         if not chat.title and not message_in.parent_id:
             from app.core.title_service import ChatTitleService
             title_service = ChatTitleService()
-            background_tasks.add_task(title_service.generate_and_update_title, db, chat.id, message_in.content)
+            background_tasks.add_task(title_service.generate_and_update_title, chat.id, message_in.content)
 
         await db.commit()
         await db.refresh(user_msg)
+
+        # Increment message count for the current checkpoint
+        from .models import ChatCheckpoint
+        cp_stmt = (
+            select(ChatCheckpoint)
+            .where(ChatCheckpoint.chat_id == chat.id, ChatCheckpoint.is_completed == False)
+            .order_by(ChatCheckpoint.order_num)
+        )
+        cp_res = await db.execute(cp_stmt)
+        active_cp = cp_res.scalars().first()
+        if active_cp:
+            active_cp.messages_spent += 1
+            db.add(active_cp)
+            await db.commit()
 
         # Build payload
         from app.core.prompt_pipeline import PromptPipeline
@@ -68,6 +82,13 @@ class MessageService(BaseService[MessageRepository]):
         from app.api.endpoints.stream_utils import generate_chat_stream
         from app.core.config import settings
         state = {"polza_api_key": current_user.polza_api_key or settings.POLZA_API_KEY}
+        
+        # Trigger Director check in background if in scenario mode
+        if chat.mode == "scenario":
+            from app.core.director_service import DirectorService
+            director = DirectorService()
+            background_tasks.add_task(director.check_progress, chat.id)
+
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
     async def regenerate_stream(self, parent_id: UUID, current_user: Any, db: AsyncSession):

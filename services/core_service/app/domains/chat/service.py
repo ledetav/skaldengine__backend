@@ -4,7 +4,7 @@ from fastapi import BackgroundTasks
 from shared.base.service import BaseService
 from .repository import ChatRepository
 from .models import Chat
-from app.domains.chat.schemas import ChatCreate, ChatUpdate
+from app.domains.chat.schemas import ChatCreate, ChatUpdate, ChatResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -41,6 +41,8 @@ class ChatService(BaseService[ChatRepository]):
             mode="scenario" if scenario else "sandbox",
             is_acquainted=chat_in.is_acquainted,
             relationship_dynamic=chat_in.relationship_dynamic,
+            custom_location=chat_in.custom_location,
+            custom_plot_hook=chat_in.custom_plot_hook,
             language=chat_in.language,
             narrative_voice=chat_in.narrative_voice,
         )
@@ -50,6 +52,9 @@ class ChatService(BaseService[ChatRepository]):
         # Increment character chat count
         from app.core.stats_service import StatsService
         await StatsService.increment_total_chats(db, character.id)
+        
+        if created_chat.mode == "scenario":
+            await StatsService.increment_scenario_chats(db, character.id)
 
         await db.commit()
         await db.refresh(created_chat)
@@ -62,8 +67,27 @@ class ChatService(BaseService[ChatRepository]):
 
         return created_chat
 
-    async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> List[Chat]:
-        return await self.repository.get_by_user(user_id, skip, limit)
+    async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> List[Any]:
+        from sqlalchemy.orm import joinedload
+        query = select(Chat).where(Chat.user_id == user_id).options(
+            joinedload(Chat.character),
+            joinedload(Chat.persona),
+            joinedload(Chat.active_leaf)
+        ).order_by(Chat.updated_at.desc()).offset(skip).limit(limit)
+        
+        result = await self.repository.db.execute(query)
+        chats = result.unique().scalars().all()
+        
+        responses = []
+        for chat in chats:
+            resp = ChatResponse.model_validate(chat)
+            resp.character_name = chat.character.name if chat.character else "Unknown"
+            resp.user_persona_name = chat.persona.name if chat.persona else "Unknown"
+            if chat.active_leaf:
+                resp.last_message_preview = chat.active_leaf.content[:100] + ("..." if len(chat.active_leaf.content) > 100 else "")
+            responses.append(resp)
+            
+        return responses
 
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> Optional[Chat]:
         chat = await self.repository.get(chat_id)

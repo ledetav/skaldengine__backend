@@ -11,6 +11,9 @@ class UserPersonaService(BaseService[UserPersonaRepository]):
 
     async def create_persona(self, persona_in: UserPersonaCreate, owner_id: UUID) -> UserPersona:
         persona_data = persona_in.model_dump()
+        if not persona_data.get("avatar_url"):
+            persona_data["avatar_url"] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={persona_data.get('name', 'default')}"
+            
         persona_data["owner_id"] = owner_id
         return await self.repository.create(obj_in=persona_data)
 
@@ -26,10 +29,14 @@ class UserPersonaService(BaseService[UserPersonaRepository]):
             return None
         return await self.repository.update(db_obj=persona, obj_in=persona_update)
 
-    async def delete_persona(self, persona_id: UUID, owner_id: UUID) -> bool:
-        persona = await self.get_persona(persona_id, owner_id)
+    async def delete_persona(self, persona_id: UUID, owner_id: UUID, is_admin: bool = False) -> bool:
+        persona = await self.repository.get(persona_id)
         if not persona:
             return False
+        
+        if not is_admin and str(persona.owner_id) != str(owner_id):
+            return False
+            
         await self.repository.delete(id=persona_id)
         return True
 
