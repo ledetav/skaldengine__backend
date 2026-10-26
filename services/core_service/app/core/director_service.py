@@ -1,6 +1,7 @@
+from typing import Optional
 import json
 import uuid
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, literal
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -13,8 +14,9 @@ from app.domains.chat.message_models import Message
 from app.domains.chat.models import ChatCheckpoint
 
 class DirectorService:
-    def __init__(self):
-        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
+    def __init__(self, api_key: Optional[str] = None):
+        key = api_key or settings.POLZA_API_KEY
+        self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=key)
 
     async def initialize_scenario(self, chat_id: uuid.UUID, checkpoints_count: int = 3):
         """Фаза 1: Генерация маршрута (чекпоинтов) при создании чата."""
@@ -185,8 +187,15 @@ Example: "Character A admits their secret to Character B." or "The group reaches
                 print(f"[Director] Error initializing scenario: {e}")
                 await db.rollback()
 
-    async def check_progress(self, chat_id: uuid.UUID):
+    async def check_progress(
+        self,
+        chat_id: uuid.UUID,
+        leaf_id: Optional[uuid.UUID] = None,
+        api_key: Optional[str] = None
+    ):
         """Фаза 2: Фоновый мониторинг (The Watcher Loop)."""
+        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=api_key) if api_key else self.client
+
         async with AsyncSessionLocal() as db:
             # 1. Берем текущую активную цель
             result = await db.execute(
@@ -198,15 +207,43 @@ Example: "Character A admits their secret to Character B." or "The group reaches
             if not current_checkpoint:
                 return # Сценарий завершен или целей нет
 
-            # 2. Берем последние 8 сообщений для контекста
-            msg_result = await db.execute(
-                select(Message)
-                .where(Message.chat_id == chat_id)
-                .order_by(desc(Message.created_at))
-                .limit(8)
-            )
-            messages = list(reversed(msg_result.scalars().all()))
-            history_text = "\n".join([f"{m.role}: {m.content}" for m in messages])
+            # 2. Определение активной ветки сообщений
+            target_leaf_id = leaf_id
+            if not target_leaf_id:
+                chat_res = await db.execute(select(Chat.active_leaf_id).where(Chat.id == chat_id))
+                target_leaf_id = chat_res.scalar_one_or_none()
+
+            limit = 8
+            if target_leaf_id:
+                # Рекурсивный CTE для обхода истории только по активной ветке от leaf_id
+                base_query = (
+                    select(Message.id, Message.parent_id, literal(1).label('depth'))
+                    .where(Message.id == target_leaf_id)
+                    .cte(name="director_tree", recursive=True)
+                )
+                recursive_query = (
+                    select(Message.id, Message.parent_id, (base_query.c.depth + 1).label('depth'))
+                    .join(base_query, Message.id == base_query.c.parent_id)
+                    .where(base_query.c.depth < limit)
+                )
+                cte = base_query.union_all(recursive_query)
+                query = select(Message).join(cte, Message.id == cte.c.id).order_by(cte.c.depth.asc())
+                msg_result = await db.execute(query)
+                messages = list(msg_result.scalars().all())
+                messages.reverse()
+            else:
+                # Фоллбэк: плоская выборка, если leaf_id отсутствует
+                msg_result = await db.execute(
+                    select(Message)
+                    .where(Message.chat_id == chat_id)
+                    .order_by(desc(Message.created_at))
+                    .limit(limit)
+                )
+                messages = list(reversed(msg_result.scalars().all()))
+
+            history_text = "\n".join([f"{m.role}: {m.content}" for m in messages if m.content])
+            if not history_text:
+                return
 
             # 3. Request to Supervisor
             prompt = f"""You are a Narrative Supervisor. Your task is to objectively evaluate the progress of a roleplaying scene.
@@ -226,7 +263,7 @@ Return JSON:
 }}"""
 
             try:
-                response = await self.client.chat.completions.create(
+                response = await client.chat.completions.create(
                     model=settings.POLZA_CHAT_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
