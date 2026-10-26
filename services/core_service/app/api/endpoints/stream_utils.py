@@ -147,7 +147,7 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
             )
             checkpoint = res.scalars().first()
             if checkpoint and checkpoint.messages_spent > 0 and checkpoint.messages_spent % 3 == 0:
-                director = DirectorService()
-                await director.check_progress(chat_id)
+                director = DirectorService(api_key=api_key)
+                await director.check_progress(chat_id, leaf_id=ai_msg_id, api_key=api_key)
         except Exception as e:
             print(f"[Supervisor] Error checking progress: {e}")
