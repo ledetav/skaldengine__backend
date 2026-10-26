@@ -1,3 +1,5 @@
+"""Точка входа и инициализация микросервиса бизнес-логики и ИИ (Core Service)."""
+
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -11,9 +13,12 @@ from shared.middlewares.logging_middleware import LoggingMiddleware, add_global_
 
 setup_logging(settings.LOG_LEVEL)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Управление жизненным циклом приложения FastAPI."""
     yield
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -33,11 +38,13 @@ app.add_middleware(
 app.add_middleware(LoggingMiddleware)
 add_global_exception_handler(app)
 
-# Раздача статики (картинок)
+# Раздача статики (загруженные медиафайлы и изображения)
 app.mount("/static", StaticFiles(directory=settings.UPLOAD_DIR), name="static")
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "core-service"}
+    """Проверка жизнеспособности сервиса Core Service."""
+    return {"status": "ok", "service": "core-service"}

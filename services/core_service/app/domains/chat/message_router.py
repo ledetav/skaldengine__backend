@@ -1,11 +1,15 @@
+"""
+Роутер эндпоинтов для взаимодействия с сообщениями диалога (ветвление, регенерация, форк, редактирование).
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from app.api import deps
 from .message_controller import MessageController
 from shared.schemas.response import BaseResponse
-from pydantic import BaseModel
 
 router = APIRouter()
 

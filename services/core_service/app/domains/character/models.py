@@ -1,3 +1,7 @@
+"""
+Модели данных персонажей (Character) и их связей с лорбуками.
+"""
+
 import uuid
 import enum
 from datetime import datetime
@@ -16,13 +20,16 @@ character_lorebook_association = Table(
     Column("lorebook_id", ForeignKey("lorebooks.id", ondelete="CASCADE"), primary_key=True),
 )
 
+
 class CharacterType(str, enum.Enum):
+    """Тип персонажа: фандомный или оригинальный."""
     FANDOM = "fandom"
     ORIGINAL = "original"
 
+
 class Character(Base):
     """
-    AI Персонажи (боты). Создаются пользователями или администраторами.
+    AI-персонажи (боты). Создаются пользователями или администраторами.
     """
     __tablename__ = "characters"
 

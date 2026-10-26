@@ -1,3 +1,7 @@
+"""
+Сервисный слой для бизнес-логики управления персонами пользователей.
+"""
+
 from typing import List, Optional
 from uuid import UUID
 from shared.base.service import BaseService
@@ -5,11 +9,21 @@ from .repository import UserPersonaRepository
 from .models import UserPersona
 from app.domains.persona.schemas import UserPersonaCreate, UserPersonaUpdate
 
+
 class UserPersonaService(BaseService[UserPersonaRepository]):
+    """
+    Сервис управления персонами пользователей: создание, редактирование,
+    удаление и агрегация статистики.
+    """
     async def get_user_personas(self, owner_id: UUID) -> List[UserPersona]:
+        """Получить список всех персон пользователя."""
         return await self.repository.get_by_owner(owner_id)
 
     async def create_persona(self, persona_in: UserPersonaCreate, owner_id: UUID) -> UserPersona:
+        """
+        Создать новую персону. При отсутствии аватара генерируется
+        дефолтный аватар через DiceBear.
+        """
         persona_data = persona_in.model_dump()
         if not persona_data.get("avatar_url"):
             persona_data["avatar_url"] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={persona_data.get('name', 'default')}"
@@ -18,18 +32,21 @@ class UserPersonaService(BaseService[UserPersonaRepository]):
         return await self.repository.create(obj_in=persona_data)
 
     async def get_persona(self, persona_id: UUID, owner_id: UUID) -> Optional[UserPersona]:
+        """Получить персону по ID с проверкой прав владения."""
         persona = await self.repository.get(persona_id)
         if persona and str(persona.owner_id) == str(owner_id):
             return persona
         return None
 
     async def update_persona(self, persona_id: UUID, persona_update: UserPersonaUpdate, owner_id: UUID) -> Optional[UserPersona]:
+        """Обновить данные персоны (только для владельца)."""
         persona = await self.get_persona(persona_id, owner_id)
         if not persona:
             return None
         return await self.repository.update(db_obj=persona, obj_in=persona_update)
 
     async def delete_persona(self, persona_id: UUID, owner_id: UUID, is_admin: bool = False) -> bool:
+        """Удалить персону с проверкой прав владельца или администратора."""
         persona = await self.repository.get(persona_id)
         if not persona:
             return False
@@ -41,4 +58,6 @@ class UserPersonaService(BaseService[UserPersonaRepository]):
         return True
 
     async def get_user_stats(self, owner_id: UUID) -> dict:
+        """Получить агрегированную статистику по ресурсам пользователя."""
         return await self.repository.get_aggregate_stats(owner_id)
+

@@ -1,3 +1,5 @@
+"""Настройка подключения к базе данных PostgreSQL и базовая модель SQLAlchemy."""
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.core.config import settings
@@ -21,5 +23,7 @@ AsyncSessionLocal = sessionmaker(
     autoflush=False
 )
 
+
 class Base(DeclarativeBase):
-    pass
+    """Базовый декларативный класс для моделей SQLAlchemy сервиса аутентификации."""
+    pass

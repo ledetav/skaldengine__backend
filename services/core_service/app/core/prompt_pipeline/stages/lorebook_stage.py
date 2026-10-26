@@ -1,6 +1,8 @@
+"""Этап 2 пайплайна: извлечение семантической памяти и лорбуков."""
+
 import re
 import ahocorasick
-from typing import List, Set
+from typing import List, Set, Any
 from sqlalchemy import select, and_
 from sqlalchemy.orm import joinedload
 
@@ -34,8 +36,10 @@ class LorebookStage(PipelineStage):
     """
 
     async def process(self, context: PipelineContext, user_text: str = "") -> None:
+        """Выполняет поиск и распределение фактов лорбуков по категориям в PipelineContext."""
         if not context.character:
             return
+
 
         # 1. Формируем список актуальных лорбуков
         relevant_lb_ids = [lb.id for lb in context.character.lorebooks]

@@ -1,3 +1,7 @@
+"""
+Конфигурация тестового окружения и фикстуры pytest для сервиса Core Service.
+"""
+
 import os
 import pytest
 from sqlalchemy.orm import configure_mappers
@@ -6,9 +10,10 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-at-least-32-chars-long")
 os.environ.setdefault("CORE_DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/test_db")
 os.environ.setdefault("POLZA_API_KEY", "test-polza-key")
 
+
 @pytest.fixture(autouse=True, scope="session")
 def setup_models():
-    # Import ALL models before configuring mappers
+    """Инициализация и связывание всех моделей SQLAlchemy перед запуском тестов."""
     try:
         import app.domains.character.attribute_models
     except ImportError:

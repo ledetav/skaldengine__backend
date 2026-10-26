@@ -1,24 +1,28 @@
-from pydantic import BaseModel, Field
-from uuid import UUID
+"""
+Pydantic-схемы для работы с сообщениями чата (Message).
+"""
+
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageBase(BaseModel):
-    role: str
-    content: str = Field(..., max_length=4000)
+    """Базовые атрибуты сообщения."""
+    role: str = Field(..., description="Роль отправителя: user, assistant или system")
+    content: str = Field(..., max_length=4000, description="Текст сообщения")
 
 
 class MessageCreate(BaseModel):
-    """Входящее сообщение от пользователя."""
-    content: str = Field(..., max_length=4000)
-    parent_id: UUID | None = None  # Для ветвления (swipe)
+    """Входящее сообщение от пользователя с поддержкой ветвления (parent_id)."""
+    content: str = Field(..., max_length=4000, description="Текст сообщения пользователя")
+    parent_id: UUID | None = Field(default=None, description="ID родительского сообщения для ветвления")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "content": "Hello there! How are you doing today?",
+                    "content": "Привет! Как твои дела?",
                     "parent_id": "123e4567-e89b-12d3-a456-426614174000"
                 }
             ]
@@ -27,8 +31,8 @@ class MessageCreate(BaseModel):
 
 
 class MessageRegenerate(BaseModel):
-    """Запрос на перегенерацию ответа."""
-    message_id: UUID
+    """Запрос на перегенерацию ответа (свайп)."""
+    message_id: UUID = Field(..., description="ID сообщения пользователя для генерации альтернативного ответа")
 
     model_config = {
         "json_schema_extra": {
@@ -42,6 +46,7 @@ class MessageRegenerate(BaseModel):
 
 
 class MessageResponse(MessageBase):
+    """Схема ответа с данными сообщения."""
     id: UUID
     chat_id: UUID
     parent_id: UUID | None = None
@@ -49,5 +54,5 @@ class MessageResponse(MessageBase):
     is_edited: bool = False
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+

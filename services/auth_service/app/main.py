@@ -1,3 +1,5 @@
+"""Точка входа и инициализация микросервиса аутентификации (Auth Service)."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -14,7 +16,7 @@ app = FastAPI(
     docs_url="/docs"
 )
 
-# CORS
+# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -29,10 +31,14 @@ add_global_exception_handler(app)
 app.include_router(auth_router, prefix=settings.API_V1_STR + "/auth", tags=["auth"])
 app.include_router(user_router, prefix=settings.API_V1_STR + "/users", tags=["users"])
 
+
 @app.get("/health")
 def health_check():
+    """Проверка жизнеспособности сервиса аутентификации."""
     return {"status": "ok", "service": "auth-service"}
 
+
 @app.get("/")
-def health_check():
-    return {"status": "ok", "service": "auth-service"}
+def root_health_check():
+    """Корневой эндпоинт проверки статуса сервиса аутентификации."""
+    return {"status": "ok", "service": "auth-service"}

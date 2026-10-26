@@ -1,3 +1,7 @@
+"""
+Модульные тесты для сервиса сценариев (ScenarioService).
+"""
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -6,16 +10,22 @@ from app.domains.scenario.service import ScenarioService
 from app.domains.scenario.schemas import ScenarioCreate, ScenarioUpdate
 from app.domains.scenario.models import Scenario
 
+
 @pytest.fixture
 def mock_repository():
+    """Фикстура мока репозитория сценариев."""
     return AsyncMock()
+
 
 @pytest.fixture
 def scenario_service(mock_repository):
+    """Фикстура экземпляра ScenarioService с мок-репозиторием."""
     return ScenarioService(repository=mock_repository)
+
 
 @pytest.mark.asyncio
 async def test_get_scenarios(scenario_service, mock_repository):
+    """Тест получения списка сценариев с пагинацией."""
     mock_scenarios = [Scenario(id=uuid4(), title="Test", description="D", start_point="S", end_point="E")]
     mock_repository.get_multi_with_counts.return_value = mock_scenarios
 
@@ -23,6 +33,7 @@ async def test_get_scenarios(scenario_service, mock_repository):
 
     mock_repository.get_multi_with_counts.assert_called_once_with(skip=10, limit=5)
     assert result == mock_scenarios
+
 
 @pytest.mark.asyncio
 async def test_get_by_character(scenario_service, mock_repository):

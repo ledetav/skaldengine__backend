@@ -1,3 +1,8 @@
+"""Модуль двунаправленного WebSocket-проксирования для API Gateway.
+
+Обеспечивает установку и поддержание соединений с Core Service
+с передачей токенов авторизации и параметров запроса.
+"""
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 import websockets as ws_lib

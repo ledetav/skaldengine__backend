@@ -1,3 +1,5 @@
+"""Этап 1 пайплайна: загрузка базовых сущностей сессии диалога."""
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -16,12 +18,13 @@ class IdentityStage(PipelineStage):
     """
 
     async def process(self, context: PipelineContext, user_text: str = "") -> None:
+        """Загружает связанные сущности чата в PipelineContext."""
         result = await context.db.execute(
             select(Chat).where(Chat.id == context.chat_id)
         )
         context.chat = result.scalar_one_or_none()
         if not context.chat:
-            raise ValueError(f"Chat {context.chat_id} not found")
+            raise ValueError(f"Чат {context.chat_id} не найден")
 
         # Загружаем связанные объекты
         char_res = await context.db.execute(
@@ -35,3 +38,4 @@ class IdentityStage(PipelineStage):
 
         if context.chat.scenario_id:
             context.scenario = await context.db.get(Scenario, context.chat.scenario_id)
+

@@ -1,9 +1,14 @@
+"""Конфигурация настроек микросервиса аутентификации."""
+
 from pydantic import Field, AliasChoices, field_validator
 from typing import List, Union, Any
 import json
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
+    """Настройки окружения сервиса аутентификации."""
+
     PROJECT_NAME: str = Field("SkaldEngine Auth Service", validation_alias=AliasChoices("AUTH_PROJECT_NAME", "PROJECT_NAME"))
     API_V1_STR: str = "/api/v1"
     LOG_LEVEL: str = "INFO"
@@ -15,6 +20,7 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def make_async_url(cls, v: Any) -> Any:
+        """Приводит URL базы данных PostgreSQL к асинхронному драйверу postgresql+asyncpg."""
         if isinstance(v, str) and v.startswith("postgresql://"):
             return v.replace("postgresql://", "postgresql+asyncpg://", 1)
         return v
@@ -34,4 +40,5 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-settings = Settings()
+
+settings = Settings()

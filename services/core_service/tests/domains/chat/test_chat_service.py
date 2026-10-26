@@ -1,3 +1,7 @@
+"""
+Модульные тесты для сервиса управления чатами (ChatService).
+"""
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 import uuid
@@ -12,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.mark.asyncio
 async def test_create_chat_raises_permission_error_for_different_persona_owner():
+    """Тест проверки запрета создания чата с чужой игровой персоной."""
     # Arrange
     user_id = uuid.uuid4()
     other_user_id = uuid.uuid4()

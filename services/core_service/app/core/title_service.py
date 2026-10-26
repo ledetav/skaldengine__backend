@@ -1,3 +1,5 @@
+"""Сервис автоматической генерации названий для ролевых чатов."""
+
 import uuid
 from openai import AsyncOpenAI
 from app.core.config import settings
@@ -6,16 +8,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class ChatTitleService:
+    """Сервис для анализа первого сообщения и генерации лаконичного названия истории."""
+
     def __init__(self):
+        """Инициализация клиента OpenAI/Polza.ai."""
         self.client = AsyncOpenAI(
             base_url="https://polza.ai/api/v1", 
             api_key=settings.POLZA_API_KEY
         )
 
     async def generate_and_update_title(self, chat_id: uuid.UUID, first_message: str):
-        """
-        Генерирует короткое название чата на основе первого сообщения пользователя
-        и обновляет его в базе данных. Использует свою сессию для работы в фоне.
+        """Генерирует короткое название чата на основе первого сообщения пользователя
+
+        и обновляет его в базе данных. Использует собственную асинхронную сессию БД
+        для безопасного фонового выполнения.
+
+        Args:
+            chat_id: Идентификатор чата.
+            first_message: Текст первого реплики пользователя.
+
+        Returns:
+            Сгенерированное название или None в случае ошибки.
         """
         from app.db.base import AsyncSessionLocal
         try:
@@ -48,3 +61,4 @@ class ChatTitleService:
         except Exception as e:
             print(f"[ERROR] Failed to generate chat title: {e}")
             return None
+

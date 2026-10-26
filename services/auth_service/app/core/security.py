@@ -1,3 +1,5 @@
+"""Утилиты безопасности, хеширования паролей и генерации JWT-токенов."""
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
@@ -5,8 +7,11 @@ from jose import jwt
 import bcrypt
 from app.core.config import settings
 
+
 @dataclass
 class TokenPayload:
+    """Полезная нагрузка (claims) для формирования JWT-токена доступа."""
+
     subject: Union[str, Any]
     role: str = "user"
     login: str | None = None
@@ -14,16 +19,45 @@ class TokenPayload:
     full_name: str | None = None
     birth_date: Union[datetime, Any] = None
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Проверяет соответствие открытого пароля хешу bcrypt.
+
+    Args:
+        plain_password: Исходный открытый пароль.
+        hashed_password: Захешированный пароль из БД.
+
+    Returns:
+        True, если пароль верен, иначе False.
+    """
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
+
 def get_password_hash(password: str) -> str:
+    """Генерирует bcrypt-хеш для пароля.
+
+    Args:
+        password: Исходный открытый пароль.
+
+    Returns:
+        Строка с bcrypt-хешем.
+    """
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
 
 def create_access_token(
     payload: TokenPayload,
     expires_delta: timedelta | None = None
 ) -> str:
+    """Создаёт подписанный JWT-токен доступа с данными пользователя.
+
+    Args:
+        payload: Структура данных TokenPayload с атрибутами пользователя.
+        expires_delta: Необязательное кастомное время жизни токена.
+
+    Returns:
+        Строка закодированного JWT-токена.
+    """
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -41,3 +75,4 @@ def create_access_token(
         
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+

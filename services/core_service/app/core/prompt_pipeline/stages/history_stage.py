@@ -1,3 +1,5 @@
+"""Этап 5 пайплайна: реконструкция дерева истории сообщений ветки чата."""
+
 from sqlalchemy import select, literal
 
 from app.domains.chat.message_models import Message
@@ -13,8 +15,10 @@ class HistoryStage(PipelineStage):
     """
 
     async def process(self, context: PipelineContext, user_text: str = "") -> None:
+        """Извлекает цепочку родительских сообщений ветки и формирует context.history."""
         if not context.chat:
             return
+
 
         current_id = context.parent_id or context.chat.active_leaf_id
         messages = []

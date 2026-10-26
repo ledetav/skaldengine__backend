@@ -1,3 +1,5 @@
+"""Оркестратор пайплайна сборки системного промпта для языковых моделей."""
+
 import uuid
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,7 @@ from app.core.prompt_pipeline.stages.assembler_stage import AssemblerStage
 
 class PromptPipeline:
     """
-    Оркестратор сборки промпта для Gemini / Polza.
+    Оркестратор сборки промпта для моделей ИИ.
     Делегирует выполнение 6 этапов изолированным модулям-стадиям.
     """
 
@@ -32,12 +34,21 @@ class PromptPipeline:
         current_user: CurrentUser,
         parent_id: Optional[uuid.UUID] = None,
     ):
+        """Инициализация пайплайна сборки промпта.
+
+        Args:
+            db: Сессия базы данных.
+            chat_id: Идентификатор чата.
+            current_user: Данные текущего пользователя.
+            parent_id: Идентификатор родительского сообщения (при ветвлении).
+        """
         self.context = PipelineContext(
             db=db,
             chat_id=chat_id,
             current_user=current_user,
             parent_id=parent_id,
         )
+
 
         # Стадии пайплайна
         self._identity_stage = IdentityStage()

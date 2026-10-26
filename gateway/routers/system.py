@@ -1,3 +1,7 @@
+"""Системные эндпоинты API Gateway.
+
+Включает проверку работоспособности шлюза и мониторинг доступности микросервисов.
+"""
 from fastapi import APIRouter
 import httpx
 
@@ -8,6 +12,7 @@ router = APIRouter()
 
 @router.get("/health")
 def health():
+    """Проверка базовой доступности самого API Gateway."""
     return {"status": "ok", "service": "gateway"}
 
 

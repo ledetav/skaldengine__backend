@@ -1,18 +1,31 @@
+"""
+Репозиторий для работы с персонами пользователей (UserPersona).
+"""
+
 from typing import List
 from uuid import UUID
 from sqlalchemy import select, func
 from shared.base.repository import BaseRepository
 from .models import UserPersona
 
+
 class UserPersonaRepository(BaseRepository[UserPersona]):
+    """
+    Репозиторий сущности UserPersona с поддержкой подсчета связанных сущностей
+    (лорбуки, чаты) и агрегированной статистики.
+    """
     def __init__(self, db):
         super().__init__(UserPersona, db)
 
     async def get_by_owner(self, owner_id: UUID) -> List[UserPersona]:
+        """
+        Получение всех персон указанного владельца вместе с количеством
+        привязанных лорбуков и активных чатов (с защитой от N+1 запросов).
+        """
         from app.domains.chat.models import Chat
         from app.domains.lorebook.models import Lorebook
 
-        # Setup scalar subqueries to avoid N+1 queries
+        # Скалярные подзапросы для предотвращения проблемы N+1
         lb_subq = (
             select(func.count(Lorebook.id))
             .where(Lorebook.user_persona_id == UserPersona.id)
@@ -27,7 +40,7 @@ class UserPersonaRepository(BaseRepository[UserPersona]):
             .correlate(UserPersona)
         )
 
-        # Single query to fetch personas and their counts
+        # Единый запрос для получения персон и их счетчиков
         query = (
             select(UserPersona, lb_subq.label("lorebook_count"), chat_subq.label("chat_count"))
             .where(UserPersona.owner_id == owner_id)
@@ -36,7 +49,7 @@ class UserPersonaRepository(BaseRepository[UserPersona]):
         result = await self.db.execute(query)
         rows = result.all()
 
-        # Reconstruct the persona objects with the fetched counts
+        # Восстановление объектов персон с установленными счетчиками
         personas = []
         for persona, lb_count, chat_count in rows:
             persona.lorebook_count = lb_count or 0
@@ -46,6 +59,10 @@ class UserPersonaRepository(BaseRepository[UserPersona]):
         return personas
 
     async def get_aggregate_stats(self, owner_id: UUID) -> dict:
+        """
+        Получение агрегированных статистических показателей пользователя:
+        общее число персон, лорбуков, чатов и сообщений.
+        """
         from app.domains.chat.models import Chat
         from app.domains.lorebook.models import Lorebook
         from app.domains.chat.message_models import Message

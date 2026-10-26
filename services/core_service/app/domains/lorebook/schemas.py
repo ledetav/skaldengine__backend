@@ -1,25 +1,36 @@
-from pydantic import BaseModel, Field
+"""
+Pydantic-схемы для работы со справочниками мира (Lorebook) и их записями (LorebookEntry).
+"""
+
 from typing import Annotated
 from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
+from app.domains.lorebook.models import LorebookType
 
 
 # ─── LorebookEntry ─────────────────────────────────────────────────────────── #
 
 class LorebookEntryBase(BaseModel):
-    keywords: list[Annotated[str, Field(max_length=150)]] = Field(default=[], max_length=10)
-    content: str = Field(..., max_length=2000)
-    priority: int = 0
-    category: str = "general"
-    is_always_included: bool = False
+    """Базовые атрибуты записи справочника мира."""
+    keywords: list[Annotated[str, Field(max_length=150)]] = Field(
+        default=[],
+        max_length=10,
+        description="Ключевые слова-триггеры для лексического поиска"
+    )
+    content: str = Field(..., max_length=2000, description="Текст лор-факта или описания")
+    priority: int = Field(default=0, description="Приоритет вставки в контекст (чем выше, тем раньше)")
+    category: str = Field(default="general", description="Категория: fact, appearance, mindset, speech, inventory, secret")
+    is_always_included: bool = Field(default=False, description="Всегда включать в промпт вне зависимости от триггеров")
 
 
 class LorebookEntryCreate(LorebookEntryBase):
+    """Схема создания записи справочника."""
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "keywords": ["magic", "spell", "wizard"],
-                    "content": "Magic is drawn from the aether around the caster.",
+                    "keywords": ["магия", "заклинание", "чародей"],
+                    "content": "Магия черпается из эфира вокруг заклинателя.",
                     "priority": 10
                 }
             ]
@@ -28,22 +39,24 @@ class LorebookEntryCreate(LorebookEntryBase):
 
 
 class LorebookEntryBulkCreate(BaseModel):
+    """Схема пакетного создания записей справочника."""
     entries: list[LorebookEntryCreate]
 
 
 class LorebookEntryUpdate(BaseModel):
-    keywords: list[Annotated[str, Field(max_length=150)]] | None = Field(default=None, max_length=10)
-    content: str | None = Field(default=None, max_length=2000)
-    priority: int | None = None
-    category: str | None = None
-    is_always_included: bool | None = None
+    """Схема частичного обновления записи справочника."""
+    keywords: list[Annotated[str, Field(max_length=150)]] | None = Field(default=None, max_length=10, description="Ключевые слова")
+    content: str | None = Field(default=None, max_length=2000, description="Текст записи")
+    priority: int | None = Field(default=None, description="Приоритет")
+    category: str | None = Field(default=None, description="Категория")
+    is_always_included: bool | None = Field(default=None, description="Флаг обязательного включения")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "keywords": ["magic", "spell", "wizard", "sorcerer"],
-                    "content": "Magic is drawn from the aether. It requires extreme focus.",
+                    "keywords": ["магия", "заклинание", "чародей", "волшебник"],
+                    "content": "Магия черпается из эфира. Требует предельной концентрации.",
                     "priority": 20
                 }
             ]
@@ -52,39 +65,39 @@ class LorebookEntryUpdate(BaseModel):
 
 
 class LorebookEntry(LorebookEntryBase):
+    """Схема чтения записи лорбука с ID."""
     id: UUID
     lorebook_id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ─── Lorebook ──────────────────────────────────────────────────────────────── #
 
-from app.domains.lorebook.models import LorebookType
-
 class LorebookBase(BaseModel):
-    name: str = Field(..., max_length=200)
-    type: LorebookType = LorebookType.FANDOM
-    character_id: UUID | None = None
-    user_persona_id: UUID | None = None
-    fandom: str | None = Field(default=None, max_length=200)
-    description: str | None = Field(default=None, max_length=500)
-    category: str = "general"
-    tags: list[str] = []
+    """Базовые атрибуты лорбука."""
+    name: str = Field(..., max_length=200, description="Название лорбука")
+    type: LorebookType = Field(default=LorebookType.FANDOM, description="Тип: fandom, character или persona")
+    character_id: UUID | None = Field(default=None, description="ID связанного персонажа")
+    user_persona_id: UUID | None = Field(default=None, description="ID связанной персоны")
+    fandom: str | None = Field(default=None, max_length=200, description="Название фандома")
+    description: str | None = Field(default=None, max_length=500, description="Описание лорбука")
+    category: str = Field(default="general", description="Категория")
+    tags: list[str] = Field(default=[], description="Список тегов")
 
 
 class LorebookCreate(LorebookBase):
+    """Схема создания нового лорбука."""
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "name": "Chronicles of Magic",
+                    "name": "Хроники магии",
                     "character_id": "aa3e4567-e89b-12d3-a456-426614174003",
                     "fandom": "Fantasy Realm"
                 },
                 {
-                    "name": "Personal Journal",
+                    "name": "Личный дневник",
                     "user_persona_id": "123e4567-e89b-12d3-a456-426614174001"
                 }
             ]
@@ -93,20 +106,21 @@ class LorebookCreate(LorebookBase):
 
 
 class LorebookUpdate(BaseModel):
-    name: str | None = Field(default=None, max_length=200)
-    description: str | None = Field(default=None, max_length=500)
-    type: LorebookType | None = None
-    fandom: str | None = Field(default=None, max_length=200)
-    character_id: UUID | None = None
-    user_persona_id: UUID | None = None
-    category: str | None = None
-    tags: list[str] | None = None
+    """Схема частичного обновления метаданных лорбука."""
+    name: str | None = Field(default=None, max_length=200, description="Название")
+    description: str | None = Field(default=None, max_length=500, description="Описание")
+    type: LorebookType | None = Field(default=None, description="Тип лорбука")
+    fandom: str | None = Field(default=None, max_length=200, description="Фандом")
+    character_id: UUID | None = Field(default=None, description="ID персонажа")
+    user_persona_id: UUID | None = Field(default=None, description="ID персоны")
+    category: str | None = Field(default=None, description="Категория")
+    tags: list[str] | None = Field(default=None, description="Теги")
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {
-                    "name": "Chronicles of Magic: Extended Version",
+                    "name": "Хроники магии: Расширенное издание",
                     "fandom": "High Fantasy Realm"
                 }
             ]
@@ -115,13 +129,15 @@ class LorebookUpdate(BaseModel):
 
 
 class Lorebook(LorebookBase):
+    """Схема лорбука с количеством записей."""
     id: UUID
     entries_count: int = 0
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LorebookWithEntries(Lorebook):
+    """Схема лорбука со списком всех его записей."""
     entries: list[LorebookEntry] = []
+
 

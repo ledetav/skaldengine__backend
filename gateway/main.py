@@ -1,3 +1,8 @@
+"""Главная точка входа для API Gateway бэкенда SKALD Engine.
+
+Инициализирует приложение FastAPI, подключает CORS-мидлвар,
+глобальный обработчик исключений, системные роутеры и маршруты проксирования.
+"""
 import traceback
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import JSONResponse

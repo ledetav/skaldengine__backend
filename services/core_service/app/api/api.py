@@ -1,3 +1,5 @@
+"""Объединяющий роутер API v1 для сервиса Core Service."""
+
 from fastapi import APIRouter
 from app.domains.persona import router as user_personas
 from app.domains.character import router as characters
@@ -8,7 +10,7 @@ from app.domains.chat import message_router as messages
 from app.domains.character import admin_router as admin_characters
 from app.domains.lorebook import admin_router as admin_lorebooks
 
-# Temporary/Shared endpoints
+# Общие эндпоинты (загрузка файлов и вебсокеты)
 from app.api.endpoints import upload, ws
 
 api_router = APIRouter()
@@ -22,6 +24,7 @@ api_router.include_router(upload.router,        prefix="/upload",      tags=["Fi
 api_router.include_router(messages.router,      prefix="/messages",    tags=["Messages"])
 api_router.include_router(ws.router,            prefix="/ws",          tags=["Real-time Updates"])
 
-# Admin Endpoints (Require valid JWT with admin/moderator role)
+# Административные эндпоинты (требуют роль admin или moderator)
 api_router.include_router(admin_characters.router, prefix="/admin/characters", tags=["Admin Characters"])
 api_router.include_router(admin_lorebooks.router, prefix="/admin/lorebooks",   tags=["Admin Lorebooks"])
+

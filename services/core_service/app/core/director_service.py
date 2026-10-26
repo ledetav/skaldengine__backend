@@ -1,3 +1,5 @@
+"""Сервис режиссёра сценария (Director Service) для динамического контроля сюжета."""
+
 from typing import Optional
 import json
 import uuid
@@ -13,12 +15,24 @@ from app.domains.scenario.models import Scenario
 from app.domains.chat.message_models import Message
 from app.domains.chat.models import ChatCheckpoint
 
+
 class DirectorService:
+    """Сервис-режиссёр для генерации контрольных точек сценария и отслеживания их прохождения."""
+
     def __init__(self):
+        """Инициализация клиента OpenAI/Polza.ai."""
         self.client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
     async def initialize_scenario(self, chat_id: uuid.UUID, checkpoints_count: int = 3):
-        """Фаза 1: Генерация маршрута (чекпоинтов) при создании чата."""
+        """Фаза 1: Генерация маршрута сюжета (чекпоинтов) при создании чата.
+
+        Извлекает контекст персонажа, персоны игрока, лорбуков и сценария, после чего
+        через LLM строит логическую последовательность промежуточных нарративных целей.
+
+        Args:
+            chat_id: Идентификатор чата.
+            checkpoints_count: Количество промежуточных чекпоинтов (по умолчанию 3).
+        """
         import random
         from sqlalchemy import func, or_
         from app.domains.lorebook.models import Lorebook, LorebookEntry, LorebookType
@@ -39,14 +53,14 @@ class DirectorService:
 
             chat, character, persona, scenario = row
 
-            # --- Lorebook Enrichment ---
+            # --- Обогащение контекста лорбуками ---
             lore_facts = []
             
-            # 2. Get Potential Lorebooks for Fandom & Character
-            # Filters: 
-            # - type=FANDOM and fandom matching character.fandom
-            # - type=CHARACTER and character_id matching character.id
-            # - associated via character_lorebook_association
+            # 2. Поиск подходящих лорбуков фандома и персонажа
+            # Критерии:
+            # - type=FANDOM и совпадение фандома с character.fandom
+            # - type=CHARACTER и совпадение с character.id
+            # - ассоциация через таблицу связей character_lorebook_association
             
             fandom_q = select(Lorebook).where(
                 Lorebook.type == LorebookType.FANDOM,
@@ -61,7 +75,7 @@ class DirectorService:
                 Lorebook.id == character_lorebook_association.c.lorebook_id
             ).where(character_lorebook_association.c.character_id == character.id)
             
-            # Combine potential lorebooks
+            # Объединение потенциальных лорбуков
             l_res_f = await db.execute(fandom_q)
             l_res_c = await db.execute(char_direct_q)
             l_res_a = await db.execute(assoc_q)
@@ -72,13 +86,13 @@ class DirectorService:
                 list(l_res_a.scalars().all())
             ))
             
-            # Select up to 3 random books
+            # Выбираем до 3 случайных книг
             if len(potential_books) > 3:
                 selected_books = random.sample(potential_books, 3)
             else:
                 selected_books = potential_books
                 
-            # Fetch up to 6 random entries from these books
+            # Извлекаем до 6 случайных записей из выбранных книг
             if selected_books:
                 book_ids = [b.id for b in selected_books]
                 entries_q = select(LorebookEntry).where(
@@ -87,7 +101,7 @@ class DirectorService:
                 e_res = await db.execute(entries_q)
                 lore_facts.extend([e.content for e in e_res.scalars().all()])
 
-            # 3. Persona Enrichment (if acquainted)
+            # 3. Обогащение лором персоны пользователя (если персонажи уже знакомы)
             persona_facts = []
             if chat.is_acquainted:
                 pers_books_q = select(Lorebook).where(
@@ -104,7 +118,7 @@ class DirectorService:
                     pe_res = await db.execute(p_entries_q)
                     persona_facts.extend([e.content for e in pe_res.scalars().all()])
 
-            # --- Build Prompt ---
+            # --- Формирование промпта для генерации чекпоинтов ---
             lore_section = "\n".join([f"- {f}" for f in lore_facts]) if lore_facts else "No specific world lore provided."
             persona_lore_section = "\n".join([f"- {f}" for f in persona_facts]) if persona_facts else ""
             
@@ -149,7 +163,7 @@ Example: "Character A admits their secret to Character B." or "The group reaches
 """
 
             try:
-                # Используем Flash для скорости и JSON mode
+                # Используем Polza chat model и JSON-режим для надежного парсинга
                 response = await self.client.chat.completions.create(
                     model=settings.POLZA_CHAT_MODEL,
                     messages=[{"role": "user", "content": prompt}],
@@ -166,7 +180,7 @@ Example: "Character A admits their secret to Character B." or "The group reaches
                 else:
                     checkpoints_list = []
 
-                # 3. Сохраняем в БД
+                # 4. Сохраняем сгенерированные чекпоинты в БД
                 for i, cp_data in enumerate(checkpoints_list[:checkpoints_count]):
                     goal = cp_data.get("goal_description")
                     if goal:
@@ -191,7 +205,15 @@ Example: "Character A admits their secret to Character B." or "The group reaches
         chat_id: uuid.UUID,
         leaf_id: Optional[uuid.UUID] = None
     ):
-        """Фаза 2: Фоновый мониторинг (The Watcher Loop)."""
+        """Фаза 2: Фоновый мониторинг выполнения текущей цели (The Watcher Loop).
+
+        Анализирует последние сообщения активной ветки диалога с помощью ИИ-супервайзера
+        и отмечает текущий чекпоинт как выполненный (is_completed=True), если цель достигнута.
+
+        Args:
+            chat_id: Идентификатор чата.
+            leaf_id: Идентификатор активного сообщения ветки (необязательно).
+        """
         client = self.client
 
         async with AsyncSessionLocal() as db:
@@ -203,7 +225,7 @@ Example: "Character A admits their secret to Character B." or "The group reaches
             )
             current_checkpoint = result.scalars().first()
             if not current_checkpoint:
-                return # Сценарий завершен или целей нет
+                return  # Сценарий завершен или целей нет
 
             # 2. Определение активной ветки сообщений
             target_leaf_id = leaf_id
@@ -243,7 +265,7 @@ Example: "Character A admits their secret to Character B." or "The group reaches
             if not history_text:
                 return
 
-            # 3. Request to Supervisor
+            # 3. Запрос к нарративному супервайзеру
             prompt = f"""You are a Narrative Supervisor. Your task is to objectively evaluate the progress of a roleplaying scene.
 
 [CURRENT SCENARIO GOAL]: "{current_checkpoint.goal_description}"
@@ -271,7 +293,7 @@ Return JSON:
                 response_text = response.choices[0].message.content
                 analysis = json.loads(response_text)
                 if analysis.get("is_achieved"):
-                    # 4. Мутация состояния
+                    # 4. Мутация состояния: чекпоинт достигнут
                     current_checkpoint.is_completed = True
                     db.add(current_checkpoint)
                     await db.commit()
@@ -281,3 +303,4 @@ Return JSON:
 
             except Exception as e:
                 print(f"[Director] Error checking progress: {e}")
+

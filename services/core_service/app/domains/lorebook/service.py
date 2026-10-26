@@ -1,3 +1,7 @@
+"""
+Сервисный слой для бизнес-логики справочников мира (Lorebook) и лор-записей (LorebookEntry).
+"""
+
 from typing import List, Optional
 from uuid import UUID
 from shared.base.service import BaseService
@@ -6,7 +10,13 @@ from app.domains.lorebook.models import Lorebook, LorebookEntry
 from app.domains.lorebook.schemas import LorebookCreate, LorebookUpdate, LorebookEntryCreate, LorebookEntryUpdate
 from app.core.broadcast import manager
 
+
 class LorebookService(BaseService[LorebookRepository]):
+    """
+    Сервис управления лорбуками и их записями.
+    Поддерживает валидацию типов (фандом/персонаж/персона), генерацию эмбеддингов
+    через модуль RAG и широковещательные WebSocket-события.
+    """
     def __init__(self, repository: LorebookRepository, entry_repository: LorebookEntryRepository):
         super().__init__(repository)
         self.entry_repository = entry_repository
@@ -19,6 +29,7 @@ class LorebookService(BaseService[LorebookRepository]):
         limit: int = 20,
         lb_type: Optional[str] = None
     ) -> tuple[List[Lorebook], int] | List[Lorebook]:
+        """Получить лорбуки с фильтрацией по персонажу, персоне, пользователю или типу."""
         if character_id:
             return await self.repository.get_by_character(character_id)
         if persona_id:
@@ -28,6 +39,7 @@ class LorebookService(BaseService[LorebookRepository]):
         return await self.repository.get_multi_with_count(skip=skip, limit=limit, lb_type=lb_type)
 
     async def create_lorebook(self, lorebook_in: LorebookCreate) -> Lorebook:
+        """Создать лорбук с валидацией обязательных полей для типа."""
         from fastapi import HTTPException
         from app.domains.lorebook.models import LorebookType
 
@@ -45,7 +57,7 @@ class LorebookService(BaseService[LorebookRepository]):
 
         created = await self.repository.create(obj_in=lorebook_in)
         
-        # Broadcast creation
+        # Оповещение через WebSocket
         await manager.broadcast({
             "type": "NEW_LOREBOOK",
             "data": {
@@ -64,18 +76,21 @@ class LorebookService(BaseService[LorebookRepository]):
         return created
 
     async def get_lorebook(self, lorebook_id: UUID) -> Optional[Lorebook]:
+        """Получить лорбук по ID."""
         return await self.repository.get(lorebook_id)
 
     async def get_fandom_lorebook(self, fandom_name: str) -> Optional[Lorebook]:
+        """Получить базовый лорбук фандома по имени."""
         return await self.repository.get_fandom_lorebook(fandom_name)
 
     async def update_lorebook(self, lorebook_id: UUID, lorebook_update: LorebookUpdate) -> Optional[Lorebook]:
+        """Обновить метаданные лорбука."""
         lorebook = await self.repository.get(lorebook_id)
         if not lorebook:
             return None
         updated = await self.repository.update(db_obj=lorebook, obj_in=lorebook_update)
         
-        # Broadcast update
+        # Оповещение через WebSocket
         await manager.broadcast({
             "type": "UPDATE_LOREBOOK",
             "data": {
@@ -93,12 +108,13 @@ class LorebookService(BaseService[LorebookRepository]):
         return updated
 
     async def delete_lorebook(self, lorebook_id: UUID) -> bool:
+        """Удалить лорбук."""
         lorebook = await self.repository.get(lorebook_id)
         if not lorebook:
             return False
         await self.repository.delete(id=lorebook_id)
         
-        # Broadcast deletion
+        # Оповещение через WebSocket
         await manager.broadcast({
             "type": "DELETE_LOREBOOK",
             "data": {"id": str(lorebook_id)}
@@ -107,6 +123,7 @@ class LorebookService(BaseService[LorebookRepository]):
 
     # Entry methods
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> LorebookEntry:
+        """Создать запись в лорбуке с вычислением векторного эмбеддинга."""
         from app.core import rag
         from fastapi import HTTPException
         
@@ -117,14 +134,14 @@ class LorebookService(BaseService[LorebookRepository]):
         entry_data = entry_in.model_dump()
         entry_data["lorebook_id"] = lorebook_id
         
-        # Generate embedding for content
+        # Генерация эмбеддинга для семантического поиска
         embedding = await rag.get_embedding(entry_in.content)
         if embedding:
             entry_data["embedding"] = embedding
             
         created = await self.entry_repository.create(obj_in=entry_data)
         
-        # Broadcast entry update (refresh needed for this lorebook)
+        # Оповещение об обновлении записей
         await manager.broadcast({
             "type": "REFRESH_LOREBOOK_ENTRIES",
             "data": {"lorebook_id": str(lorebook_id)}
@@ -132,6 +149,7 @@ class LorebookService(BaseService[LorebookRepository]):
         return created
 
     async def create_entries_bulk(self, lorebook_id: UUID, entries_in: List[LorebookEntryCreate]) -> List[LorebookEntry]:
+        """Пакетное создание записей лорбука с ограничением в 100 записей на лорбук."""
         from app.core import rag
         from fastapi import HTTPException
         
@@ -150,7 +168,7 @@ class LorebookService(BaseService[LorebookRepository]):
             
         created_entries = await self.entry_repository.create_bulk(lorebook_id, entries_data)
         
-        # Broadcast entry update
+        # Оповещение через WebSocket
         await manager.broadcast({
             "type": "REFRESH_LOREBOOK_ENTRIES",
             "data": {"lorebook_id": str(lorebook_id)}
@@ -158,6 +176,7 @@ class LorebookService(BaseService[LorebookRepository]):
         return created_entries
 
     async def update_entry(self, entry_id: UUID, entry_update: LorebookEntryUpdate) -> Optional[LorebookEntry]:
+        """Обновить запись лорбука с пересчетом эмбеддинга при изменении текста."""
         from app.core import rag
         entry = await self.entry_repository.get(entry_id)
         if not entry:
@@ -165,7 +184,7 @@ class LorebookService(BaseService[LorebookRepository]):
             
         update_data = entry_update.model_dump(exclude_unset=True)
         
-        # If content changed, regenerate embedding
+        # Пересчет эмбеддинга при изменении контента
         if "content" in update_data:
             embedding = await rag.get_embedding(update_data["content"])
             if embedding:
@@ -181,16 +200,18 @@ class LorebookService(BaseService[LorebookRepository]):
         return updated
 
     async def get_entry(self, entry_id: UUID) -> Optional[LorebookEntry]:
+        """Получить конкретную запись лорбука по ID."""
         return await self.entry_repository.get(entry_id)
 
     async def delete_entry(self, entry_id: UUID) -> bool:
+        """Удалить запись лорбука по ID."""
         entry = await self.entry_repository.get(entry_id)
         if not entry:
             return False
         lorebook_id = entry.lorebook_id
         await self.entry_repository.delete(id=entry_id)
         
-        # Broadcast entry update
+        # Оповещение через WebSocket
         await manager.broadcast({
             "type": "REFRESH_LOREBOOK_ENTRIES",
             "data": {"lorebook_id": str(lorebook_id)}
@@ -198,4 +219,6 @@ class LorebookService(BaseService[LorebookRepository]):
         return True
 
     async def get_entries_by_lorebook(self, lorebook_id: UUID, skip: int = 0, limit: int = 20, sort_by: str = "created_at") -> tuple[List[LorebookEntry], int]:
+        """Получить записи лорбука с пагинацией и сортировкой."""
         return await self.entry_repository.get_by_lorebook_with_count(lorebook_id, skip=skip, limit=limit, sort_by=sort_by)
+
