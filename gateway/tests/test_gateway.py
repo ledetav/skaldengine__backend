@@ -36,11 +36,13 @@ def test_gateway_root():
 async def test_proxy_non_streaming():
     """Проверка корректной передачи стандартных (не потоковых) ответов."""
     async def handler(request: httpx.Request):
+        """Мок-обработчик успешного ответа целевого сервиса."""
         return httpx.Response(200, json={"message": "ok"}, headers={"content-type": "application/json"})
 
     transport = httpx.MockTransport(handler)
 
     def mock_async_client(*args, **kwargs):
+        """Фабрика тестового HTTP-клиента с подмененным транспортом."""
         kwargs["transport"] = transport
         return _RealAsyncClient(*args, **kwargs)
 
@@ -66,7 +68,9 @@ async def test_proxy_sse_streaming():
     ]
 
     async def stream_handler(request: httpx.Request):
+        """Мок-обработчик потокового ответа SSE."""
         async def generate_chunks():
+            """Генератор тестовых порций потока байтов."""
             for c in chunks:
                 yield c
         return httpx.Response(
@@ -78,6 +82,7 @@ async def test_proxy_sse_streaming():
     transport = httpx.MockTransport(stream_handler)
 
     def mock_async_client(*args, **kwargs):
+        """Фабрика тестового HTTP-клиента с мок-транспортом SSE."""
         kwargs["transport"] = transport
         return _RealAsyncClient(*args, **kwargs)
 
@@ -107,11 +112,13 @@ async def test_proxy_sse_streaming():
 async def test_proxy_upstream_error_502():
     """Проверка возврата ошибки 502 Bad Gateway при недоступности апстрима."""
     async def error_handler(request: httpx.Request):
+        """Мок-обработчик сбоя сетевого подключения к апстриму."""
         raise httpx.ConnectError("Connection refused")
 
     transport = httpx.MockTransport(error_handler)
 
     def mock_async_client(*args, **kwargs):
+        """Фабрика тестового HTTP-клиента с симуляцией сбоя апстрима."""
         kwargs["transport"] = transport
         return _RealAsyncClient(*args, **kwargs)
 

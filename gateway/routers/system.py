@@ -35,6 +35,7 @@ async def debug_health():
 
 @router.get("/")
 def root():
+    """Корневой информационный эндпоинт со ссылками на документацию сервисов."""
     return {
         "status": "ok",
         "service": "skald-engine",

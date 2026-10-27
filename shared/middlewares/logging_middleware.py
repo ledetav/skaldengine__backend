@@ -38,6 +38,7 @@ def add_global_exception_handler(app: FastAPI):
     """
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        """Внутренний обработчик необработанных исключений сервера с форматированным выводом трейсбека."""
         print(f"\n{'='*50}\n🔥 КРИТИЧЕСКАЯ ОШИБКА 🔥")
         traceback.print_exc()
         print(f"{'='*50}\n")
