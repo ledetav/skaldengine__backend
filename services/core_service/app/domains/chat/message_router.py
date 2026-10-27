@@ -14,6 +14,7 @@ from shared.schemas.response import BaseResponse
 router = APIRouter()
 
 class MessageEdit(BaseModel):
+    """Схема полезной нагрузки для редактирования текста сообщения."""
     new_content: str
 
 @router.post("/{parent_id}/regenerate/stream")

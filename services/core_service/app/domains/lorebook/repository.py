@@ -16,6 +16,7 @@ class LorebookRepository(BaseRepository[Lorebook]):
     и получение глобальных фандомных справочников.
     """
     def __init__(self, db):
+        """Инициализирует репозиторий лорбуков сессией базы данных SQLAlchemy."""
         super().__init__(Lorebook, db)
 
     async def get(self, id: Any) -> Optional[Lorebook]:
@@ -87,6 +88,7 @@ class LorebookEntryRepository(BaseRepository[LorebookEntry]):
     Репозиторий записей справочника (LorebookEntry).
     """
     def __init__(self, db):
+        """Инициализирует репозиторий записей лорбуков сессией базы данных SQLAlchemy."""
         super().__init__(LorebookEntry, db)
 
     async def get_by_lorebook(self, lorebook_id: UUID) -> List[LorebookEntry]:

@@ -17,6 +17,7 @@ class ChatController(BaseController):
     Контроллер запросов для управления чатами и получением дерева сообщений.
     """
     def __init__(self, chat_service: ChatService):
+        """Инициализирует контроллер чатов сервисом управления диалогами."""
         self.chat_service = chat_service
 
     async def create_chat(self, chat_in: ChatCreate, user_id: UUID, background_tasks: BackgroundTasks, db: AsyncSession) -> BaseResponse:

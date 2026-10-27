@@ -18,6 +18,7 @@ class LorebookService(BaseService[LorebookRepository]):
     через модуль RAG и широковещательные WebSocket-события.
     """
     def __init__(self, repository: LorebookRepository, entry_repository: LorebookEntryRepository):
+        """Инициализирует сервис лорбуков репозиториями баз знаний и отдельных статей."""
         super().__init__(repository)
         self.entry_repository = entry_repository
 

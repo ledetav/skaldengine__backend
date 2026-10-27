@@ -14,6 +14,7 @@ class MessageRepository(BaseRepository[Message]):
     Репозиторий сообщений диалога с поддержкой сортировки по времени.
     """
     def __init__(self, db):
+        """Инициализирует репозиторий сообщений сессией базы данных SQLAlchemy."""
         super().__init__(Message, db)
 
     async def get_chat_history(self, chat_id: UUID) -> List[Message]:

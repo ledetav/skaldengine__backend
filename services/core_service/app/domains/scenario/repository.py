@@ -15,6 +15,7 @@ class ScenarioRepository(BaseRepository[Scenario]):
     Репозиторий сценариев с подсчетом связанных чатов.
     """
     def __init__(self, db):
+        """Инициализирует репозиторий сценариев сессией базы данных SQLAlchemy."""
         super().__init__(Scenario, db)
 
     async def get_multi_with_counts(self, skip: int = 0, limit: int = 100) -> List[Scenario]:

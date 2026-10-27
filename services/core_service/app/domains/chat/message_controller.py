@@ -19,6 +19,7 @@ class MessageController(BaseController):
     Контроллер запросов для взаимодействия с сообщениями чата.
     """
     def __init__(self, message_service: MessageService):
+        """Инициализирует контроллер сообщений сервисом потоковой обработки реплик."""
         self.message_service = message_service
 
     async def send_message_stream(

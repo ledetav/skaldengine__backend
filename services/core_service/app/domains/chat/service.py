@@ -175,6 +175,7 @@ class ChatService(BaseService[ChatRepository]):
             siblings.sort(key=lambda x: x.created_at)
 
         def _build_node(msg):
+            """Формирует узел дерева сообщений с вычислением индекса ветви среди братьев."""
             brothers = children_map.get(msg.parent_id, [])
             try:
                 current_index = brothers.index(msg) + 1

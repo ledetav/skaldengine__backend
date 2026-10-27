@@ -15,6 +15,7 @@ class UserPersonaRepository(BaseRepository[UserPersona]):
     (лорбуки, чаты) и агрегированной статистики.
     """
     def __init__(self, db):
+        """Инициализирует репозиторий персон сессией базы данных SQLAlchemy."""
         super().__init__(UserPersona, db)
 
     async def get_by_owner(self, owner_id: UUID) -> List[UserPersona]:

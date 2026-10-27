@@ -14,6 +14,7 @@ class ChatRepository(BaseRepository[Chat]):
     Репозиторий игровых сессий пользователей.
     """
     def __init__(self, db):
+        """Инициализирует репозиторий чатов сессией базы данных SQLAlchemy."""
         super().__init__(Chat, db)
 
     async def get_by_user(self, user_id: UUID, skip: int = 0, limit: int = 20) -> List[Chat]:

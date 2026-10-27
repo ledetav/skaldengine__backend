@@ -112,6 +112,7 @@ class CharacterRead(BaseModel):
 
     @classmethod
     def model_validate(cls, obj, **kwargs):
+        """Валидирует объект модели персонажа с извлечением списка идентификаторов привязанных лорбуков."""
         if hasattr(obj, 'lorebooks'):
             setattr(obj, 'lorebook_ids', [lb.id for lb in obj.lorebooks])
         return super().model_validate(obj, **kwargs)

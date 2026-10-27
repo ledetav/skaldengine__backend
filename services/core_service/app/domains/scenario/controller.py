@@ -16,6 +16,7 @@ class ScenarioController(BaseController):
     Контроллер запросов для управления сценариями.
     """
     def __init__(self, scenario_service: ScenarioService):
+        """Инициализирует контроллер сценариев сервисом ролевых квестов и сценариев."""
         self.scenario_service = scenario_service
 
     async def get_scenarios(self, character_id: Optional[UUID] = None, skip: int = 0, limit: int = 20) -> BaseResponse:

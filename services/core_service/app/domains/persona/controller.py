@@ -17,6 +17,7 @@ class UserPersonaController(BaseController):
     Контроллер запросов для управления персонами пользователей.
     """
     def __init__(self, persona_service: UserPersonaService):
+        """Инициализирует контроллер персон сервисом управления пользовательскими личностями."""
         self.persona_service = persona_service
 
     async def get_my_personas(self, user_id: UUID) -> BaseResponse:

@@ -20,6 +20,7 @@ class CharacterController(BaseController):
     создание, редактирование, удаление, загрузка изображений и обогащение авторами.
     """
     def __init__(self, character_service: CharacterService, lorebook_service: LorebookService):
+        """Инициализирует контроллер персонажей внедренными сервисами персонажей и лорбуков."""
         self.character_service = character_service
         self.lorebook_service = lorebook_service
 

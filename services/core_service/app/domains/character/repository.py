@@ -16,6 +16,7 @@ class CharacterRepository(BaseRepository[Character]):
     Репозиторий персонажей с методами фильтрации активных ботов и вычисления статистики.
     """
     def __init__(self, db):
+        """Инициализирует репозиторий персонажей сессией базы данных SQLAlchemy."""
         super().__init__(Character, db)
 
     async def get_active_characters(self, skip: int = 0, limit: int = 20) -> List[Character]:

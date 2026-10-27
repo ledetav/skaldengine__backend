@@ -20,6 +20,7 @@ class LorebookController(BaseController):
     Контроллер запросов для управления лорбуками и их записями.
     """
     def __init__(self, lorebook_service: LorebookService):
+        """Инициализирует контроллер лорбуков сервисом баз знаний."""
         self.lorebook_service = lorebook_service
 
     async def get_lorebooks(self, 
