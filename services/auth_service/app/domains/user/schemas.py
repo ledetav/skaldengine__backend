@@ -90,6 +90,7 @@ class LoginUpdate(BaseModel):
     @field_validator("new_login")
     @classmethod
     def validate_login(cls, v: str) -> str:
+        """Валидирует обновляемый логин по общим правилам UserBase."""
         return UserBase.validate_login(v)
 
 
@@ -101,6 +102,7 @@ class UsernameUpdate(BaseModel):
     @field_validator("new_username")
     @classmethod
     def validate_username(cls, v: str) -> str:
+        """Валидирует обновляемый никнейм по общим правилам UserBase."""
         return UserBase.validate_username(v)
 
 
@@ -138,6 +140,7 @@ class UserUpdate(BaseModel):
     @field_validator("login")
     @classmethod
     def validate_login(cls, v: str | None) -> str | None:
+        """Валидирует логин при частичном обновлении данных пользователя."""
         if v is None:
             return v
         return UserBase.validate_login(v)
@@ -145,6 +148,7 @@ class UserUpdate(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str | None) -> str | None:
+        """Валидирует никнейм при частичном обновлении данных пользователя."""
         if v is None:
             return v
         return UserBase.validate_username(v)
@@ -159,6 +163,7 @@ class PasswordUpdate(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        """Валидирует сложность и длину нового пароля."""
         return UserCreate.validate_password(v)
 
 
@@ -178,6 +183,7 @@ class UserResponse(UserBase):
     created_at: datetime
 
     class Config:
+        """Конфигурация сериализации ORM-модели SQLAlchemy в схему Pydantic."""
         from_attributes = True
 
 
@@ -194,6 +200,7 @@ class PublicProfileResponse(BaseModel):
     created_at: datetime
 
     class Config:
+        """Конфигурация сериализации ORM-модели SQLAlchemy в схему Pydantic."""
         from_attributes = True
 
 

@@ -24,12 +24,20 @@ if root_dir not in sys.path:
 
 # Мокирование компонентов пакета 'shared', использующих Generic
 class DummyGenericMeta(type):
+    """Метакласс для эмуляции параметризации дженериков BaseService/BaseRepository."""
+
     def __getitem__(cls, item):
+        """Возвращает сам класс при индексации дженерика вида BaseService[Model]."""
         return cls
 
+
 class DummyGeneric(metaclass=DummyGenericMeta):
+    """Базовый мок-класс для сервисов и репозиториев."""
+
     def __init__(self, repository=None):
+        """Инициализирует тестовый экземпляр фиктивного сервиса/репозитория."""
         self.repository = repository
+
 
 sys.modules["shared"] = MagicMock()
 sys.modules["shared.base"] = MagicMock()
@@ -43,7 +51,10 @@ sys.modules["app.core.config"] = MagicMock(settings=mock_settings)
 
 # Мокирование app.db.base
 class DummyBase:
+    """Фиктивный базовый класс декларативных моделей SQLAlchemy."""
     pass
+
+
 sys.modules["app.db.base"] = MagicMock(Base=DummyBase)
 
 # 2. Настройка конкретных моков для функций безопасности
@@ -64,6 +75,7 @@ class TestAuthService(IsolatedAsyncioTestCase):
     """Набор тестов для методов сервиса аутентификации AuthService."""
 
     def setUp(self):
+        """Подготавливает мок репозитория и тестируемый сервис перед каждым тестом."""
         self.repository = AsyncMock()
         self.service = AuthService(repository=self.repository)
 

@@ -31,6 +31,7 @@ async def login_json(
     from fastapi.security import OAuth2PasswordRequestForm as _Form
 
     class _FakeForm:
+        """Адаптер формы аутентификации, имитирующий структуру OAuth2PasswordRequestForm."""
         username = body.login
         password = body.password
 
