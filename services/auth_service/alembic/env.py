@@ -1,3 +1,8 @@
+"""Конфигурация окружения миграций Alembic для сервиса аутентификации (Auth Service).
+
+Настраивает асинхронное подключение к PostgreSQL через SQLAlchemy и задает
+изолированную таблицу версий миграций alembic_version_auth.
+"""
 import asyncio
 from logging.config import fileConfig
 from sqlalchemy import pool
@@ -20,6 +25,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
+    """Запуск миграций в офлайн-режиме (генерация SQL скриптов без активного соединения)."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -31,11 +37,17 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def do_run_migrations(connection: Connection) -> None:
+    """Выполняет применение миграций в рамках переданного синхронного соединения.
+
+    Args:
+        connection: Активное синхронное подключение к базе данных.
+    """
     context.configure(connection=connection, target_metadata=target_metadata, version_table="alembic_version_auth")
     with context.begin_transaction():
         context.run_migrations()
 
 async def run_migrations_online() -> None:
+    """Запуск миграций в онлайн-режиме через асинхронный движок SQLAlchemy."""
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

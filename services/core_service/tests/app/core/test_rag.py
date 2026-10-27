@@ -1,3 +1,11 @@
+"""Тесты модуля фоновой суммаризации скользящего окна диалога (RAG Sliding Window).
+
+Проверяет:
+- Ранний выход при короткой ветке диалога (< 12 сообщений).
+- Вставку маркера EMPTY_FACTS_SENTINEL при отсутствии значимых фактов во фрагменте.
+- Защиту от повторной суммаризации и зацикливания при наличии маркера в summarized_ids.
+- Корректную вставку извлеченных фактов с эмбеддингами в EpisodicMemory и коммит транзакции.
+"""
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -11,6 +19,7 @@ from app.domains.chat.models import EpisodicMemory
 
 @pytest.fixture
 def mock_db():
+    """Фикстура мока сессии базы данных для тестирования операций сохранения памяти."""
     db = MagicMock()
     db.execute = AsyncMock()
     db.commit = AsyncMock()
@@ -20,6 +29,15 @@ def mock_db():
 
 
 def create_mock_messages(count: int, chat_id=None):
+    """Создает цепочку фиктивных сообщений с указанным числом реплик.
+
+    Args:
+        count: Количество сообщений.
+        chat_id: Идентификатор чата (опционально).
+
+    Returns:
+        Список связанных объектов Message.
+    """
     c_id = chat_id or uuid4()
     messages = []
     parent_id = None
@@ -39,6 +57,7 @@ def create_mock_messages(count: int, chat_id=None):
 
 @pytest.mark.asyncio
 async def test_process_sliding_window_early_exit_short_branch(mock_db):
+    """Проверка пропуска суммаризации, если длина ветки меньше порогового размера окна."""
     chat_id = uuid4()
     last_msg_id = uuid4()
 
@@ -58,6 +77,7 @@ async def test_process_sliding_window_early_exit_short_branch(mock_db):
 
 @pytest.mark.asyncio
 async def test_process_sliding_window_empty_facts_inserts_sentinel(mock_db):
+    """Проверка записи маркера EMPTY_FACTS_SENTINEL при отсутствии фактов в вытесненных сообщениях."""
     chat_id = uuid4()
     last_msg_id = uuid4()
 
@@ -101,6 +121,7 @@ async def test_process_sliding_window_empty_facts_inserts_sentinel(mock_db):
 
 @pytest.mark.asyncio
 async def test_process_sliding_window_prevents_loop_when_sentinel_in_summarized_ids(mock_db):
+    """Проверка предотвращения повторной суммаризации чанка, если его маркер уже есть в БД."""
     chat_id = uuid4()
     last_msg_id = uuid4()
 
@@ -130,6 +151,7 @@ async def test_process_sliding_window_prevents_loop_when_sentinel_in_summarized_
 
 @pytest.mark.asyncio
 async def test_process_sliding_window_with_facts_inserts_and_commits(mock_db):
+    """Проверка успешного сохранения извлеченных фактов с вычислением эмбеддинга."""
     chat_id = uuid4()
     last_msg_id = uuid4()
 

@@ -1,3 +1,7 @@
+"""
+Контроллер API для работы со справочниками мира (Lorebook) и их записями (LorebookEntry).
+"""
+
 from typing import List, Optional
 from uuid import UUID
 from fastapi import status
@@ -10,8 +14,13 @@ from .schemas import (
 )
 from shared.schemas.response import BaseResponse
 
+
 class LorebookController(BaseController):
+    """
+    Контроллер запросов для управления лорбуками и их записями.
+    """
     def __init__(self, lorebook_service: LorebookService):
+        """Инициализирует контроллер лорбуков сервисом баз знаний."""
         self.lorebook_service = lorebook_service
 
     async def get_lorebooks(self, 
@@ -22,6 +31,7 @@ class LorebookController(BaseController):
         limit: int = 20,
         lb_type: Optional[str] = None
     ) -> BaseResponse:
+        """Получить список лорбуков с фильтрацией."""
         result = await self.lorebook_service.get_lorebooks(character_id, persona_id, user_id, skip=skip, limit=limit, lb_type=lb_type)
         if isinstance(result, tuple):
             lorebooks, total = result
@@ -32,20 +42,23 @@ class LorebookController(BaseController):
         return self.handle_success(data=data)
 
     async def check_fandom(self, fandom_name: str) -> BaseResponse:
+        """Проверить наличие глобального лорбука для фандома."""
         lorebook = await self.lorebook_service.get_fandom_lorebook(fandom_name)
         return self.handle_success(data={"exists": lorebook is not None})
 
     async def create_lorebook(self, lorebook_in: LorebookCreate, is_admin: bool = False) -> BaseResponse:
+        """Создать лорбук с проверкой прав доступа модератора."""
         if not is_admin and not lorebook_in.character_id:
             self.handle_error(
                 "Moderators can only create character-specific lorebooks (character_id is required)", 
                 status_code=status.HTTP_400_BAD_REQUEST
             )
         lorebook = await self.lorebook_service.create_lorebook(lorebook_in)
-        # We use LorebookSchema (metadata only) because entries are not loaded here and are expected to be empty anyway
+        # Используем LorebookSchema (только метаданные), так как записи пусты при создании
         return self.handle_success(data=LorebookSchema.model_validate(lorebook))
 
     async def get_lorebook(self, lorebook_id: UUID) -> BaseResponse:
+        """Получить лорбук со всеми его записями по ID."""
         lorebook = await self.lorebook_service.get_lorebook(lorebook_id)
         if not lorebook:
             self.handle_error("Lorebook not found", status_code=status.HTTP_404_NOT_FOUND)
@@ -54,6 +67,7 @@ class LorebookController(BaseController):
         return self.handle_success(data=data)
 
     async def update_lorebook(self, lorebook_id: UUID, lorebook_update: LorebookUpdate, is_admin: bool = False) -> BaseResponse:
+        """Обновить метаданные лорбука с проверкой прав доступа."""
         lorebook = await self.lorebook_service.get_lorebook(lorebook_id)
         if not lorebook:
             self.handle_error("Lorebook not found", status_code=status.HTTP_404_NOT_FOUND)
@@ -62,10 +76,10 @@ class LorebookController(BaseController):
             self.handle_error("Moderators cannot edit fandom-wide lorebooks", status_code=status.HTTP_403_FORBIDDEN)
             
         updated = await self.lorebook_service.update_lorebook(lorebook_id, lorebook_update)
-        # metadata only to avoid lazy loading issues
         return self.handle_success(data=LorebookSchema.model_validate(updated))
 
     async def delete_lorebook(self, lorebook_id: UUID, is_admin: bool = False) -> BaseResponse:
+        """Удалить лорбук с проверкой прав доступа."""
         lorebook = await self.lorebook_service.get_lorebook(lorebook_id)
         if not lorebook:
             self.handle_error("Lorebook not found", status_code=status.HTTP_404_NOT_FOUND)
@@ -78,33 +92,40 @@ class LorebookController(BaseController):
 
     # Entry methods
     async def create_entry(self, lorebook_id: UUID, entry_in: LorebookEntryCreate) -> BaseResponse:
+        """Создать одну запись в лорбуке."""
         entry = await self.lorebook_service.create_entry(lorebook_id, entry_in)
         return self.handle_success(data=LorebookEntrySchema.model_validate(entry))
 
     async def create_entries_bulk(self, lorebook_id: UUID, bulk_in: LorebookEntryBulkCreate) -> BaseResponse:
+        """Создать пакет записей в лорбуке."""
         entries = await self.lorebook_service.create_entries_bulk(lorebook_id, bulk_in.entries)
         data = [LorebookEntrySchema.model_validate(e) for e in entries]
         return self.handle_success(data=data)
 
     async def get_entry(self, entry_id: UUID) -> BaseResponse:
+        """Получить конкретную запись лорбука."""
         entry = await self.lorebook_service.get_entry(entry_id)
         if not entry:
             self.handle_error("Entry not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=LorebookEntrySchema.model_validate(entry))
 
     async def update_entry(self, entry_id: UUID, entry_update: LorebookEntryUpdate) -> BaseResponse:
+        """Обновить запись лорбука."""
         entry = await self.lorebook_service.update_entry(entry_id, entry_update)
         if not entry:
             self.handle_error("Entry not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=LorebookEntrySchema.model_validate(entry))
 
     async def delete_entry(self, entry_id: UUID) -> BaseResponse:
+        """Удалить запись лорбука."""
         success = await self.lorebook_service.delete_entry(entry_id)
         if not success:
             self.handle_error("Entry not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=None)
 
     async def get_entries(self, lorebook_id: UUID, skip: int = 0, limit: int = 20, sort_by: str = "created_at") -> BaseResponse:
+        """Получить записи лорбука с пагинацией."""
         entries, total = await self.lorebook_service.get_entries_by_lorebook(lorebook_id, skip=skip, limit=limit, sort_by=sort_by)
         items = [LorebookEntrySchema.model_validate(e) for e in entries]
         return self.handle_success(data={"items": items, "total": total})
+

@@ -1,3 +1,5 @@
+"""Модуль генерации векторных эмбеддингов и фоновой суммаризации истории чата (RAG)."""
+
 import uuid
 from typing import Optional, List
 from openai import AsyncOpenAI
@@ -5,16 +7,22 @@ from sqlalchemy import select, desc, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
-# Polza client (OpenAI wrapper) default instance
+# Экземпляр клиента Polza.ai по умолчанию
 _default_client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
 
 EMPTY_FACTS_SENTINEL = "[NO_FACTS]"
 
 
 async def get_embedding(text: str) -> list[float]:
-    """
-    Асинхронная генерация эмбеддинга (1536-dim) через text-embedding-3-small.
-    Используется для сохранения воспоминаний.
+    """Асинхронная генерация эмбеддинга (1536-dim) через text-embedding-3-small.
+    
+    Используется для сохранения фактов в эпизодическую память.
+
+    Args:
+        text: Текст факта для векторизации.
+
+    Returns:
+        Список чисел с плавающей точкой (вектор эмбеддинга).
     """
     client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
     try:
@@ -23,7 +31,6 @@ async def get_embedding(text: str) -> list[float]:
             input=text,
             dimensions=1536 if "text-embedding-3" in settings.POLZA_EMBEDDING_MODEL else None
         )
-        # Assuming we just return it
         return response.data[0].embedding
     except Exception as e:
         print(f"[RAG] Error generating embedding: {e}")
@@ -31,8 +38,13 @@ async def get_embedding(text: str) -> list[float]:
 
 
 async def get_query_embedding(query: str) -> list[float]:
-    """
-    Асинхронная генерация эмбеддинга для поискового запроса.
+    """Асинхронная генерация эмбеддинга для поискового запроса RAG.
+
+    Args:
+        query: Текст запроса для поиска релевантных воспоминаний.
+
+    Returns:
+        Вектор эмбеддинга запроса.
     """
     client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
     try:
@@ -48,6 +60,17 @@ async def get_query_embedding(query: str) -> list[float]:
 
 
 async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: uuid.UUID):
+    """Фоновая обработка скользящего окна сообщений ветки чата.
+
+    Извлекает сообщения, вышедшие за пределы оперативного контекста (последние 6 сообщений),
+    выделяет из них ключевые факты с помощью LLM-суммаризатора и сохраняет векторные эмбеддинги
+    в эпизодическую память (EpisodicMemory).
+
+    Args:
+        db: Асинхронная сессия базы данных.
+        chat_id: Идентификатор чата.
+        leaf_id: Идентификатор последнего листа текущей ветки сообщений.
+    """
     from app.domains.chat.message_models import Message
     from app.domains.chat.models import EpisodicMemory
     
@@ -74,7 +97,7 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
     # Все сообщения, вышедшие за пределы окна последних 6
     fallen_out = branch[:-6]
     
-    # Retrieve all message_ids from this chat that were already summarized
+    # Получаем идентификаторы сообщений этого чата, которые уже были суммаризированы
     res = await db.execute(select(EpisodicMemory.message_id).where(EpisodicMemory.chat_id == chat_id))
     summarized_ids = set(res.scalars().all())
     
@@ -140,7 +163,7 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
                     saved_any = True
             
             if not saved_any:
-                # Mark chunk as processed with sentinel so we don't re-summarize in an infinite loop
+                # Помечаем чанк как обработанный сигнальным значением (sentinel), чтобы избежать повторной суммаризации
                 dummy_vector = [0.0] * 1536
                 dummy_vector[0] = 1.0
                 sentinel_mem = EpisodicMemory(
@@ -154,3 +177,4 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
             await db.commit()
         except Exception as e:
             print(f"[RAG] Error in process_sliding_window: {e}")
+

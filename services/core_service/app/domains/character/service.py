@@ -1,3 +1,7 @@
+"""
+Сервисный слой для управления персонажами (Character) и связанными ресурсами.
+"""
+
 from typing import List, Optional
 from uuid import UUID
 
@@ -7,8 +11,14 @@ from .models import Character
 from app.domains.character.schemas import CharacterCreate, CharacterUpdate
 from app.core.broadcast import manager
 
+
 class CharacterService(BaseService[CharacterRepository]):
+    """
+    Сервис бизнес-логики персонажей: получение каталога, создание,
+    обновление, мягкое удаление, сохранение медиа и WebSocket-оповещения.
+    """
     async def get_characters(self, skip: int = 0, limit: int = 20, is_admin: bool = False) -> tuple[List[Character], int]:
+        """Получить список персонажей с подсчетом сценариев и сценарных чатов."""
         from sqlalchemy.orm import selectinload
         from sqlalchemy import select, func
         
@@ -33,6 +43,7 @@ class CharacterService(BaseService[CharacterRepository]):
         return characters, total
 
     async def get_character(self, character_id: UUID, is_admin: bool = False) -> Optional[Character]:
+        """Получить конкретного персонажа по ID с проверкой прав доступа."""
         from sqlalchemy.orm import selectinload
         from sqlalchemy import select
         query = select(Character).options(selectinload(Character.lorebooks)).where(Character.id == character_id)
@@ -49,8 +60,10 @@ class CharacterService(BaseService[CharacterRepository]):
         character.scenario_chats_count = await self.repository.get_scenario_chats_count(character.id)
         return character
 
-
     async def create_character(self, character_in: CharacterCreate, creator_id: UUID) -> Character:
+        """
+        Создать персонажа. Для типа original автоматически создается персональный лорбук.
+        """
         data = character_in.model_dump(exclude={"lorebook_ids"})
         if not data.get("avatar_url"):
             data["avatar_url"] = f"https://api.dicebear.com/7.x/avataaars/svg?seed={data.get('name', 'default')}"
@@ -134,6 +147,10 @@ class CharacterService(BaseService[CharacterRepository]):
         return created
 
     async def update_character(self, character_id: UUID, character_update: CharacterUpdate, creator_id: Optional[UUID] = None) -> Optional[Character]:
+        """
+        Обновить данные персонажа.
+        Для оригинальных персонажей перепривязываются и настраиваются персональные лорбуки.
+        """
         from sqlalchemy.orm import selectinload
         from sqlalchemy import select
         
@@ -214,6 +231,9 @@ class CharacterService(BaseService[CharacterRepository]):
         return updated
 
     async def delete_character(self, character_id: UUID, creator_id: Optional[UUID] = None) -> bool:
+        """
+        Мягкое удаление персонажа и удаление привязанных к нему персональных лорбуков.
+        """
         character = await self.repository.get(character_id)
         if not character:
             return False
@@ -250,6 +270,7 @@ class CharacterService(BaseService[CharacterRepository]):
         return True
 
     async def save_character_image(self, character_id: UUID, file_content: bytes, filename: str, prefix: str) -> str:
+        """Сохранить файл изображения персонажа на диск и вернуть публичный URL."""
         import os
         import aiofiles
         from app.core.config import settings
@@ -266,7 +287,8 @@ class CharacterService(BaseService[CharacterRepository]):
 
 
     def _format_broadcast_data(self, character: Character) -> dict:
-        # Use __dict__ to check for loaded attributes without triggering lazy loads
+        """Форматирование сущности персонажа в словарь для рассылки через WebSocket."""
+        # Проверка атрибутов через __dict__ во избежание нежелательной отложенной загрузки
         lorebook_ids = []
         if "lorebooks" in character.__dict__:
             lorebook_ids = [str(lb.id) for lb in character.lorebooks]

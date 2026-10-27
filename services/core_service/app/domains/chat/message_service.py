@@ -1,3 +1,7 @@
+"""
+Сервисный слой для потоковой обработки сообщений (Message), ветвления, редактирования и форка чатов.
+"""
+
 from typing import List, Optional, Any
 from uuid import UUID
 from fastapi import BackgroundTasks
@@ -9,11 +13,20 @@ from .message_schemas import MessageCreate
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update as sa_update
 
+
 class MessageService(BaseService[MessageRepository]):
+    """
+    Сервис сообщений: потоковая генерация SSE через LLM-пайплайн, свайпы (регенерация),
+    редактирование сообщений и форк ветки в новую игровую сессию.
+    """
     async def send_message_stream(
         self, chat_id: UUID, current_user: Any, message_in: MessageCreate, 
         background_tasks: BackgroundTasks, db: AsyncSession
     ):
+        """
+        Сохранение сообщения пользователя, обновление чекпоинтов,
+        сборка системного промпта через PromptPipeline и запуск SSE-стриминга ответа ИИ.
+        """
         from .models import Chat
         from app.domains.character.models import Character
         from app.domains.persona.models import UserPersona
@@ -23,7 +36,7 @@ class MessageService(BaseService[MessageRepository]):
         if not chat or str(chat.user_id) != str(current_user.id):
             raise ValueError("Chat not found")
 
-        # Save user message
+        # Сохранение входящего сообщения пользователя
         user_msg = Message(
             chat_id=chat.id,
             role="user",
@@ -32,6 +45,7 @@ class MessageService(BaseService[MessageRepository]):
         )
         db.add(user_msg)
         
+        # Автоматическая генерация заголовка для нового чата
         if not chat.title and not message_in.parent_id:
             from app.core.title_service import ChatTitleService
             title_service = ChatTitleService()
@@ -40,7 +54,7 @@ class MessageService(BaseService[MessageRepository]):
         await db.commit()
         await db.refresh(user_msg)
 
-        # Increment message count for the current checkpoint
+        # Увеличение счетчика сообщений для активной контрольной точки
         from .models import ChatCheckpoint
         cp_stmt = (
             select(ChatCheckpoint)
@@ -54,12 +68,12 @@ class MessageService(BaseService[MessageRepository]):
             db.add(active_cp)
             await db.commit()
 
-        # Build payload
+        # Сборка промпта через конвейер стадий
         from app.core.prompt_pipeline import PromptPipeline
         pipeline = PromptPipeline(db, chat_id, current_user=current_user, parent_id=message_in.parent_id)
         payload = await pipeline.build_payload(message_in.content)
         
-        # AI message template
+        # Шаблон сообщения ассистента в БД
         ai_msg = Message(
             chat_id=chat.id,
             role="assistant",
@@ -69,7 +83,7 @@ class MessageService(BaseService[MessageRepository]):
         db.add(ai_msg)
         await db.flush()
 
-        # Update active leaf
+        # Обновление указателя активного листа чата
         await db.execute(
             sa_update(Chat)
             .where(Chat.id == chat.id)
@@ -78,13 +92,16 @@ class MessageService(BaseService[MessageRepository]):
         await db.commit()
         await db.refresh(ai_msg)
 
-        # Streaming
+        # Запуск стриминга ответа через Polza API / локальный провайдер
         from app.api.endpoints.stream_utils import generate_chat_stream
         state = {}
 
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
     async def regenerate_stream(self, parent_id: UUID, current_user: Any, db: AsyncSession):
+        """
+        Перегенерация ответа ИИ для указанного сообщения пользователя (механика свайпа).
+        """
         parent_msg = await self.repository.get(parent_id)
         if not parent_msg or parent_msg.role != "user":
             raise ValueError("Parent user message not found")
@@ -118,7 +135,12 @@ class MessageService(BaseService[MessageRepository]):
         state = {}
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
+
     async def edit_message(self, message_id: UUID, new_content: str, user_id: UUID, db: AsyncSession) -> Message:
+        """
+        Редактирование сообщения в истории.
+        Создает новое сообщение-потомок того же родителя (непрямое ветвление), сохраняя историю.
+        """
         original_msg = await self.repository.get(message_id)
         if not original_msg:
             raise ValueError("Message not found")
@@ -147,6 +169,11 @@ class MessageService(BaseService[MessageRepository]):
         return new_msg
 
     async def fork_chat(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> Chat:
+        """
+        Явное форкание (ответвление) диалога в новый независимый чат.
+        Копирует всю цепочку сообщений от корня до выбранного узла,
+        включая эпизодическую память и контрольные точки сценария.
+        """
         from app.domains.chat.models import EpisodicMemory
         from app.domains.chat.models import ChatCheckpoint
         from sqlalchemy import cast as sql_cast
@@ -174,7 +201,7 @@ class MessageService(BaseService[MessageRepository]):
         db.add(new_chat)
         await db.flush()
 
-        # Path to root
+        # Восстановление пути от целевого сообщения к корню
         path = []
         curr = target_msg
         while curr:
@@ -202,7 +229,7 @@ class MessageService(BaseService[MessageRepository]):
 
         new_chat.active_leaf_id = last_id
 
-        # Episodic memory
+        # Клонирование эпизодической памяти
         mem_res = await db.execute(
             select(EpisodicMemory).where(EpisodicMemory.message_id.in_(old_to_new.keys()))
         )
@@ -214,7 +241,7 @@ class MessageService(BaseService[MessageRepository]):
                 embedding=mem.embedding
             ))
 
-        # Checkpoints
+        # Клонирование контрольных точек сценария
         if original_chat.mode == "scenario":
             cp_res = await db.execute(select(ChatCheckpoint).where(ChatCheckpoint.chat_id == original_chat.id))
             for cp in cp_res.scalars().all():
@@ -231,6 +258,7 @@ class MessageService(BaseService[MessageRepository]):
         return new_chat
 
     async def get_message(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> Optional[Message]:
+        """Получить сообщение по ID с проверкой прав доступа к чату."""
         message = await self.repository.get(message_id)
         if not message:
             return None
@@ -240,6 +268,7 @@ class MessageService(BaseService[MessageRepository]):
         return message
 
     async def delete_message(self, message_id: UUID, user_id: UUID, db: AsyncSession) -> bool:
+        """Удалить сообщение из чата с проверкой прав владельца."""
         message = await self.repository.get(message_id)
         if not message:
             return False
@@ -248,3 +277,4 @@ class MessageService(BaseService[MessageRepository]):
             return False
         await self.repository.delete(id=message_id)
         return True
+

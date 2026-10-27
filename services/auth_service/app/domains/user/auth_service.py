@@ -1,3 +1,5 @@
+"""Сервис аутентификации, верификации учетных данных и регистрации."""
+
 from datetime import timedelta
 from typing import Optional, Dict
 from shared.base.service import BaseService
@@ -7,8 +9,20 @@ from app.core.security import verify_password, create_access_token, get_password
 from app.core.config import settings
 from app.domains.user.schemas import UserCreate, UserResponse, Token
 
+
 class AuthService(BaseService[UserRepository]):
+    """Сервис аутентификации и регистрации пользователей."""
+
     async def authenticate(self, identifier: str, password: str) -> Optional[Dict]:
+        """Аутентифицирует пользователя по логину/email и паролю.
+
+        Args:
+            identifier: Email или логин пользователя.
+            password: Введённый пароль.
+
+        Returns:
+            Словарь с токеном доступа или None, если проверка не пройдена.
+        """
         user = await self.repository.get_by_email_or_login(identifier)
         if not user or not verify_password(password, user.password_hash):
             return None
@@ -32,7 +46,18 @@ class AuthService(BaseService[UserRepository]):
         }
 
     async def register(self, user_in: UserCreate) -> User:
-        # Check if user exists
+        """Регистрирует нового пользователя в системе.
+
+        Args:
+            user_in: Данные для создания пользователя.
+
+        Returns:
+            Созданный объект модели User.
+
+        Raises:
+            ValueError: Если email, login или username уже зарегистрированы.
+        """
+        # Проверяем, существует ли уже пользователь с такими данными
         existing_user = await self.repository.check_existence(
             email=user_in.email,
             login=user_in.login,
@@ -40,11 +65,11 @@ class AuthService(BaseService[UserRepository]):
         )
         if existing_user:
             if existing_user.email == user_in.email:
-                raise ValueError("User with this email already registered")
+                raise ValueError("Пользователь с таким email уже зарегистрирован")
             elif existing_user.login == user_in.login:
-                raise ValueError("Login already taken")
+                raise ValueError("Логин уже занят")
             else:
-                raise ValueError("Username (handle) already taken")
+                raise ValueError("Имя пользователя (@handle) уже занято")
 
         user_data = {
             "email": user_in.email,
@@ -57,3 +82,4 @@ class AuthService(BaseService[UserRepository]):
             "avatar_url": f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_in.username}"
         }
         return await self.repository.create(obj_in=user_data)
+

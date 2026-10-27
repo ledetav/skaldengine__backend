@@ -1,3 +1,7 @@
+"""
+Сервисный слой управления ролевыми сессиями (Chat).
+"""
+
 from typing import List, Optional, Any
 from uuid import UUID
 from fastapi import BackgroundTasks
@@ -8,10 +12,17 @@ from app.domains.chat.schemas import ChatCreate, ChatUpdate, ChatResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
+
 class ChatService(BaseService[ChatRepository]):
+    """
+    Сервис бизнес-логики чатов: создание сессий, инициализация сценариев Режиссером,
+    пагинация списка с превью и построение дерева сообщений.
+    """
     async def create_chat(self, chat_in: ChatCreate, user_id: UUID, background_tasks: BackgroundTasks, db: AsyncSession) -> Chat:
-        # We pass db here temporarily if needed for complex cross-service logic, 
-        # but ideally we should use injected repositories.
+        """
+        Создать новую игровую сессию.
+        Для сценарных чатов запускает фоновую генерацию контрольных точек Режиссером.
+        """
         from app.domains.character.models import Character
         from app.domains.persona.models import UserPersona
         from app.domains.scenario.models import Scenario
@@ -49,7 +60,7 @@ class ChatService(BaseService[ChatRepository]):
 
         created_chat = await self.repository.create(obj_in=chat)
         
-        # Increment character chat count
+        # Инкремент счетчиков использования персонажа
         from app.core.stats_service import StatsService
         await StatsService.increment_total_chats(db, character.id)
         
@@ -68,6 +79,7 @@ class ChatService(BaseService[ChatRepository]):
         return created_chat
 
     async def get_user_chats(self, user_id: UUID, skip: int = 0, limit: int = 20) -> List[Any]:
+        """Получить список чатов пользователя с предзагрузкой имен персонажа, персоны и превью последнего сообщения."""
         from sqlalchemy.orm import joinedload
         query = select(Chat).where(Chat.user_id == user_id).options(
             joinedload(Chat.character),
@@ -90,18 +102,21 @@ class ChatService(BaseService[ChatRepository]):
         return responses
 
     async def get_chat(self, chat_id: UUID, user_id: UUID) -> Optional[Chat]:
+        """Получить чат по ID с проверкой прав владельца."""
         chat = await self.repository.get(chat_id)
         if chat and str(chat.user_id) == str(user_id):
             return chat
         return None
 
     async def update_chat(self, chat_id: UUID, chat_update: ChatUpdate, user_id: UUID) -> Optional[Chat]:
+        """Обновить настройки или метаданные чата."""
         chat = await self.get_chat(chat_id, user_id)
         if not chat:
             return None
         return await self.repository.update(db_obj=chat, obj_in=chat_update)
 
     async def delete_chat(self, chat_id: UUID, user_id: UUID) -> bool:
+        """Удалить чат (вместе со всеми сообщениями и чекпоинтами каскадно)."""
         chat = await self.get_chat(chat_id, user_id)
         if not chat:
             return False
@@ -109,6 +124,10 @@ class ChatService(BaseService[ChatRepository]):
         return True
 
     async def get_history_payload(self, chat_id: UUID, user_id: UUID, db: AsyncSession) -> dict:
+        """
+        Построить полное дерево сообщений, активную ветку диалога
+        и список сюжетных чекпоинтов для клиентского интерфейса.
+        """
         from app.domains.chat.message_models import Message
         from app.domains.chat.models import ChatCheckpoint
         from collections import defaultdict
@@ -156,6 +175,7 @@ class ChatService(BaseService[ChatRepository]):
             siblings.sort(key=lambda x: x.created_at)
 
         def _build_node(msg):
+            """Формирует узел дерева сообщений с вычислением индекса ветви среди братьев."""
             brothers = children_map.get(msg.parent_id, [])
             try:
                 current_index = brothers.index(msg) + 1

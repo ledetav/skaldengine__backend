@@ -1,3 +1,7 @@
+"""
+Контроллер API для работы с персонами пользователей.
+"""
+
 from typing import List, Optional
 from uuid import UUID
 from fastapi import status
@@ -7,36 +11,48 @@ from .schemas import UserPersonaCreate, UserPersonaUpdate, UserPersonaResponse
 from app.domains.persona.schemas import UserStatistics
 from shared.schemas.response import BaseResponse
 
+
 class UserPersonaController(BaseController):
+    """
+    Контроллер запросов для управления персонами пользователей.
+    """
     def __init__(self, persona_service: UserPersonaService):
+        """Инициализирует контроллер персон сервисом управления пользовательскими личностями."""
         self.persona_service = persona_service
 
     async def get_my_personas(self, user_id: UUID) -> BaseResponse:
+        """Получить список персон текущего пользователя."""
         personas = await self.persona_service.get_user_personas(user_id)
         return self.handle_success(data=[UserPersonaResponse.model_validate(p) for p in personas])
 
     async def create_persona(self, persona_in: UserPersonaCreate, user_id: UUID) -> BaseResponse:
+        """Создать новую персону для пользователя."""
         persona = await self.persona_service.create_persona(persona_in, user_id)
         return self.handle_success(data=UserPersonaResponse.model_validate(persona))
 
     async def get_persona(self, persona_id: UUID, user_id: UUID) -> BaseResponse:
+        """Получить информацию о конкретной персоне пользователя."""
         persona = await self.persona_service.get_persona(persona_id, user_id)
         if not persona:
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=UserPersonaResponse.model_validate(persona))
 
     async def update_persona(self, persona_id: UUID, persona_update: UserPersonaUpdate, user_id: UUID) -> BaseResponse:
+        """Обновить данные персоны пользователя."""
         persona = await self.persona_service.update_persona(persona_id, persona_update, user_id)
         if not persona:
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=UserPersonaResponse.model_validate(persona))
 
     async def delete_persona(self, persona_id: UUID, user_id: UUID, is_admin: bool = False) -> BaseResponse:
+        """Удалить персону пользователя."""
         success = await self.persona_service.delete_persona(persona_id, user_id, is_admin=is_admin)
         if not success:
             self.handle_error("Persona not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data=None)
 
     async def get_user_stats(self, user_id: UUID) -> BaseResponse:
+        """Получить сводную статистику сущностей пользователя."""
         stats = await self.persona_service.get_user_stats(user_id)
         return self.handle_success(data=UserStatistics(**stats))
+

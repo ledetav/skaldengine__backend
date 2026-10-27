@@ -1,1 +1,1 @@
-# Gateway tests package
+"""Пакет интеграционных и модульных тестов для API Gateway."""

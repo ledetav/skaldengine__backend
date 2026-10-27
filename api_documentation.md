@@ -1,37 +1,37 @@
-# SkaldEngine API Documentation
+# Документация API SKALDEngine
 
-Welcome to the SkaldEngine API documentation. This guide provides an exhaustive list of all endpoints, their HTTP methods, request/response formats, security roles, and examples.
+Данное руководство содержит полное описание всех доступных эндпоинтов, их HTTP-методов, схем запросов и ответов, уровней доступа и примеров использования.
 
 ---
 
-## Overview
+## Архитектурный обзор
 
-The SkaldEngine backend architecture consists of a unified API Gateway and dedicated microservices:
+Бэкенд SKALDEngine построен на базе централизованного шлюза API Gateway и выделенных микросервисов:
 
-1. **API Gateway (Unified Entry Point)**: `http://localhost:8080/api/v1` (or via reverse-proxy Caddy at `http://localhost/api/v1`).
-   - Automatically dispatches requests to `auth_service` and `core_service`.
-   - Handles WebSocket routing, CORS headers, and anti-buffering for SSE text streaming.
-   - Swagger / OpenAPI documentation:
-     - Gateway documentation index: `http://localhost:8080/docs`
-     - Auth Service OpenAPI: `http://localhost:8080/auth/docs`
-     - Core Service OpenAPI: `http://localhost:8080/core/docs`
-2. **Auth Service**: `http://localhost:8001/api/v1` (Internal / Direct access). Handles authentication, user management, and JWT profiles.
-3. **Core Service**: `http://localhost:8000/api/v1` (Internal / Direct access). Handles core game logic, prompt pipelines, AI streaming, characters, personas, lorebooks, and scenarios.
+1. **API Gateway (Единая точка входа)**: `http://localhost:8080/api/v1` (или через reverse-proxy Caddy по адресу `http://localhost/api/v1`).
+   - Автоматически маршрутизирует запросы к `auth_service` и `core_service`.
+   - Обеспечивает проксирование WebSocket, установку CORS-заголовков и антибуферизацию потоковых ответов SSE.
+   - Swagger / OpenAPI документация:
+     - Сводный индекс шлюза: `http://localhost:8080/docs`
+     - Спецификация Auth Service: `http://localhost:8080/auth/docs`
+     - Спецификация Core Service: `http://localhost:8080/core/docs`
+2. **Auth Service**: `http://localhost:8001/api/v1` (Внутренний доступ). Обеспечивает авторизацию, управление пользователями и JWT-профили.
+3. **Core Service**: `http://localhost:8000/api/v1` (Внутренний доступ). Игровой движок, конвейер сборки промптов, потоковая генерация ИИ, персонажи, персоны, лорбуки и сценарии.
 
-### Common Response Envelope
+### Стандартизированный формат ответа (BaseResponse)
 
-All REST API requests and responses use **JSON** and conform to the standardized `BaseResponse` format:
+Все эндпоинты REST API используют формат **JSON** и возвращают стандартизированную структуру `BaseResponse`:
 
 ```json
 {
   "success": true,
   "data": { ... },
-  "message": "Operation successful",
+  "message": "Операция выполнена успешно",
   "error_code": null
 }
 ```
 
-In case of error, `success` is `false`, `data` is `null`, and `message`/`error_code` describe the failure.
+В случае ошибки поле `success` равно `false`, поле `data` равно `null`, а поля `message` и `error_code` содержат описание возникшей ошибки.
 
 ---
 

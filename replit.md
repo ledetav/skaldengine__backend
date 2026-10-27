@@ -1,93 +1,114 @@
-# SKALD Engine Backend
+# Бэкенд SKALD Engine
 
-A high-performance platform for interactive storytelling and role-playing games featuring AI characters. Built with a Vertical Slices (Domain-Driven Design) architecture for scalability and production use.
+Высокопроизводительная платформа для интерактивного сторителлинга и ролевых игр с ИИ-персонажами. Построена на архитектуре вертикальных срезов (Domain-Driven Design / Vertical Slices) с разделением на микросервисы и единый шлюз API Gateway.
 
-## Architecture
+## Архитектура системы
 
-This project consists of two FastAPI microservices sharing a single PostgreSQL database:
+Проект состоит из трех сервисов и общего слоя:
 
-### Auth Service (port 5000 — main webview)
-- Handles authentication, user profiles, and JWT token management
-- Located at `services/auth_service/`
-- Exposes `/api/v1/auth` and `/api/v1/users` endpoints
-- Swagger UI available at `/docs`
+### 1. API Gateway (порт 8080 / 8000)
+- Единая точка входа для клиентов и фронтенда (Reverse Proxy на базе `httpx.AsyncClient`).
+- Маршрутизация запросов к `auth_service` (`/api/v1/auth`, `/api/v1/users`) и `core_service` (все остальные эндпоинты `/api/v1/*`).
+- Проксирование двунаправленного WebSocket-соединения (`/ws/updates`).
+- Агрегированная документация Swagger UI:
+  - Сводный индекс: `/docs`
+  - Документация Auth Service: `/auth/docs`
+  - Документация Core Service: `/core/docs`
+- Антибуферизация SSE-стриминга (`X-Accel-Buffering: no`).
 
-### Core Service (port 8000 — background console)
-- Main game engine: AI character interactions, RAG, chat, lorebooks, personas, scenarios
-- Located at `services/core_service/`
-- Exposes all game-related endpoints under `/api/v1/`
-- Swagger UI available at `/docs`
-- Serves uploaded files (avatars, cards) at `/static/`
+### 2. Auth Service (порт 8001)
+- Микросервис аутентификации, регистрации, профилей пользователей и JWT.
+- Расположен в `services/auth_service/`.
+- Предоставляет эндпоинты `/api/v1/auth` и `/api/v1/users`.
+- Собственная база данных `auth_db`.
 
-## Tech Stack
+### 3. Core Service (порт 8000)
+- Основной игровой движок: ролевые диалоги, персонажи, сценарии, персоны игроков, лорбуки.
+- 6-стадийный конвейер сборки контекста (`PromptPipeline`).
+- Семантический поиск и эпизодическая память (гибридный RAG на `pgvector`).
+- Режиссер сценариев (`DirectorService`) и генерация названий чатов.
+- Расположен в `services/core_service/`.
+- Собственная база данных `core_db` с поддержкой `pgvector`.
 
-- **Language:** Python 3.12
-- **Web Framework:** FastAPI with Uvicorn (ASGI)
-- **Database:** PostgreSQL with pgvector extension (single Replit DB shared by both services)
-- **ORM:** SQLAlchemy (async) with asyncpg driver
-- **Migrations:** Alembic (separate version tables: `alembic_version_auth`, `alembic_version_core`)
-- **AI/LLM:** Polza.ai (OpenAI-compatible wrapper) for character responses and embeddings
-- **Auth:** JWT via python-jose, password hashing via passlib/bcrypt
+### 4. Shared Layer (`shared/`)
+- Общие базовые классы `BaseRepository`, `BaseService`, `BaseController`.
+- Единый формат ответа API `BaseResponse`.
+- Централизованные схемы и конфигурация логирования.
 
-## Project Structure
+---
+
+## Технологический стек
+
+- **Язык:** Python 3.12
+- **Веб-фреймворк:** FastAPI + Uvicorn (ASGI)
+- **База данных:** PostgreSQL с расширением `pgvector`
+- **ORM:** SQLAlchemy (асинхронный движок с драйвером `asyncpg`)
+- **Миграции:** Alembic (раздельные миграции для каждого сервиса)
+- **ИИ / LLM:** Polza.ai (OpenAI-совместимый API) через единый системный токен
+- **Безопасность:** JWT (python-jose), хеширование паролей (passlib/bcrypt)
+
+---
+
+## Структура проекта
 
 ```
+gateway/             # Шлюз API Gateway (Reverse Proxy, WebSocket, Swagger)
 services/
-  auth_service/      # Authentication microservice
+  auth_service/      # Микросервис аутентификации и пользователей
     app/
-      domains/user/  # User models, auth, JWT
-      core/config.py # Settings (reads AUTH_DATABASE_URL)
-    alembic/         # DB migrations
-  core_service/      # Game engine microservice
+      domains/user/  # Модели, схемы, репозитории, сервисы и контроллеры пользователей
+      core/config.py # Настройки (AUTH_DATABASE_URL, SECRET_KEY)
+    alembic/         # Миграции базы данных auth_db
+  core_service/      # Игровой движок и работа с LLM
     app/
       domains/       # character, chat, lorebook, persona, scenario
-      core/          # RAG, prompt pipelines, director, stats
-    alembic/         # DB migrations
-shared/              # Common base classes and schemas used by both services
-start_auth.sh        # Startup script for auth service (sets PYTHONPATH)
-start_core.sh        # Startup script for core service (sets PYTHONPATH)
+      core/          # PromptPipeline, RAG, Director, Stats, Title
+    alembic/         # Миграции базы данных core_db
+shared/              # Общие базовые абстракции и схемы ответа
 ```
 
-## Environment Variables
+---
 
-| Variable | Description |
+## Переменные окружения
+
+| Переменная | Описание |
 |---|---|
-| `SECRET_KEY` | JWT signing secret |
-| `ALGORITHM` | JWT algorithm (default: HS256) |
-| `AUTH_DATABASE_URL` | asyncpg URL for auth service DB |
-| `CORE_DATABASE_URL` | asyncpg URL for core service DB |
-| `POLZA_API_KEY` | Polza.ai / OpenAI-compatible API key (secret) |
-| `POLZA_CHAT_MODEL` | Model for character chat responses |
-| `POLZA_EMBEDDING_MODEL` | Model for vector embeddings |
-| `POLZA_SUMMARY_MODEL` | Model for summarization |
-| `POLZA_TITLE_MODEL` | Model for title generation |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token expiry |
+| `SECRET_KEY` | Секретный ключ для подписи токенов JWT |
+| `ALGORITHM` | Алгоритм подписи JWT (по умолчанию `HS256`) |
+| `AUTH_DATABASE_URL` | URL подключения к базе данных auth_service (`postgresql+asyncpg://...`) |
+| `CORE_DATABASE_URL` | URL подключения к базе данных core_service (`postgresql+asyncpg://...`) |
+| `POLZA_API_KEY` | Системный API-ключ Polza.ai / OpenAI для генерации ответов и эмбеддингов |
+| `POLZA_CHAT_MODEL` | Имя модели для диалогов персонажей |
+| `POLZA_EMBEDDING_MODEL` | Имя модели для векторных эмбеддингов |
+| `POLZA_SUMMARY_MODEL` | Имя модели для саммаризации памяти |
+| `POLZA_TITLE_MODEL` | Имя модели для генерации заголовков чатов |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Срок жизни access токена в минутах |
 
-## Running Locally
+---
 
-Both services need `PYTHONPATH` set to the workspace root so the `shared` module resolves:
-
-```bash
-# Auth service
-bash start_auth.sh
-
-# Core service  
-bash start_core.sh
-```
-
-## Database Migrations
+## Запуск миграций базы данных
 
 ```bash
-# Auth service
+# Миграции Auth Service
 cd services/auth_service
-AUTH_DATABASE_URL="..." SECRET_KEY="..." python3 -m alembic upgrade head
+python -m alembic upgrade head
 
-# Core service
+# Миграции Core Service
 cd services/core_service
-CORE_DATABASE_URL="..." SECRET_KEY="..." POLZA_API_KEY="..." python3 -m alembic upgrade head
+python -m alembic upgrade head
 ```
 
-## Workflows
+---
 
-- **Start application** — Auth service on port 5000 (webview)
-- **Core Service** — Core game engine on port 8000 (console)
+## Тестирование
+
+```bash
+# Тесты Gateway
+python -m pytest gateway/tests
+
+# Тесты Auth Service
+python -m pytest services/auth_service/tests/test_auth_service.py
+
+# Тесты Core Service
+python -m pytest services/core_service/tests
+```

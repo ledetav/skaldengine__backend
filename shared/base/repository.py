@@ -1,3 +1,5 @@
+"""Базовый репозиторий для асинхронной работы с базой данных через SQLAlchemy."""
+
 from typing import Generic, TypeVar, Type, List, Optional, Any
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,34 +9,77 @@ ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType")
 UpdateSchemaType = TypeVar("UpdateSchemaType")
 
+
 class BaseRepository(Generic[ModelType]):
+    """Обобщённый базовый репозиторий CRUD-операций для моделей SQLAlchemy."""
+
     def __init__(self, model: Type[ModelType], db: AsyncSession):
+        """Инициализация репозитория.
+
+        Args:
+            model: Класс модели SQLAlchemy.
+            db: Асинхронная сессия SQLAlchemy.
+        """
         self.model = model
         self.db = db
 
     async def get(self, id: Any) -> Optional[ModelType]:
+        """Получает запись по первичному ключу (ID).
+
+        Args:
+            id: Идентификатор записи.
+
+        Returns:
+            Экземпляр модели или None, если запись не найдена.
+        """
         query = select(self.model).where(self.model.id == id)
         result = await self.db.execute(query)
         return result.scalars().first()
 
     async def get_multi(self, skip: int = 0, limit: int = 100) -> List[ModelType]:
+        """Получает список записей с пагинацией (offset/limit).
+
+        Args:
+            skip: Количество пропускаемых записей.
+            limit: Максимальное количество возвращаемых записей.
+
+        Returns:
+            Список найденных моделей.
+        """
         query = select(self.model).offset(skip).limit(limit)
         result = await self.db.execute(query)
         return result.scalars().all()
 
     async def get_multi_by_ids(self, ids: List[Any]) -> List[ModelType]:
+        """Получает записи по списку идентификаторов.
+
+        Args:
+            ids: Список идентификаторов записей.
+
+        Returns:
+            Список найденных моделей.
+        """
         query = select(self.model).where(self.model.id.in_(ids))
         result = await self.db.execute(query)
         return result.scalars().all()
 
     async def get_multi_with_count(self, skip: int = 0, limit: int = 100) -> tuple[List[ModelType], int]:
+        """Получает список записей с пагинацией и общее количество записей.
+
+        Args:
+            skip: Количество пропускаемых записей.
+            limit: Максимальное количество возвращаемых записей.
+
+        Returns:
+            Кортеж из списка записей и общего числа записей (items, total).
+        """
         from sqlalchemy import func
-        # Query for items
+        # Запрос записей с пагинацией
         query = select(self.model).offset(skip).limit(limit)
         result = await self.db.execute(query)
         items = result.scalars().all()
 
-        # Query for total count
+        # Запрос общего количества записей
         count_query = select(func.count()).select_from(self.model)
         count_result = await self.db.execute(count_query)
         total = count_result.scalar() or 0
@@ -42,6 +87,14 @@ class BaseRepository(Generic[ModelType]):
         return list(items), total
 
     async def create(self, obj_in) -> ModelType:
+        """Создаёт новую запись в базе данных.
+
+        Args:
+            obj_in: Данные для создания (dict, Pydantic-схема или экземпляр модели).
+
+        Returns:
+            Созданный экземпляр модели.
+        """
         if isinstance(obj_in, dict):
             db_obj = self.model(**obj_in)
         elif hasattr(obj_in, 'model_dump'):
@@ -56,6 +109,15 @@ class BaseRepository(Generic[ModelType]):
         return db_obj
 
     async def update(self, db_obj: ModelType, obj_in: Any) -> ModelType:
+        """Обновляет существующую запись в базе данных.
+
+        Args:
+            db_obj: Существующий объект модели в базе данных.
+            obj_in: Новые данные для обновления (dict или Pydantic-схема).
+
+        Returns:
+            Обновлённый экземпляр модели.
+        """
         if isinstance(obj_in, dict):
             update_data = obj_in
         else:
@@ -71,7 +133,16 @@ class BaseRepository(Generic[ModelType]):
         return db_obj
 
     async def delete(self, id: Any) -> bool:
+        """Удаляет запись по первичному ключу.
+
+        Args:
+            id: Идентификатор удаляемой записи.
+
+        Returns:
+            True, если запись была удалена, иначе False.
+        """
         query = delete(self.model).where(self.model.id == id)
         result = await self.db.execute(query)
         await self.db.commit()
         return result.rowcount > 0
+

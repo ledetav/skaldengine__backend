@@ -1,3 +1,7 @@
+"""
+Модульные тесты для сервиса персонажей (CharacterService).
+"""
+
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import uuid4
@@ -6,15 +10,17 @@ from app.domains.character.service import CharacterService
 from app.domains.character.models import Character
 from app.domains.character.repository import CharacterRepository
 
-# Import related models to fix SQLAlchemy mapper registry errors
+# Импорт связанных моделей для корректной настройки мапперов SQLAlchemy
 from app.domains.lorebook.models import Lorebook
 from app.domains.scenario.models import Scenario
 from app.domains.chat.models import Chat
 from app.domains.persona.models import UserPersona
 from app.domains.chat.message_models import Message
 
+
 @pytest.mark.asyncio
 async def test_delete_character_wrong_owner():
+    """Тест отклонения удаления персонажа пользователем, не являющимся владельцем."""
     # Setup
     character_id = uuid4()
     real_creator_id = uuid4()
@@ -56,6 +62,7 @@ async def test_delete_character_wrong_owner():
 
 @pytest.mark.asyncio
 async def test_delete_character_success():
+    """Проверка мягкого удаления персонажа (is_deleted=True) и каскадного удаления связанных лорбуков."""
     character_id = uuid4()
     creator_id = uuid4()
     lb_id = uuid4()
@@ -106,6 +113,7 @@ async def test_delete_character_success():
 
 @pytest.mark.asyncio
 async def test_delete_character_not_found():
+    """Проверка возврата False при попытке удаления несуществующего персонажа."""
     character_id = uuid4()
     mock_repo = AsyncMock(spec=CharacterRepository)
     mock_repo.get.return_value = None

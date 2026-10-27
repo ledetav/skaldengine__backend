@@ -1,3 +1,11 @@
+"""Тесты третьего этапа пайплайна (RAGStage) по извлечению воспоминаний из pgvector.
+
+Проверяет:
+- Извлечение кандидатов воспоминаний при реалистичной дистанции косинусного расстояния (до 0.60).
+- Гибридную оценку релевантности с приоритетом свежих воспоминаний по времени.
+- Ранний выход из этапа при отсутствии вектора запроса пользователя.
+- Фильтрацию служебных маркеров отсутствия фактов (EMPTY_FACTS_SENTINEL).
+"""
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +18,7 @@ from app.core.config import settings
 
 @pytest.fixture
 def mock_db():
+    """Фикстура мока сессии базы данных с асинхронными методами execute и get."""
     db = MagicMock()
     db.execute = AsyncMock()
     db.get = AsyncMock()
@@ -18,6 +27,7 @@ def mock_db():
 
 @pytest.fixture
 def current_user():
+    """Фикстура тестового текущего пользователя."""
     user = MagicMock()
     user.id = uuid4()
     user.birth_date = None
@@ -26,6 +36,7 @@ def current_user():
 
 @pytest.mark.asyncio
 async def test_stage_3_rag_retrieves_candidates_at_realistic_distance(mock_db, current_user):
+    """Проверка извлечения фактов памяти при реалистичной косинусной дистанции (0.42)."""
     chat_id = uuid4()
     parent_id = uuid4()
 
@@ -61,6 +72,7 @@ async def test_stage_3_rag_retrieves_candidates_at_realistic_distance(mock_db, c
 
 @pytest.mark.asyncio
 async def test_stage_3_rag_hybrid_scoring_prioritizes_recent_memories(mock_db, current_user):
+    """Проверка гибридного скоринга: недавние воспоминания получают приоритет перед старыми."""
     chat_id = uuid4()
     parent_id = uuid4()
 
@@ -101,6 +113,7 @@ async def test_stage_3_rag_hybrid_scoring_prioritizes_recent_memories(mock_db, c
 
 @pytest.mark.asyncio
 async def test_stage_3_rag_exits_early_when_no_query_vector(mock_db, current_user):
+    """Проверка раннего завершения этапа без обращения к БД, если вектор запроса не сформирован."""
     chat_id = uuid4()
     pipeline = PromptPipeline(db=mock_db, chat_id=chat_id, current_user=current_user)
     pipeline.query_vector = None
@@ -113,6 +126,7 @@ async def test_stage_3_rag_exits_early_when_no_query_vector(mock_db, current_use
 
 @pytest.mark.asyncio
 async def test_stage_3_rag_filters_out_empty_facts_sentinel(mock_db, current_user):
+    """Проверка отфильтровывания маркера EMPTY_FACTS_SENTINEL из возвращаемых воспоминаний."""
     from app.core.rag import EMPTY_FACTS_SENTINEL
 
     chat_id = uuid4()

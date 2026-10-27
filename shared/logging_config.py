@@ -1,7 +1,15 @@
+"""Конфигурация структурированного логирования для приложения."""
+
 import logging
 import sys
 
+
 def setup_logging(log_level: str = "INFO"):
+    """Настраивает корневой логгер и форматирование логов для консольного вывода.
+
+    Args:
+        log_level: Уровень логирования в виде строки (например, "INFO", "DEBUG").
+    """
     level = getattr(logging, log_level.upper(), logging.INFO)
 
     formatter = logging.Formatter(
@@ -19,9 +27,10 @@ def setup_logging(log_level: str = "INFO"):
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    # Adjust Uvicorn loggers to not propagate if they have their own handlers
-    # or let them propagate and remove their handlers so everything uses our format.
+    # Настройка логгеров Uvicorn и FastAPI: удаляем их собственные обработчики,
+    # чтобы все логи проходили через корневой логгер с нашим форматом.
     for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
         logger = logging.getLogger(logger_name)
         logger.handlers = []
         logger.propagate = True
+

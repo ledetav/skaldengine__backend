@@ -1,3 +1,5 @@
+"""Pydantic-схемы данных для пользователей и аутентификации."""
+
 import re
 from typing import Literal
 from pydantic import BaseModel, EmailStr, field_validator, Field
@@ -6,48 +8,55 @@ from datetime import date, datetime
 
 
 class UserBase(BaseModel):
-    email: EmailStr
-    login: str
-    username: str
-    full_name: str | None = Field(default=None, max_length=200)
-    about: str | None = Field(default=None, max_length=500)
-    birth_date: date
+    """Базовая схема с общими полями пользователя."""
+
+    email: EmailStr = Field(..., description="Адрес электронной почты")
+    login: str = Field(..., description="Уникальный логин для входа")
+    username: str = Field(..., description="Публичный никнейм/хэндл (@handle)")
+    full_name: str | None = Field(default=None, max_length=200, description="Полное имя")
+    about: str | None = Field(default=None, max_length=500, description="Информация о себе")
+    birth_date: date = Field(..., description="Дата рождения")
 
     @field_validator("login")
     @classmethod
     def validate_login(cls, v: str) -> str:
+        """Валидация формата логина."""
         if v.strip() != v:
-            raise ValueError("Login cannot have leading or trailing spaces")
+            raise ValueError("Логин не должен содержать начальные или конечные пробелы")
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
-            raise ValueError("Login can only contain alphanumeric characters, hyphens, and underscores")
+            raise ValueError("Логин может содержать только латинские буквы, цифры, дефисы и знаки подчеркивания")
         return v
 
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str) -> str:
+        """Валидация публичного никнейма."""
         if v.strip() != v:
-            raise ValueError("Username cannot have leading or trailing spaces")
+            raise ValueError("Имя пользователя не должно содержать начальные или конечные пробелы")
         if v.startswith("@"):
             v = v[1:]
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
-            raise ValueError("Username can only contain alphanumeric characters, hyphens, and underscores")
+            raise ValueError("Имя пользователя может содержать только латинские буквы, цифры, дефисы и знаки подчеркивания")
         return v
 
 
 class UserCreate(UserBase):
-    password: str
+    """Схема для регистрации нового пользователя."""
+
+    password: str = Field(..., description="Пароль пользователя")
 
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        """Валидация сложности пароля."""
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters long")
+            raise ValueError("Пароль должен содержать не менее 8 символов")
         if not any(c.isdigit() for c in v):
-            raise ValueError("Password must contain at least one digit")
+            raise ValueError("Пароль должен содержать хотя бы одну цифру")
         if not any(c.isupper() for c in v):
-            raise ValueError("Password must contain at least one uppercase letter")
+            raise ValueError("Пароль должен содержать хотя бы одну заглавную букву")
         if not any(not c.isalnum() for c in v):
-            raise ValueError("Password must contain at least one special character")
+            raise ValueError("Пароль должен содержать хотя бы один специальный символ")
         return v
 
     model_config = {
@@ -57,7 +66,7 @@ class UserCreate(UserBase):
                     "email": "user@example.com",
                     "login": "SuperPlayer2000",
                     "username": "Skaldik",
-                    "full_name": "Ivan Ivanov",
+                    "full_name": "Иван Иванов",
                     "password": "StrongPassword123!",
                     "birth_date": "1995-04-03"
                 }
@@ -67,43 +76,59 @@ class UserCreate(UserBase):
 
 
 class UserLogin(BaseModel):
-    login: str  # OAuth2PasswordRequestForm использует username, а не email
-    password: str
+    """Схема для аутентификации пользователя."""
+
+    login: str = Field(..., description="Логин или username")
+    password: str = Field(..., description="Пароль")
 
 
 class LoginUpdate(BaseModel):
-    new_login: str
+    """Схема для обновления логина."""
+
+    new_login: str = Field(..., description="Новый уникальный логин")
 
     @field_validator("new_login")
     @classmethod
     def validate_login(cls, v: str) -> str:
+        """Валидирует обновляемый логин по общим правилам UserBase."""
         return UserBase.validate_login(v)
 
 
 class UsernameUpdate(BaseModel):
-    new_username: str
+    """Схема для обновления публичного никнейма."""
+
+    new_username: str = Field(..., description="Новое публичное имя пользователя")
 
     @field_validator("new_username")
     @classmethod
     def validate_username(cls, v: str) -> str:
+        """Валидирует обновляемый никнейм по общим правилам UserBase."""
         return UserBase.validate_username(v)
 
 
 class EmailUpdate(BaseModel):
-    new_email: EmailStr
+    """Схема для обновления адреса электронной почты."""
+
+    new_email: EmailStr = Field(..., description="Новый email адрес")
 
 
 class FullNameUpdate(BaseModel):
-    full_name: str | None = Field(default=None, max_length=200)
+    """Схема для обновления полного имени."""
+
+    full_name: str | None = Field(default=None, max_length=200, description="Полное имя")
 
 
 class ProfileUpdate(BaseModel):
-    avatar_url: str | None = None
-    cover_url: str | None = None
-    about: str | None = Field(default=None, max_length=500)
+    """Схема для обновления данных профиля (аватар, обложка, описание)."""
+
+    avatar_url: str | None = Field(None, description="URL аватара")
+    cover_url: str | None = Field(None, description="URL обложки профиля")
+    about: str | None = Field(default=None, max_length=500, description="Информация о себе")
 
 
 class UserUpdate(BaseModel):
+    """Схема для комплексного обновления данных пользователя."""
+
     email: EmailStr | None = None
     login: str | None = None
     username: str | None = None
@@ -115,6 +140,7 @@ class UserUpdate(BaseModel):
     @field_validator("login")
     @classmethod
     def validate_login(cls, v: str | None) -> str | None:
+        """Валидирует логин при частичном обновлении данных пользователя."""
         if v is None:
             return v
         return UserBase.validate_login(v)
@@ -122,26 +148,34 @@ class UserUpdate(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v: str | None) -> str | None:
+        """Валидирует никнейм при частичном обновлении данных пользователя."""
         if v is None:
             return v
         return UserBase.validate_username(v)
 
 
 class PasswordUpdate(BaseModel):
-    old_password: str
-    new_password: str
+    """Схема для смены пароля."""
+
+    old_password: str = Field(..., description="Текущий пароль")
+    new_password: str = Field(..., description="Новый пароль")
 
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        """Валидирует сложность и длину нового пароля."""
         return UserCreate.validate_password(v)
 
 
 class RoleUpdate(BaseModel):
-    role: Literal["user", "moderator", "admin"]
+    """Схема для назначения роли пользователю."""
+
+    role: Literal["user", "moderator", "admin"] = Field(..., description="Новая роль пользователя")
 
 
 class UserResponse(UserBase):
+    """Схема полного ответа с данными пользователя."""
+
     id: UUID
     role: str
     avatar_url: str | None = None
@@ -149,10 +183,13 @@ class UserResponse(UserBase):
     created_at: datetime
 
     class Config:
+        """Конфигурация сериализации ORM-модели SQLAlchemy в схему Pydantic."""
         from_attributes = True
 
 
 class PublicProfileResponse(BaseModel):
+    """Схема публичного профиля пользователя."""
+
     id: UUID
     username: str
     full_name: str | None = None
@@ -163,9 +200,13 @@ class PublicProfileResponse(BaseModel):
     created_at: datetime
 
     class Config:
+        """Конфигурация сериализации ORM-модели SQLAlchemy в схему Pydantic."""
         from_attributes = True
 
 
 class Token(BaseModel):
-    access_token: str
-    token_type: str
+    """Схема возвращаемого JWT-токена доступа."""
+
+    access_token: str = Field(..., description="JWT access токен")
+    token_type: str = Field(default="bearer", description="Тип токена")
+

@@ -1,3 +1,8 @@
+"""Тесты потоковой генерации и фильтрации системных тегов в SSE-стримах.
+
+Проверяет буферизацию потенциальных тегов мыслей (<Internal_Analysis>), корректность
+фильтрации разбитых по чанкам тегов и сброс ложных префиксов в выходной поток.
+"""
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,14 +12,19 @@ from app.api.endpoints.stream_utils import generate_chat_stream
 
 
 class MockChunkStream:
+    """Асинхронный итератор для мокирования потоковых порций (чанков) OpenAI API."""
+
     def __init__(self, contents):
+        """Инициализирует мок-поток списком строковых фрагментов."""
         self.contents = contents
 
     def __aiter__(self):
+        """Возвращает асинхронный итератор."""
         self._iter = iter(self.contents)
         return self
 
     async def __anext__(self):
+        """Возвращает следующий мок-чанк ответа с дельтой контента."""
         try:
             content = next(self._iter)
             mock_choice = MagicMock()
@@ -27,6 +37,14 @@ class MockChunkStream:
 
 
 async def collect_stream_tokens(stream_gen):
+    """Считывает и парсит события из асинхронного генератора SSE-потока.
+
+    Args:
+        stream_gen: Асинхронный генератор SSE строк.
+
+    Returns:
+        Кортеж (emitted_text, events) с объединенным текстом токенов и списком событий.
+    """
     tokens = []
     events = []
     async for item in stream_gen:
@@ -48,6 +66,7 @@ async def collect_stream_tokens(stream_gen):
 @patch("app.api.endpoints.stream_utils.process_post_generation")
 @patch("app.api.endpoints.stream_utils.AsyncOpenAI")
 async def test_stream_regular_content_without_tags(mock_openai_cls, mock_post_gen):
+    """Проверка генерации обычного контента без системных тегов."""
     chunks = ["Hello, ", "this is ", "a simple ", "response."]
     mock_client = AsyncMock()
     mock_client.chat.completions.create.return_value = MockChunkStream(chunks)
@@ -67,6 +86,7 @@ async def test_stream_regular_content_without_tags(mock_openai_cls, mock_post_ge
 @patch("app.api.endpoints.stream_utils.process_post_generation")
 @patch("app.api.endpoints.stream_utils.AsyncOpenAI")
 async def test_stream_filters_tag_split_across_chunks(mock_openai_cls, mock_post_gen):
+    """Проверка фильтрации открывающего тега, разделенного между чанками."""
     # Tag split into two chunks: '<Inter' and 'nal_Analysis>'
     chunks = [
         "Greeting! ",
@@ -93,6 +113,7 @@ async def test_stream_filters_tag_split_across_chunks(mock_openai_cls, mock_post
 @patch("app.api.endpoints.stream_utils.process_post_generation")
 @patch("app.api.endpoints.stream_utils.AsyncOpenAI")
 async def test_stream_filters_closing_tag_split_across_chunks(mock_openai_cls, mock_post_gen):
+    """Проверка фильтрации закрывающего тега, разделенного между двумя чанками."""
     chunks = [
         "<Internal_Analysis>Secret thought</Internal",
         "_Analysis>Visible text after thought.",
@@ -113,6 +134,7 @@ async def test_stream_filters_closing_tag_split_across_chunks(mock_openai_cls, m
 @patch("app.api.endpoints.stream_utils.process_post_generation")
 @patch("app.api.endpoints.stream_utils.AsyncOpenAI")
 async def test_stream_filters_character_by_character_tag(mock_openai_cls, mock_post_gen):
+    """Проверка посимвольной фильтрации тега, поступающего отдельными байтами/символами."""
     tag = "<Internal_Analysis>"
     chunks = list(tag) + ["thought", "</Internal_Analysis>", "Done!"]
     mock_client = AsyncMock()
@@ -131,6 +153,7 @@ async def test_stream_filters_character_by_character_tag(mock_openai_cls, mock_p
 @patch("app.api.endpoints.stream_utils.process_post_generation")
 @patch("app.api.endpoints.stream_utils.AsyncOpenAI")
 async def test_stream_does_not_swallow_false_prefix(mock_openai_cls, mock_post_gen):
+    """Проверка возврата в поток ложного префикса тега (<Internet ... вместо <Internal_Analysis>)."""
     # Prefix '<Inter' followed by 'net connection>' (not '<Internal_Analysis>')
     chunks = ["Check the <Inter", "net connection> right now."]
     mock_client = AsyncMock()
@@ -148,6 +171,7 @@ async def test_stream_does_not_swallow_false_prefix(mock_openai_cls, mock_post_g
 @patch("app.api.endpoints.stream_utils.process_post_generation")
 @patch("app.api.endpoints.stream_utils.AsyncOpenAI")
 async def test_stream_flushes_pending_prefix_at_end_of_stream(mock_openai_cls, mock_post_gen):
+    """Проверка сброса буферизованного префикса тега при завершении генерации потока."""
     # Stream ends while buffer holds potential prefix '<Inter'
     chunks = ["Goodbye <Inter"]
     mock_client = AsyncMock()

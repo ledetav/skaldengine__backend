@@ -1,3 +1,5 @@
+"""Оркестратор пайплайна сборки системного промпта для языковых моделей."""
+
 import uuid
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +23,7 @@ from app.core.prompt_pipeline.stages.assembler_stage import AssemblerStage
 
 class PromptPipeline:
     """
-    Оркестратор сборки промпта для Gemini / Polza.
+    Оркестратор сборки промпта для моделей ИИ.
     Делегирует выполнение 6 этапов изолированным модулям-стадиям.
     """
 
@@ -32,12 +34,21 @@ class PromptPipeline:
         current_user: CurrentUser,
         parent_id: Optional[uuid.UUID] = None,
     ):
+        """Инициализация пайплайна сборки промпта.
+
+        Args:
+            db: Сессия базы данных.
+            chat_id: Идентификатор чата.
+            current_user: Данные текущего пользователя.
+            parent_id: Идентификатор родительского сообщения (при ветвлении).
+        """
         self.context = PipelineContext(
             db=db,
             chat_id=chat_id,
             current_user=current_user,
             parent_id=parent_id,
         )
+
 
         # Стадии пайплайна
         self._identity_stage = IdentityStage()
@@ -50,114 +61,142 @@ class PromptPipeline:
     # Свойства для прозрачной обратной совместимости с существующими тестами и сервисами
     @property
     def db(self) -> AsyncSession:
+        """Асинхронная сессия SQLAlchemy для взаимодействия с базой данных."""
         return self.context.db
 
     @property
     def chat_id(self) -> uuid.UUID:
+        """Уникальный идентификатор текущего чата."""
         return self.context.chat_id
 
     @property
     def current_user(self) -> CurrentUser:
+        """Текущий авторизованный пользователь сессии."""
         return self.context.current_user
 
     @property
     def parent_id(self) -> Optional[uuid.UUID]:
+        """Идентификатор родительского сообщения в дереве диалога."""
         return self.context.parent_id
 
     @property
     def client(self) -> Optional[AsyncOpenAI]:
+        """Асинхронный клиент OpenAI / Polza AI для генерации эмбеддингов и текста."""
         return self.context.client
 
     @property
     def chat(self) -> Optional[Chat]:
+        """Сущность текущей игровой сессии диалога."""
         return self.context.chat
 
     @chat.setter
     def chat(self, value: Optional[Chat]):
+        """Устанавливает загруженную сущность чата в контекст пайплайна."""
         self.context.chat = value
 
     @property
     def character(self) -> Optional[Character]:
+        """Сущность персонажа, от лица которого ведется диалог."""
         return self.context.character
 
     @character.setter
     def character(self, value: Optional[Character]):
+        """Устанавливает загруженную сущность персонажа в контекст пайплайна."""
         self.context.character = value
 
     @property
     def persona(self) -> Optional[UserPersona]:
+        """Сущность игровой персоны пользователя (игрока)."""
         return self.context.persona
 
     @persona.setter
     def persona(self, value: Optional[UserPersona]):
+        """Устанавливает игровую персону пользователя в контекст пайплайна."""
         self.context.persona = value
 
     @property
     def scenario(self) -> Optional[Scenario]:
+        """Сущность активного сценарного квеста для текущего диалога."""
         return self.context.scenario
 
     @scenario.setter
     def scenario(self, value: Optional[Scenario]):
+        """Устанавливает активный сценарий в контекст пайплайна."""
         self.context.scenario = value
 
     @property
     def lore_fragments(self) -> List[str]:
+        """Список текстовых фрагментов лорбуков, отобранных для промпта."""
         return self.context.lore_fragments
 
     @property
     def memories(self) -> List[str]:
+        """Список релевантных воспоминаний из векторной базы pgvector."""
         return self.context.memories
 
     @property
     def history(self) -> List[Dict[str, str]]:
+        """Реконструированная хронологическая цепочка сообщений чата."""
         return self.context.history
 
     @property
     def character_motivations(self) -> List[str]:
+        """Мотивации и цели персонажа, извлеченные из базы знаний."""
         return self.context.character_motivations
 
     @property
     def character_behavioral_cues(self) -> List[str]:
+        """Поведенческие паттерны и манеры речи персонажа."""
         return self.context.character_behavioral_cues
 
     @property
     def character_facts(self) -> List[str]:
+        """Факты биографии персонажа для системного контекста."""
         return self.context.character_facts
 
     @property
     def persona_facts(self) -> List[str]:
+        """Факты об игровой персоне пользователя."""
         return self.context.persona_facts
 
     @property
     def scenario_directive(self) -> str:
+        """Директива сценария (Точка А / Точка Б) для ведения сюжета."""
         return self.context.scenario_directive
 
     @scenario_directive.setter
     def scenario_directive(self, value: str):
+        """Устанавливает сформированную сюжетную директиву."""
         self.context.scenario_directive = value
 
     @property
     def core_attributes(self) -> List[str]:
+        """Неотъемлемые ключевые атрибуты персонажа, включаемые всегда."""
         return self.context.core_attributes
 
     @property
     def categorized_facts(self) -> Dict[str, List[str]]:
+        """Категоризированные факты лорбука персонажа (appearance, psychology, facts)."""
         return self.context.categorized_facts
 
     @property
     def persona_core_attributes(self) -> List[str]:
+        """Ключевые неотъемлемые атрибуты персоны игрока."""
         return self.context.persona_core_attributes
 
     @property
     def persona_categorized_facts(self) -> Dict[str, List[str]]:
+        """Категоризированные факты лорбука персоны игрока."""
         return self.context.persona_categorized_facts
 
     @property
     def query_vector(self) -> Optional[List[float]]:
+        """Вектор эмбеддинга текущей реплики пользователя для поиска RAG."""
         return self.context.query_vector
 
     @query_vector.setter
     def query_vector(self, value: Optional[List[float]]):
+        """Сохраняет вычисленный вектор эмбеддинга для повторного использования."""
         self.context.query_vector = value
 
     async def build_payload(self, user_text: str) -> Dict[str, Any]:
@@ -196,7 +235,9 @@ class PromptPipeline:
         return await self._assembler_stage.process(self.context, user_text)
 
     def _get_stems(self, text: str) -> List[str]:
+        """Извлекает нормализованные основы слов (стеммы) для поиска по ключевым словам."""
         return get_stems(text)
 
     def _add_lore_to_collections(self, entry: LorebookEntry, is_core: bool = False) -> None:
+        """Добавляет статью лорбука в соответствующую категорию контекста персонажа или персоны."""
         self._lorebook_stage._add_lore_to_collections(self.context, entry, is_core)

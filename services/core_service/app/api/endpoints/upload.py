@@ -1,3 +1,5 @@
+"""Эндпоинт загрузки статических медиафайлов (изображений) на сервер."""
+
 import uuid
 import aiofiles
 import os
@@ -14,7 +16,7 @@ ALLOWED_MIME_TYPES = {
     "image/webp": "webp"
 }
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 МБ
 
 
 @router.post("/", response_model=dict)
@@ -22,9 +24,21 @@ async def upload_file(
     file: UploadFile = File(...),
     current_user: deps.CurrentUser = Depends(deps.get_current_user)
 ):
-    # Read first 2048 bytes for magic numbers
+    """Загружает файл изображения на сервер с проверкой MIME-типа и размера.
+
+    Args:
+        file: Загружаемый файл.
+        current_user: Текущий авторизованный пользователь.
+
+    Returns:
+        Словарь с относительным URL загруженного файла ({"url": "/static/..."}).
+
+    Raises:
+        HTTPException: Если тип файла недопустим, превышен размер или произошла ошибка записи.
+    """
+    # Считываем первые 2048 байт для проверки сигнатуры (magic numbers)
     header = await file.read(2048)
-    # Reset file pointer to beginning so the entire file is saved later
+    # Сбрасываем указатель файла в начало для корректного сохранения
     await file.seek(0)
 
     mime_type = magic.from_buffer(header, mime=True)
@@ -57,6 +71,7 @@ async def upload_file(
         if os.path.exists(file_path):
             os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
+
         
     url = f"/static/{unique_filename}"
-    return {"url": url}
+    return {"url": url}

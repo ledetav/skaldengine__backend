@@ -1,15 +1,20 @@
+"""
+Роутер эндпоинтов для взаимодействия с сообщениями диалога (ветвление, регенерация, форк, редактирование).
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from app.api import deps
 from .message_controller import MessageController
 from shared.schemas.response import BaseResponse
-from pydantic import BaseModel
 
 router = APIRouter()
 
 class MessageEdit(BaseModel):
+    """Схема полезной нагрузки для редактирования текста сообщения."""
     new_content: str
 
 @router.post("/{parent_id}/regenerate/stream")

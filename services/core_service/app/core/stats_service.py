@@ -1,3 +1,5 @@
+"""Сервис подсчёта и обновления статистики персонажей (количество чатов, ежемесячные счётчики)."""
+
 import uuid
 import datetime
 from sqlalchemy import select, func, and_, update, bindparam
@@ -5,21 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domains.chat.models import Chat
 from app.domains.character.models import Character
 
+
 class StatsService:
-    """
-    Сервис для работы со статистикой персонажей.
-    """
+    """Сервис для работы со статистикой активности персонажей."""
     
     @staticmethod
     async def increment_total_chats(db: AsyncSession, character_id: uuid.UUID):
-        """
-        Инкрементирует общий счетчик чатов персонажа.
+        """Инкрементирует общий счетчик чатов персонажа.
+
+        Args:
+            db: Сессия базы данных.
+            character_id: Идентификатор персонажа.
         """
         await db.execute(
             update(Character)
             .where(Character.id == character_id)
             .values(total_chats_count=Character.total_chats_count + 1)
         )
+
 
     @staticmethod
     async def increment_scenario_chats(db: AsyncSession, character_id: uuid.UUID):

@@ -1,24 +1,30 @@
-from pydantic import BaseModel
-from uuid import UUID
+"""
+Pydantic-схемы для работы с ролевыми чатами (Chat).
+"""
+
 from datetime import datetime
+from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatBase(BaseModel):
-    character_id: UUID
-    user_persona_id: UUID
-    scenario_id: UUID | None = None
-    title: str | None = None
-    is_acquainted: bool = False
-    relationship_dynamic: str | None = None
-    custom_location: str | None = None
-    custom_plot_hook: str | None = None
-    language: str = "ru"
-    narrative_voice: str = "third"  # "first" | "second" | "third"
-    persona_lorebook_id: UUID | None = None
-    checkpoints_count: int = 3  # Кол-во точек сценария (от 2 до 6)
+    """Базовые атрибуты ролевого чата."""
+    character_id: UUID = Field(..., description="ID персонажа")
+    user_persona_id: UUID = Field(..., description="ID персоны пользователя")
+    scenario_id: UUID | None = Field(default=None, description="ID сценария (опционально)")
+    title: str | None = Field(default=None, description="Название чата")
+    is_acquainted: bool = Field(default=False, description="Флаг знакомства персонажей")
+    relationship_dynamic: str | None = Field(default=None, description="Динамика взаимоотношений")
+    custom_location: str | None = Field(default=None, description="Кастомная локация")
+    custom_plot_hook: str | None = Field(default=None, description="Кастомная сюжетная завязка")
+    language: str = Field(default="ru", description="Язык повествования")
+    narrative_voice: str = Field(default="third", description="Лицо повествования: first, second или third")
+    persona_lorebook_id: UUID | None = Field(default=None, description="ID лорбука персоны")
+    checkpoints_count: int = Field(default=3, ge=2, le=6, description="Количество сюжетных чекпоинтов (2-6)")
 
 
 class ChatCreate(ChatBase):
+    """Схема создания нового ролевого чата."""
     model_config = {
         "json_schema_extra": {
             "examples": [
@@ -28,7 +34,7 @@ class ChatCreate(ChatBase):
                     "persona_lorebook_id": "123e4567-e89b-12d3-a456-426614174005",
                     "scenario_id": "123e4567-e89b-12d3-a456-426614174002",
                     "is_acquainted": True,
-                    "relationship_dynamic": "Rivals forced to work together",
+                    "relationship_dynamic": "Соперники, вынужденные сотрудничать",
                     "language": "ru",
                     "narrative_voice": "third"
                 }
@@ -38,16 +44,18 @@ class ChatCreate(ChatBase):
 
 
 class ChatUpdate(BaseModel):
-    title: str | None = None
-    language: str | None = None
-    narrative_voice: str | None = None
-    is_acquainted: bool | None = None
-    relationship_dynamic: str | None = None
-    persona_lorebook_id: UUID | None = None
-    active_leaf_id: UUID | None = None
+    """Схема обновления параметров чата."""
+    title: str | None = Field(default=None, description="Название")
+    language: str | None = Field(default=None, description="Язык")
+    narrative_voice: str | None = Field(default=None, description="Лицо повествования")
+    is_acquainted: bool | None = Field(default=None, description="Флаг знакомства")
+    relationship_dynamic: str | None = Field(default=None, description="Динамика отношений")
+    persona_lorebook_id: UUID | None = Field(default=None, description="ID лорбука персоны")
+    active_leaf_id: UUID | None = Field(default=None, description="ID активного сообщения ветки")
 
 
 class ChatResponse(ChatBase):
+    """Схема ответа с данными чата и обогащенными полями для списка."""
     id: UUID
     user_id: UUID
     mode: str
@@ -55,10 +63,10 @@ class ChatResponse(ChatBase):
     created_at: datetime
     updated_at: datetime | None = None
     
-    # Enriched fields for list view
+    # Обогащенные поля для отображения в каталоге/списке чатов
     character_name: str | None = None
     user_persona_name: str | None = None
     last_message_preview: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+

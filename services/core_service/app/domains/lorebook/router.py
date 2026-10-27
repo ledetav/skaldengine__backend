@@ -1,3 +1,7 @@
+"""
+Роутер публичных эндпоинтов для взаимодействия со справочниками мира (Lorebook) и их записями.
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 

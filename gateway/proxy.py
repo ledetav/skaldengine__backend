@@ -1,3 +1,8 @@
+"""Модуль HTTP-проксирования для API Gateway.
+
+Обеспечивает перенаправление обычных HTTP-запросов, проксирование Swagger UI,
+а также передачу потоковых ответов Server-Sent Events (SSE) без буферизации.
+"""
 from fastapi import Request
 from fastapi.responses import HTMLResponse, Response, JSONResponse, StreamingResponse
 import httpx
@@ -6,7 +11,11 @@ from gateway.config import logger
 
 
 async def _fetch(path: str, target_base: str, request: Request) -> httpx.Response:
-    """Выполняет внутренний HTTP-запрос к целевому микросервису."""
+    """Выполняет внутренний HTTP-запрос к целевому микросервису.
+
+    Исключает заголовки хоста и источника (host, origin, referer), чтобы downstream-сервис
+    видел корректный внутренний контекст запроса.
+    """
     url = httpx.URL(target_base + path, params=request.query_params)
     excluded_headers = {"host", "origin", "referer"}
     headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
@@ -28,15 +37,23 @@ async def _proxy(path: str, target_base: str, request: Request) -> Response:
     """
     Проксирует HTTP-запрос к микросервису с поддержкой потоковых ответов (SSE)
     и защитой от буферизации обратными прокси.
+
+    Особенности архитектуры:
+    - Для SSE (text/event-stream) выставляется таймаут чтения read=None, так как генерация
+      токенов нейросетью может занимать продолжительное время без постоянного входящего трафика.
+    - Заголовок 'content-length' исключается из передачи, чтобы не ломать chunked-кодирование.
+    - Заголовок 'X-Accel-Buffering: no' инструктирует Nginx/Caddy не буферизовать порции текста,
+      а моментально отдавать их клиенту (браузеру) для плавного вывода ответа.
     """
     url = httpx.URL(target_base + path, params=request.query_params)
+    # content-length исключается, чтобы httpx самостоятельно рассчитал длину или использовал chunked transfer
     excluded_headers = {"host", "origin", "referer", "content-length"}
     headers = {k: v for k, v in request.headers.items() if k.lower() not in excluded_headers}
     body = await request.body()
 
     logger.info(f"Proxying {request.method} request to: {url}")
 
-    # 120s connect/write timeout, infinite read timeout for SSE streams
+    # Таймаут подключения 10 сек, таймаут записи 120 сек, бесконечный таймаут чтения для SSE потоков
     client = httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0, read=None))
     try:
         req = client.build_request(
@@ -54,11 +71,16 @@ async def _proxy(path: str, target_base: str, request: Request) -> Response:
         is_stream = "text/event-stream" in content_type or path.endswith("/stream")
 
         if is_stream:
-            # Предотвращаем буферизацию в Nginx / Caddy
+            # Предотвращаем буферизацию в промежуточных прокси (Nginx / Caddy / Cloudflare)
             resp_headers["X-Accel-Buffering"] = "no"
             resp_headers["Cache-Control"] = "no-cache, no-transform"
 
             async def body_stream():
+                """Асинхронный генератор сырых порций (chunks) SSE-потока.
+                
+                Гарантирует закрытие HTTP-соединения с upstream-микросервисом
+                и клиента httpx при завершении или обрыве соединения клиентом.
+                """
                 try:
                     async for chunk in upstream_resp.aiter_raw():
                         yield chunk
@@ -99,10 +121,17 @@ async def _proxy(path: str, target_base: str, request: Request) -> Response:
 
 async def _proxy_docs(docs_path: str, openapi_path: str,
                       target_base: str, prefix: str, request: Request) -> Response:
-    """Проксирует Swagger UI и подменяет openapi.json URL для корректного отображения."""
+    """Проксирует Swagger UI и подменяет openapi.json URL для корректного отображения.
+
+    FastAPI Swagger UI по умолчанию ищет схему по относительному пути '/openapi.json'.
+    Так как Gateway монтирует каждый сервис с префиксом (например, '/auth/docs'),
+    необходимо перезаписать путь к схеме на '/{prefix}/openapi.json', чтобы интерфейс
+    документации мог успешно загрузить спецификацию через единую точку входа Gateway.
+    """
     try:
         resp = await _fetch(docs_path, target_base, request)
         html = resp.text
+        # Подменяем путь к спецификации OpenAPI в HTML коде Swagger UI
         html = html.replace(
             f"url: '{openapi_path}'",
             f"url: '/{prefix}{openapi_path}'"

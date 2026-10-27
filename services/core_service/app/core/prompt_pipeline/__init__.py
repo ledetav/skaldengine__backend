@@ -1,3 +1,5 @@
+"""Пакет модульного пайплайна сборки системного промпта."""
+
 from app.core.prompt_pipeline.context import PipelineContext
 from app.core.prompt_pipeline.pipeline import PromptPipeline
 from app.core.prompt_pipeline.stages import (
@@ -9,6 +11,7 @@ from app.core.prompt_pipeline.stages import (
     HistoryStage,
     AssemblerStage,
 )
+
 
 __all__ = [
     "PromptPipeline",

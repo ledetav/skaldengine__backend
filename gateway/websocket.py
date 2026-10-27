@@ -1,3 +1,8 @@
+"""Модуль двунаправленного WebSocket-проксирования для API Gateway.
+
+Обеспечивает установку и поддержание соединений с Core Service
+с передачей токенов авторизации и параметров запроса.
+"""
 import asyncio
 from fastapi import WebSocket, WebSocketDisconnect
 import websockets as ws_lib
@@ -32,6 +37,7 @@ async def websocket_proxy_handler(websocket: WebSocket, path: str) -> None:
             await websocket.accept()
 
             async def client_to_backend():
+                """Считывает текстовые сообщения от клиента и транслирует их в сокет бэкенда."""
                 try:
                     while True:
                         data = await websocket.receive_text()
@@ -40,6 +46,7 @@ async def websocket_proxy_handler(websocket: WebSocket, path: str) -> None:
                     pass
 
             async def backend_to_client():
+                """Принимает сообщения из бэкенд-сокета и передает их подключенному клиенту."""
                 try:
                     async for message in backend_ws:
                         if isinstance(message, str):

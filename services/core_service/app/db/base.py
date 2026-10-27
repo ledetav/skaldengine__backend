@@ -1,3 +1,5 @@
+"""Настройка асинхронного подключения к БД Core Service и базовая декларативная модель."""
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.core.config import settings
@@ -14,5 +16,7 @@ AsyncSessionLocal = sessionmaker(
     bind=engine, class_=AsyncSession, expire_on_commit=False, autocommit=False, autoflush=False
 )
 
+
 class Base(DeclarativeBase):
-    pass
+    """Базовый декларативный класс для моделей SQLAlchemy в Core Service."""
+    pass

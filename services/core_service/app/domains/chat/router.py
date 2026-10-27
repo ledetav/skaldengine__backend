@@ -1,3 +1,7 @@
+"""
+Роутер эндпоинтов для управления игровыми сессиями (Chat).
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession

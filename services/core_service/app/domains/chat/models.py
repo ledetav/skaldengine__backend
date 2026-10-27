@@ -1,28 +1,34 @@
+"""
+Модели данных ролевых сессий (Chat), контрольных точек (ChatCheckpoint) и эпизодической памяти (EpisodicMemory).
+"""
+
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime
+from sqlalchemy import String, Text, Boolean, ForeignKey, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
 
 from app.db.base import Base
 
 
 class Chat(Base):
     """
-    Игровая сессия (переименована из Session в Chat по ТЗ).
-    Содержит все параметры конкретного прохождения.
-    user_id — raw UUID из auth_db (без FK constraint).
+    Игровая сессия (ролевой чат с персонажем).
+    Содержит все параметры конкретного прохождения: режим, настройки отношений,
+    язык, стиль повествования и ссылку на активный лист дерева сообщений.
+    user_id — UUID пользователя из auth_service (без внешнего ключа БД).
     """
     __tablename__ = "chats"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
 
-    # Участники (user_id без FK — cross-DB)
+    # Участники (user_id без FK — межсервисная связь с auth_service)
     user_id: Mapped[uuid.UUID] = mapped_column()
     user_persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("user_personas.id"))
     character_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("characters.id"))
 
-    # Сценарий (NULL если sandbox)
+    # Сценарий (NULL если режим sandbox)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mode: Mapped[str] = mapped_column(String, default="sandbox")  # "sandbox" | "scenario"
     scenario_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -40,7 +46,7 @@ class Chat(Base):
     narrative_voice: Mapped[str] = mapped_column(String, default="third")  # "first" | "second" | "third"
 
     # Указатель на текущий активный лист дерева (последнее сообщение выбранной ветки)
-    # Nullable при создании — заполняется после первого сообщения
+    # Заполняется после генерации первого ответа
     active_leaf_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("messages.id", use_alter=True, name="fk_chats_active_leaf_id"),
         nullable=True
@@ -77,9 +83,12 @@ class Chat(Base):
         "EpisodicMemory", back_populates="chat", cascade="all, delete-orphan"
     )
 
-from pgvector.sqlalchemy import Vector
 
 class EpisodicMemory(Base):
+    """
+    Эпизодическая память — сжатое резюме фрагмента диалога с векторным эмбеддингом
+    для семантического поиска в RAG.
+    """
     __tablename__ = "episodic_memories"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -91,9 +100,12 @@ class EpisodicMemory(Base):
     chat: Mapped["Chat"] = relationship("Chat", back_populates="episodic_memories")
     message: Mapped["Message"] = relationship("Message", back_populates="episodic_memory")
 
-from sqlalchemy import Integer
 
 class ChatCheckpoint(Base):
+    """
+    Контрольная сюжетная точка сценарного режима.
+    Отслеживает прогресс достижения промежуточных целей и затраченные сообщения.
+    """
     __tablename__ = "chat_checkpoints"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -104,3 +116,4 @@ class ChatCheckpoint(Base):
     messages_spent: Mapped[int] = mapped_column(Integer, default=0)
 
     chat: Mapped["Chat"] = relationship("Chat", back_populates="checkpoints")
+

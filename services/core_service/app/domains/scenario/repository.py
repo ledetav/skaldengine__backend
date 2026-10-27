@@ -1,3 +1,7 @@
+"""
+Репозиторий для доступа к данным сценариев (Scenario).
+"""
+
 from typing import List, Tuple
 from uuid import UUID
 from sqlalchemy import select, func
@@ -5,11 +9,19 @@ from shared.base.repository import BaseRepository
 from .models import Scenario
 from app.domains.chat.models import Chat
 
+
 class ScenarioRepository(BaseRepository[Scenario]):
+    """
+    Репозиторий сценариев с подсчетом связанных чатов.
+    """
     def __init__(self, db):
+        """Инициализирует репозиторий сценариев сессией базы данных SQLAlchemy."""
         super().__init__(Scenario, db)
 
     async def get_multi_with_counts(self, skip: int = 0, limit: int = 100) -> List[Scenario]:
+        """
+        Получить список сценариев с пагинацией и количеством созданных чатов.
+        """
         chat_count_subquery = (
             select(func.count(Chat.id))
             .where(Chat.scenario_id == Scenario.id)
@@ -27,6 +39,9 @@ class ScenarioRepository(BaseRepository[Scenario]):
         return items
 
     async def get_by_character(self, character_id: UUID) -> List[Scenario]:
+        """
+        Получить все сценарии, привязанные к конкретному персонажу.
+        """
         chat_count_subquery = (
             select(func.count(Chat.id))
             .where(Chat.scenario_id == Scenario.id)
@@ -43,6 +58,9 @@ class ScenarioRepository(BaseRepository[Scenario]):
         return items
 
     async def get_with_count(self, id: UUID) -> Scenario | None:
+        """
+        Получить сценарий по ID с вычисленным количеством связанных чатов.
+        """
         chat_count_subquery = (
             select(func.count(Chat.id))
             .where(Chat.scenario_id == Scenario.id)
@@ -58,3 +76,4 @@ class ScenarioRepository(BaseRepository[Scenario]):
         scenario, chats_count = row
         scenario.chats_count = chats_count
         return scenario
+

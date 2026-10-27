@@ -1,3 +1,12 @@
+"""Набор модульных и интеграционных тестов для API Gateway.
+
+Проверяет:
+- Системные эндпоинты (/health, /)
+- Проксирование стандартных HTTP-запросов и обработку ошибок (502 Bad Gateway)
+- Потоковую передачу данных SSE (Server-Sent Events) и заголовки антибуферизации
+- Безопасность CORS (валидация Origin и защита от фишинговых поддоменов)
+- Форматирование WebSocket URL-адресов
+"""
 import pytest
 import httpx
 from fastapi.testclient import TestClient
@@ -8,6 +17,7 @@ _RealAsyncClient = httpx.AsyncClient
 
 
 def test_gateway_health():
+    """Проверка доступности эндпоинта /health."""
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
@@ -15,6 +25,7 @@ def test_gateway_health():
 
 
 def test_gateway_root():
+    """Проверка корневого эндпоинта шлюза /."""
     client = TestClient(app)
     response = client.get("/")
     assert response.status_code == 200
@@ -23,13 +34,15 @@ def test_gateway_root():
 
 @pytest.mark.asyncio
 async def test_proxy_non_streaming():
-    """Verify regular non-streaming responses are passed through properly."""
+    """Проверка корректной передачи стандартных (не потоковых) ответов."""
     async def handler(request: httpx.Request):
+        """Мок-обработчик успешного ответа целевого сервиса."""
         return httpx.Response(200, json={"message": "ok"}, headers={"content-type": "application/json"})
 
     transport = httpx.MockTransport(handler)
 
     def mock_async_client(*args, **kwargs):
+        """Фабрика тестового HTTP-клиента с подмененным транспортом."""
         kwargs["transport"] = transport
         return _RealAsyncClient(*args, **kwargs)
 
@@ -47,7 +60,7 @@ async def test_proxy_non_streaming():
 
 @pytest.mark.asyncio
 async def test_proxy_sse_streaming():
-    """Verify that SSE stream is returned as StreamingResponse with correct anti-buffering headers."""
+    """Проверка передачи SSE-потока в StreamingResponse с заголовками антибуферизации."""
     chunks = [
         b"event: token\ndata: {\"content\": \"Hello\"}\n\n",
         b"event: token\ndata: {\"content\": \" world\"}\n\n",
@@ -55,7 +68,9 @@ async def test_proxy_sse_streaming():
     ]
 
     async def stream_handler(request: httpx.Request):
+        """Мок-обработчик потокового ответа SSE."""
         async def generate_chunks():
+            """Генератор тестовых порций потока байтов."""
             for c in chunks:
                 yield c
         return httpx.Response(
@@ -67,6 +82,7 @@ async def test_proxy_sse_streaming():
     transport = httpx.MockTransport(stream_handler)
 
     def mock_async_client(*args, **kwargs):
+        """Фабрика тестового HTTP-клиента с мок-транспортом SSE."""
         kwargs["transport"] = transport
         return _RealAsyncClient(*args, **kwargs)
 
@@ -94,13 +110,15 @@ async def test_proxy_sse_streaming():
 
 @pytest.mark.asyncio
 async def test_proxy_upstream_error_502():
-    """Verify network error returns 502 Bad Gateway."""
+    """Проверка возврата ошибки 502 Bad Gateway при недоступности апстрима."""
     async def error_handler(request: httpx.Request):
+        """Мок-обработчик сбоя сетевого подключения к апстриму."""
         raise httpx.ConnectError("Connection refused")
 
     transport = httpx.MockTransport(error_handler)
 
     def mock_async_client(*args, **kwargs):
+        """Фабрика тестового HTTP-клиента с симуляцией сбоя апстрима."""
         kwargs["transport"] = transport
         return _RealAsyncClient(*args, **kwargs)
 
@@ -117,19 +135,19 @@ async def test_proxy_upstream_error_502():
 
 
 def test_cors_origin_security_unit():
-    """Unit tests for is_origin_allowed helper."""
+    """Модульные тесты для вспомогательной функции is_origin_allowed."""
     from gateway.main import is_origin_allowed
     suffixes = [".replit.dev", ".replit.app", "localhost", "127.0.0.1"]
     origins = ["https://custom.app"]
 
-    # Allowed
+    # Разрешенные источники
     assert is_origin_allowed("http://localhost:3000", origins, suffixes) is True
     assert is_origin_allowed("http://127.0.0.1:8080", origins, suffixes) is True
     assert is_origin_allowed("https://my-app.replit.dev", origins, suffixes) is True
     assert is_origin_allowed("https://sub.my-app.replit.app", origins, suffixes) is True
     assert is_origin_allowed("https://custom.app", origins, suffixes) is True
 
-    # Attack/Phishing vectors that should be REJECTED
+    # Атаки и фишинговые векторы (должны блокироваться)
     assert is_origin_allowed("https://attacker-localhost.com", origins, suffixes) is False
     assert is_origin_allowed("https://localhost.attacker.com", origins, suffixes) is False
     assert is_origin_allowed("https://fake127.0.0.1.org", origins, suffixes) is False
@@ -139,10 +157,10 @@ def test_cors_origin_security_unit():
 
 
 def test_cors_middleware_preflight_security():
-    """Test CORS preflight OPTIONS request rejects malicious origins."""
+    """Тест отклонения preflight OPTIONS-запросов от вредоносных источников."""
     client = TestClient(app)
 
-    # Legitimate origin
+    # Легитимный источник
     res_ok = client.options("/health", headers={
         "Origin": "http://localhost:3000",
         "Access-Control-Request-Method": "GET"
@@ -150,7 +168,7 @@ def test_cors_middleware_preflight_security():
     assert res_ok.status_code == 200
     assert res_ok.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
-    # Malicious substring origin
+    # Вредоносная подстрока источника
     res_evil = client.options("/health", headers={
         "Origin": "https://attacker-localhost.com",
         "Access-Control-Request-Method": "GET"
@@ -160,7 +178,7 @@ def test_cors_middleware_preflight_security():
 
 
 def test_ws_url_formatting():
-    """Verify conversion of HTTP URLs to WebSocket URLs."""
+    """Проверка преобразования HTTP-URL в WebSocket-URL."""
     from gateway.websocket import _ws_url
 
     assert _ws_url("http://127.0.0.1:8000", "/api/v1/ws/chat") == "ws://127.0.0.1:8000/api/v1/ws/chat"

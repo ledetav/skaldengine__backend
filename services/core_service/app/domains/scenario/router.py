@@ -1,3 +1,7 @@
+"""
+Роутер эндпоинтов для управления сценариями (Scenario).
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 

@@ -1,3 +1,5 @@
+"""Роутер конечных точек аутентификации и регистрации."""
+
 import traceback
 from typing import Any
 from fastapi import APIRouter, Depends, status, Body
@@ -10,14 +12,13 @@ from shared.schemas.response import BaseResponse
 
 router = APIRouter()
 
+
 @router.post("/login", response_model=BaseResponse)
 async def login_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     controller: AuthController = Depends(deps.get_auth_controller)
 ) -> Any:
-    """
-    OAuth2 compatible token login (form-data: username + password).
-    """
+    """OAuth2-совместимый вход по логину и паролю (form-data: username + password)."""
     return await controller.login(form_data)
 
 
@@ -26,12 +27,11 @@ async def login_json(
     body: UserLogin,
     controller: AuthController = Depends(deps.get_auth_controller)
 ) -> Any:
-    """
-    JSON-body login (identifier + password). For use by the frontend.
-    """
+    """Вход с передачей JSON в теле запроса (логин + пароль) для веб-клиента."""
     from fastapi.security import OAuth2PasswordRequestForm as _Form
 
     class _FakeForm:
+        """Адаптер формы аутентификации, имитирующий структуру OAuth2PasswordRequestForm."""
         username = body.login
         password = body.password
 
@@ -43,21 +43,12 @@ async def register_user(
     user_in: UserCreate,
     controller: AuthController = Depends(deps.get_auth_controller)
 ) -> Any:
-    """
-    Create a new user.
-    """
+    """Регистрация нового пользователя."""
     try:
-        print("\n--- НАЧИНАЕМ РЕГИСТРАЦИЮ ---")
-        
-        # Вот тут вызывается код, который падает
         result = await controller.register(user_in)
-        
-        print("--- РЕГИСТРАЦИЯ УСПЕШНА, РЕЗУЛЬТАТ:", result)
         return result
-        
     except Exception as e:
-        # ВОТ ЭТО МЫ ТОЧНО УВИДИМ В КОНСОЛИ!
-        print("\n!!! ПОЙМАЛИ ОШИБКУ В РОУТЕРЕ !!!")
-        traceback.print_exc()
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+        logger_error_trace = traceback.format_exc()
+        print(f"\nОшибка при регистрации пользователя: {e}\n{logger_error_trace}")
         raise e
+

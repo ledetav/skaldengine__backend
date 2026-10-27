@@ -1,3 +1,8 @@
+"""Тесты сервиса контроля сценарных контрольных точек (DirectorService).
+
+Проверяет анализ прогресса сюжетной ветки диалога (через CTE-запрос от активного листа),
+проверку достижения цели через LLM-судью и обработку крайних случаев (отсутствие активных чекпоинтов).
+"""
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +15,7 @@ from app.domains.chat.models import ChatCheckpoint
 
 @pytest.fixture
 def mock_session():
+    """Фикстура мока асинхронной сессии SQLAlchemy."""
     session = AsyncMock()
     session.execute = AsyncMock()
     session.commit = AsyncMock()
@@ -20,6 +26,7 @@ def mock_session():
 
 @pytest.fixture
 def mock_session_local(mock_session):
+    """Фикстура контекстного менеджера сессии БД с подменой AsyncSessionLocal."""
     cm = MagicMock()
     cm.__aenter__ = AsyncMock(return_value=mock_session)
     cm.__aexit__ = AsyncMock(return_value=None)
@@ -29,6 +36,7 @@ def mock_session_local(mock_session):
 
 @pytest.mark.asyncio
 async def test_check_progress_with_leaf_id_branch_achieved(mock_session_local):
+    """Проверка успешной фиксации достижения чекпоинта по явной ветке сообщений."""
     chat_id = uuid4()
     leaf_id = uuid4()
 
@@ -83,6 +91,7 @@ async def test_check_progress_with_leaf_id_branch_achieved(mock_session_local):
 
 @pytest.mark.asyncio
 async def test_check_progress_resolves_active_leaf_when_not_provided(mock_session_local):
+    """Проверка автоматического разрешения активного листа чата при вызове без leaf_id."""
     chat_id = uuid4()
     active_leaf_id = uuid4()
 
@@ -134,6 +143,7 @@ async def test_check_progress_resolves_active_leaf_when_not_provided(mock_sessio
 
 @pytest.mark.asyncio
 async def test_check_progress_fallback_flat_when_no_leaf(mock_session_local):
+    """Проверка фоллбэка на плоскую выборку сообщений при отсутствии листа ветки."""
     chat_id = uuid4()
 
     checkpoint = ChatCheckpoint(
@@ -180,6 +190,7 @@ async def test_check_progress_fallback_flat_when_no_leaf(mock_session_local):
 
 @pytest.mark.asyncio
 async def test_check_progress_no_active_checkpoint(mock_session_local):
+    """Проверка раннего выхода из проверки, если все чекпоинты уже выполнены."""
     chat_id = uuid4()
 
     cp_scalars = MagicMock()

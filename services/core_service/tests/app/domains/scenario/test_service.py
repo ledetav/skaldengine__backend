@@ -1,3 +1,7 @@
+"""
+Модульные тесты для сервиса сценариев (ScenarioService).
+"""
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -6,16 +10,22 @@ from app.domains.scenario.service import ScenarioService
 from app.domains.scenario.schemas import ScenarioCreate, ScenarioUpdate
 from app.domains.scenario.models import Scenario
 
+
 @pytest.fixture
 def mock_repository():
+    """Фикстура мока репозитория сценариев."""
     return AsyncMock()
+
 
 @pytest.fixture
 def scenario_service(mock_repository):
+    """Фикстура экземпляра ScenarioService с мок-репозиторием."""
     return ScenarioService(repository=mock_repository)
+
 
 @pytest.mark.asyncio
 async def test_get_scenarios(scenario_service, mock_repository):
+    """Тест получения списка сценариев с пагинацией."""
     mock_scenarios = [Scenario(id=uuid4(), title="Test", description="D", start_point="S", end_point="E")]
     mock_repository.get_multi_with_counts.return_value = mock_scenarios
 
@@ -24,8 +34,10 @@ async def test_get_scenarios(scenario_service, mock_repository):
     mock_repository.get_multi_with_counts.assert_called_once_with(skip=10, limit=5)
     assert result == mock_scenarios
 
+
 @pytest.mark.asyncio
 async def test_get_by_character(scenario_service, mock_repository):
+    """Проверка получения списка сценариев, привязанных к конкретному персонажу."""
     char_id = uuid4()
     mock_scenarios = [Scenario(id=uuid4(), title="Test", character_id=char_id, description="D", start_point="S", end_point="E")]
     mock_repository.get_by_character.return_value = mock_scenarios
@@ -38,6 +50,7 @@ async def test_get_by_character(scenario_service, mock_repository):
 @pytest.mark.asyncio
 @patch("app.core.broadcast.manager.broadcast")
 async def test_create_scenario(mock_broadcast, scenario_service, mock_repository):
+    """Проверка создания общего сценария и рассылки WebSocket-события NEW_SCENARIO."""
     scenario_in = ScenarioCreate(
         title="New Scenario",
         location="Castle",
@@ -72,6 +85,7 @@ async def test_create_scenario(mock_broadcast, scenario_service, mock_repository
 @pytest.mark.asyncio
 @patch("app.core.broadcast.manager.broadcast")
 async def test_create_scenario_with_character(mock_broadcast, scenario_service, mock_repository):
+    """Проверка создания сценария с явной привязкой к ID персонажа."""
     char_id = uuid4()
     scenario_in = ScenarioCreate(
         title="Char Scenario",
@@ -103,6 +117,7 @@ async def test_create_scenario_with_character(mock_broadcast, scenario_service, 
 @pytest.mark.asyncio
 @patch("app.core.broadcast.manager.broadcast")
 async def test_update_scenario_success(mock_broadcast, scenario_service, mock_repository):
+    """Проверка успешного обновления сценария и рассылки события UPDATE_SCENARIO."""
     scenario_id = uuid4()
     existing_scenario = Scenario(id=scenario_id, title="Old", description="D", start_point="S", end_point="E")
     update_data = ScenarioUpdate(title="New")
@@ -136,6 +151,7 @@ async def test_update_scenario_success(mock_broadcast, scenario_service, mock_re
 
 @pytest.mark.asyncio
 async def test_update_scenario_not_found(scenario_service, mock_repository):
+    """Проверка возврата None при попытке обновления несуществующего сценария."""
     scenario_id = uuid4()
     update_data = ScenarioUpdate(title="New")
 
@@ -150,6 +166,7 @@ async def test_update_scenario_not_found(scenario_service, mock_repository):
 @pytest.mark.asyncio
 @patch("app.core.broadcast.manager.broadcast")
 async def test_delete_scenario_success(mock_broadcast, scenario_service, mock_repository):
+    """Проверка успешного удаления сценария и рассылки события DELETE_SCENARIO."""
     scenario_id = uuid4()
     existing_scenario = Scenario(id=scenario_id, title="Old", description="D", start_point="S", end_point="E")
 
@@ -168,6 +185,7 @@ async def test_delete_scenario_success(mock_broadcast, scenario_service, mock_re
 
 @pytest.mark.asyncio
 async def test_delete_scenario_not_found(scenario_service, mock_repository):
+    """Проверка возврата False при попытке удаления несуществующего сценария."""
     scenario_id = uuid4()
 
     mock_repository.get.return_value = None

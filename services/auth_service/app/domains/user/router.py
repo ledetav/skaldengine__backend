@@ -1,3 +1,5 @@
+"""Роутер конечных точек управления профилями пользователей и администрирования."""
+
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import jwt, JWTError
@@ -14,12 +16,14 @@ router = APIRouter()
 
 _http_bearer = HTTPBearer()
 
+
 async def _verify_staff_from_token(
     current_user: User = Depends(deps.get_current_user),
 ) -> None:
-    """Check that the user is an admin or moderator by checking DB."""
+    """Проверяет, что пользователь имеет роль администратора или модератора."""
     if current_user.role not in ("admin", "moderator"):
-        raise HTTPException(status_code=403, detail="Not enough privileges")
+        raise HTTPException(status_code=403, detail="Недостаточно прав доступа")
+
 
 @router.get("/", response_model=BaseResponse, dependencies=[Depends(_verify_staff_from_token)])
 async def list_all_users(
@@ -52,13 +56,13 @@ async def admin_update_role(
     return await controller.admin_update_role(current_user, user_id, role_update.role)
 
 
-
 @router.get("/me", response_model=BaseResponse)
 async def read_user_me(
     current_user: User = Depends(deps.get_current_user),
 ):
     """Получить информацию о текущем пользователе по токену."""
     return BaseResponse(success=True, data=UserResponse.model_validate(current_user))
+
 
 @router.get("/profile/{username}", response_model=BaseResponse)
 async def read_public_profile(
@@ -127,6 +131,12 @@ async def update_email(
     return await controller.update_email(current_user, update_in)
 
 
+@router.patch("/me/password", response_model=BaseResponse)
+async def update_password(
+    update_in: PasswordUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    controller: UserController = Depends(deps.get_user_controller)
+):
     """Изменить пароль пользователя."""
     return await controller.update_password(current_user, update_in)
 
@@ -158,6 +168,8 @@ async def delete_user(
 ):
     """Удалить учетную запись текущего пользователя."""
     return await controller.delete_user(current_user)
+
+
 @router.get("/batch", response_model=BaseResponse)
 async def get_users_batch(
     ids: str,
@@ -169,4 +181,5 @@ async def get_users_batch(
         user_ids = [UUID(id_str.strip()) for id_str in ids.split(",") if id_str.strip()]
         return await controller.get_users_by_ids(user_ids)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid UUID in batch: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Некорректный UUID в пакетном запросе: {str(e)}")
+

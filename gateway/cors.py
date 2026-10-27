@@ -1,3 +1,8 @@
+"""Модуль управления политикой CORS для API Gateway.
+
+Обеспечивает валидацию заголовка Origin с защитой от спуфинга поддоменов
+и обработку preflight OPTIONS-запросов.
+"""
 import os
 import json
 from urllib.parse import urlsplit

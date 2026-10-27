@@ -1,3 +1,7 @@
+"""
+Модели данных сценариев ролевых сессий (Scenario).
+"""
+
 import uuid
 from sqlalchemy import String, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
