@@ -1,3 +1,11 @@
+"""Тесты отдельных стадий пайплайна генерации системного промпта (Prompt Pipeline Stages).
+
+Проверяет:
+- Стемминг ключевых слов для русского и английского языков в LorebookStage.
+- Детекцию застоя сюжета и внедрение критической интервенции в ScenarioStage.
+- Стандартное наведение на цель сценария при нормальном темпе диалога.
+- Финальную сборку промпта, русскоязычную «проверку реальности» и SFW/NSFW ограничения в AssemblerStage.
+"""
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -16,6 +24,7 @@ from app.domains.lorebook.models import Lorebook, LorebookEntry
 
 
 def test_get_stems_handles_russian_and_english():
+    """Проверка корректности извлечения основ слов (стемминга) для русского и английского языков."""
     text = "Драконы летали над Castle of Shadows"
     stems = get_stems(text)
     # Stems for Russian and English words >= 3 chars
@@ -27,6 +36,7 @@ def test_get_stems_handles_russian_and_english():
 
 @pytest.mark.asyncio
 async def test_scenario_stage_detects_stall_intervention():
+    """Проверка внедрения критической директивы сюжета при застревании диалога (>8 реплик без прогресса)."""
     db = MagicMock()
     chat_id = uuid4()
     user = MagicMock()
@@ -53,6 +63,7 @@ async def test_scenario_stage_detects_stall_intervention():
 
 @pytest.mark.asyncio
 async def test_scenario_stage_normal_goal_guidance():
+    """Проверка формирования стандартной сюжетной директивы при умеренном темпе прохождения цели."""
     db = MagicMock()
     chat_id = uuid4()
     user = MagicMock()
@@ -77,6 +88,7 @@ async def test_scenario_stage_normal_goal_guidance():
 
 @pytest.mark.asyncio
 async def test_assembler_stage_formats_russian_reality_check():
+    """Проверка финальной сборки промпта с включением русской проверки реальности и профилей персонажей."""
     db = MagicMock()
     chat_id = uuid4()
     user = MagicMock()

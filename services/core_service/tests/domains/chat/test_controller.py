@@ -51,6 +51,7 @@ async def test_get_history_success(controller, chat_service_mock, db_session_moc
 
 @pytest.mark.asyncio
 async def test_get_history_value_error(controller, chat_service_mock, db_session_mock):
+    """Проверка генерации HTTP 404 Not Found при возникновении ValueError при получении истории."""
     # Arrange
     chat_id = uuid.uuid4()
     user_id = uuid.uuid4()

@@ -1,3 +1,8 @@
+"""Тесты эндпоинта загрузки медиафайлов (Upload).
+
+Проверяет валидацию MIME-типов (magic numbers) для изображений, защиту от загрузки
+поддельных текстовых файлов с расширением .png и лимит максимального размера (413 Payload Too Large).
+"""
 import pytest
 import io
 import sys
@@ -5,6 +10,7 @@ from unittest.mock import patch, MagicMock
 
 @pytest.mark.asyncio
 async def test_upload_valid_image():
+    """Проверка успешной загрузки валидного PNG-изображения."""
     # Mock all the app modules so we don't hit import errors for unrelated code
     mock_app = MagicMock()
     mock_app_api = MagicMock()
@@ -31,6 +37,7 @@ async def test_upload_valid_image():
 
     # Mock read
     async def mock_read(size=-1):
+        """Мок для первого считывания заголовка файла."""
         if hasattr(mock_read, "first_call") and mock_read.first_call:
             mock_read.first_call = False
             return png_content
@@ -40,6 +47,7 @@ async def test_upload_valid_image():
     mock_file.read = mock_read
 
     async def mock_seek(*args, **kwargs):
+        """Мок перемотки указателя потока."""
         pass
     mock_file.seek = mock_seek
 
@@ -47,6 +55,7 @@ async def test_upload_valid_image():
     with patch("app.api.endpoints.upload.aiofiles.open"):
         # Mock the read function for the while loop
         async def mock_read_loop(size=-1):
+            """Мок считывания порций в цикле сохранения файла."""
             if hasattr(mock_read_loop, "first_call") and mock_read_loop.first_call:
                 mock_read_loop.first_call = False
                 return png_content
@@ -60,6 +69,7 @@ async def test_upload_valid_image():
 
 @pytest.mark.asyncio
 async def test_upload_invalid_image():
+    """Проверка отклонения некорректного файла с невалидным MIME-типом."""
     # Mock all the app modules so we don't hit import errors for unrelated code
     mock_app = MagicMock()
     mock_app_api = MagicMock()
@@ -85,10 +95,12 @@ async def test_upload_invalid_image():
     mock_file.filename = "malicious.png"
 
     async def mock_read(size=-1):
+        """Мок чтения некорректных байтов файла."""
         return text_content
     mock_file.read = mock_read
 
     async def mock_seek(*args, **kwargs):
+        """Мок перемотки файла."""
         pass
     mock_file.seek = mock_seek
 
@@ -101,6 +113,7 @@ async def test_upload_invalid_image():
 
 @pytest.mark.asyncio
 async def test_upload_file_size_exceeded():
+    """Проверка возврата ошибки 413 при превышении допустимого размера файла."""
     mock_app = MagicMock()
     mock_app_api = MagicMock()
     mock_deps = MagicMock()
@@ -123,6 +136,7 @@ async def test_upload_file_size_exceeded():
     mock_file.filename = "large.png"
 
     async def mock_seek(*args, **kwargs):
+        """Мок перемотки файла."""
         pass
     mock_file.seek = mock_seek
 
@@ -133,6 +147,7 @@ async def test_upload_file_size_exceeded():
 
     is_header_read = True
     async def mock_read(size=-1):
+        """Мок чтения потока порций, суммарно превышающих лимит в 10МБ."""
         nonlocal is_header_read
         if is_header_read:
             is_header_read = False
@@ -155,5 +170,7 @@ async def test_upload_file_size_exceeded():
             mock_remove.assert_called_once()
 
 class AsyncMock(MagicMock):
+    """Асинхронный мок вызова функции для тестов загрузки."""
     async def __call__(self, *args, **kwargs):
+        """Асинхронный вызов мока."""
         return super(AsyncMock, self).__call__(*args, **kwargs)

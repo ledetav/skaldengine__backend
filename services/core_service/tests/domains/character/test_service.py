@@ -62,6 +62,7 @@ async def test_delete_character_wrong_owner():
 
 @pytest.mark.asyncio
 async def test_delete_character_success():
+    """Проверка мягкого удаления персонажа (is_deleted=True) и каскадного удаления связанных лорбуков."""
     character_id = uuid4()
     creator_id = uuid4()
     lb_id = uuid4()
@@ -112,6 +113,7 @@ async def test_delete_character_success():
 
 @pytest.mark.asyncio
 async def test_delete_character_not_found():
+    """Проверка возврата False при попытке удаления несуществующего персонажа."""
     character_id = uuid4()
     mock_repo = AsyncMock(spec=CharacterRepository)
     mock_repo.get.return_value = None
