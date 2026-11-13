@@ -5,6 +5,7 @@ import re
 import asyncio
 from uuid import UUID
 from openai import AsyncOpenAI
+from sqlalchemy import select
 from app.core.config import settings
 
 _client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
@@ -12,7 +13,7 @@ _client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA
 
 async def generate_chat_stream(
     chat_id: UUID,
-    ai_msg_id: UUID, 
+    ai_msg_id: UUID,
     payload: dict,
     state: dict
 ):
@@ -31,25 +32,23 @@ async def generate_chat_stream(
     yield f"event: message_id\ndata: {json.dumps({'id': str(ai_msg_id)}, ensure_ascii=False)}\n\n"
 
     full_text = ""
-    is_thinking = False
     buffer = ""
+    is_thinking = False
 
     try:
-        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
-        response_stream = await client.chat.completions.create(**payload)
-        
-        async for chunk in response_stream:
-            if chunk.choices and len(chunk.choices) > 0:
-                text_chunk = chunk.choices[0].delta.content or ""
-                if not text_chunk:
-                    continue
-                
-                full_text += text_chunk
-                buffer += text_chunk
-                
+        stream = await _client.chat.completions.create(
+            **payload,
+            stream=True
+        )
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                piece = chunk.choices[0].delta.content
+                full_text += piece
+                buffer += piece
+
                 START_TAG = "<Internal_Analysis>"
                 END_TAG = "</Internal_Analysis>"
-                
+
                 # Логика скрытия содержимого между тегами <Internal_Analysis> и </Internal_Analysis>
                 while buffer:
                     if not is_thinking:
@@ -65,10 +64,10 @@ async def generate_chat_stream(
                             matching_prefix_len = 0
                             max_check = min(len(buffer), len(START_TAG) - 1)
                             for k in range(max_check, 0, -1):
-                                if buffer.endswith(START_TAG[:k]):
+                                if START_TAG.startswith(buffer[-k:]):
                                     matching_prefix_len = k
                                     break
-                            
+
                             if matching_prefix_len > 0:
                                 # Отправляем всё до совпадающего префикса, оставляя префикс в буфере
                                 to_emit = buffer[:-matching_prefix_len]
@@ -92,21 +91,20 @@ async def generate_chat_stream(
                             if len(buffer) > len(END_TAG) - 1:
                                 buffer = buffer[-(len(END_TAG) - 1):]
                             break
-            
+
         # Сбрасываем остаток буфера по завершении потока, если не в блоке размышлений
         if not is_thinking and buffer:
             yield f"event: token\ndata: {json.dumps({'content': buffer}, ensure_ascii=False)}\n\n"
             buffer = ""
 
-    except Exception as e:
+    except Exception:
         error_msg = "(Системная ошибка: нейросеть временно недоступна)"
         yield f"event: token\ndata: {json.dumps({'content': error_msg}, ensure_ascii=False)}\n\n"
         full_text += error_msg
 
-    # Окончание стрима
-    yield f"event: done\ndata: {json.dumps({'status': 'success'}, ensure_ascii=False)}\n\n"
-    
-    # Сохраняем полный текст для фоновой задачи
+    yield f"event: done\ndata: {json.dumps({'id': str(ai_msg_id)}, ensure_ascii=False)}\n\n"
+
+    # Сохраняем полный текст в словарь состояния и запускаем фоновую обработку
     state["full_text"] = full_text
     asyncio.create_task(process_post_generation(chat_id, ai_msg_id, state))
 
@@ -125,38 +123,32 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
     from app.db.base import AsyncSessionLocal
     from app.domains.chat.message_models import Message
     from app.domains.chat.models import ChatCheckpoint
-    from sqlalchemy import select
     from app.core import rag
-    from app.core.director_service import DirectorService
-    
+    from app.core.director_service import director
+
     full_text = state.get("full_text", "")
-    if not full_text: 
-        return
-    
-    thought_match = re.search(r"<Internal_Analysis>(.*?)</Internal_Analysis>", full_text, flags=re.DOTALL)
-    if thought_match:
-        hidden_thought = thought_match.group(1).strip()
-        ai_text = re.sub(r"<Internal_Analysis>.*?</Internal_Analysis>", "", full_text, flags=re.DOTALL).strip()
-    else:
-        hidden_thought = None
-        ai_text = full_text.strip()
-        
+
+    # Извлекаем блок внутреннего анализа и очищаем основной текст сообщения
+    thoughts_match = re.search(r"<Internal_Analysis>(.*?)</Internal_Analysis>", full_text, flags=re.DOTALL)
+    internal_thoughts = thoughts_match.group(1).strip() if thoughts_match else None
+    clean_content = re.sub(r"<Internal_Analysis>.*?</Internal_Analysis>", "", full_text, flags=re.DOTALL).strip()
+
     async with AsyncSessionLocal() as db:
         ai_msg = await db.get(Message, ai_msg_id)
         if not ai_msg:
             return
-            
-        ai_msg.content = ai_text
-        ai_msg.hidden_thought = hidden_thought
+
+        ai_msg.content = clean_content
+        ai_msg.internal_thoughts = internal_thoughts
         db.add(ai_msg)
         await db.commit()
-        
+
         # 1. Эпизодическая память RAG (обработка скользящего окна)
         try:
             await rag.process_sliding_window(db, chat_id, ai_msg_id)
         except Exception as e:
             print(f"[RAG] Error adding to memory: {e}")
-            
+
         # 2. Проверка прогресса сценария супервайзером
         try:
             res = await db.execute(
@@ -164,10 +156,7 @@ async def process_post_generation(chat_id: UUID, ai_msg_id: UUID, state: dict):
                 .where(ChatCheckpoint.chat_id == chat_id, ChatCheckpoint.is_completed == False)
                 .order_by(ChatCheckpoint.order_num)
             )
-            checkpoint = res.scalars().first()
-            if checkpoint and checkpoint.messages_spent > 0 and checkpoint.messages_spent % 3 == 0:
-                director = DirectorService()
+            if res.scalars().first():
                 await director.check_progress(chat_id, leaf_id=ai_msg_id)
         except Exception as e:
             print(f"[Supervisor] Error checking progress: {e}")
-

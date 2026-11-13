@@ -1,6 +1,5 @@
 """Точка входа и инициализация микросервиса бизнес-логики и ИИ (Core Service)."""
 
-import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,4 +46,4 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.get("/health")
 def health_check():
     """Проверка жизнеспособности сервиса Core Service."""
-    return {"status": "ok", "service": "core-service"}
+    return {"status": "ok", "service": "core-service"}

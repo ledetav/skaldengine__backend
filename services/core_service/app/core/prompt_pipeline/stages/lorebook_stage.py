@@ -6,45 +6,59 @@ from typing import List, Set, Any
 from sqlalchemy import select, and_
 from sqlalchemy.orm import joinedload
 
-from app.core.config import settings
 from app.core import rag
 from app.domains.lorebook.models import LorebookEntry
-from app.domains.chat.models import EpisodicMemory
 from app.core.prompt_pipeline.context import PipelineContext
 from app.core.prompt_pipeline.stages.base import PipelineStage
 
 
-def get_stems(text: str) -> List[str]:
-    """Упрощенное стеммирование для русского и английского: берем корни слов."""
-    words = re.findall(r'[a-zа-я0-9]{3,}', text.lower())
-    stems = []
-    for w in words:
-        if len(w) > 5:
-            stems.append(w[:5])
-        elif len(w) > 4:
-            stems.append(w[:4])
-        else:
-            stems.append(w)
-    return list(set(stems))
-
-
 class LorebookStage(PipelineStage):
     """
-    Этап 2: Извлечение семантической памяти (Lorebook).
-    Поддерживает Core-атрибуты (is_always_included), гибридный поиск (Aho-Corasick + Vector)
-    и проверку знакомства с персонажем (is_acquainted).
+    Отвечает за подгрузку записей лорбуков (Core, Keyword, Semantic RAG)
+    и распределение фактов по категориям для персонажа и персоны игрока.
     """
+
+    def _add_lore_to_collections(
+        self, context: PipelineContext, entry: LorebookEntry, is_core: bool = False
+    ) -> None:
+        """Распределяет факт из лорбука в нужные коллекции контекста."""
+        cat = entry.category or "Lore"
+        text = entry.content.strip()
+        if not text:
+            return
+
+        is_persona = getattr(entry.lorebook, "user_persona_id", None) is not None
+
+        if is_persona:
+            if is_core:
+                if text not in context.persona_core_attributes:
+                    context.persona_core_attributes.append(text)
+            else:
+                context.persona_categorized_facts.setdefault(cat, [])
+                if text not in context.persona_categorized_facts[cat]:
+                    context.persona_categorized_facts[cat].append(text)
+        else:
+            if is_core:
+                if text not in context.core_attributes:
+                    context.core_attributes.append(text)
+            else:
+                context.categorized_facts.setdefault(cat, [])
+                if text not in context.categorized_facts[cat]:
+                    context.categorized_facts[cat].append(text)
 
     async def process(self, context: PipelineContext, user_text: str = "") -> None:
         """Выполняет поиск и распределение фактов лорбуков по категориям в PipelineContext."""
         if not context.character:
             return
 
-
         # 1. Формируем список актуальных лорбуков
         relevant_lb_ids = [lb.id for lb in context.character.lorebooks]
         if hasattr(context.chat, 'persona_lorebook_id') and context.chat.persona_lorebook_id:
-            relevant_lb_ids.append(context.chat.persona_lorebook_id)
+            if context.chat.persona_lorebook_id not in relevant_lb_ids:
+                relevant_lb_ids.append(context.chat.persona_lorebook_id)
+
+        if not relevant_lb_ids:
+            return
 
         base_query = (
             select(LorebookEntry)
@@ -57,66 +71,56 @@ class LorebookStage(PipelineStage):
         for entry in always_res.scalars().all():
             self._add_lore_to_collections(context, entry, is_core=True)
 
-        # 2. Проверяем необходимость генерации query_vector
-        lb_has_vectors = False
+        # Проверяем наличие записей с эмбеддингами для оптимизации RAG
         vector_check_query = select(LorebookEntry.id).where(and_(
             LorebookEntry.lorebook_id.in_(relevant_lb_ids),
             LorebookEntry.embedding != None
         )).limit(1)
         lb_vec_res = await context.db.execute(vector_check_query)
-        if lb_vec_res.scalar():
-            lb_has_vectors = True
+        has_lb_vectors = lb_vec_res.first() is not None
 
-        has_episodes = False
-        memo_check_query = (
-            select(EpisodicMemory.id)
-            .where(
-                and_(
-                    EpisodicMemory.chat_id == context.chat_id,
-                    EpisodicMemory.summary != rag.EMPTY_FACTS_SENTINEL
-                )
-            )
-            .limit(1)
-        )
-        memo_vec_res = await context.db.execute(memo_check_query)
-        if memo_vec_res.scalar():
-            has_episodes = True
-
-        if lb_has_vectors or has_episodes:
+        if has_lb_vectors and context.query_vector is None and user_text.strip():
             context.query_vector = await rag.get_query_embedding(user_text)
 
-        found_entries_ids: Set[Any] = set()
+        # Текст для поиска по ключевым словам
+        search_corpus = user_text
+        if context.history:
+            last_msgs = [m["content"] for m in context.history[-2:]]
+            search_corpus = " ".join(last_msgs) + " " + user_text
+
+        matched_entry_ids: Set[Any] = set()
 
         # А) Поиск по ключевым словам (Aho-Corasick)
         all_entries_res = await context.db.execute(base_query.where(LorebookEntry.is_always_included == False))
         candidates = all_entries_res.scalars().all()
 
-        if candidates:
-            automaton = ahocorasick.Automaton()
-            stem_to_entries = {}
-            has_keywords = False
+        automaton = ahocorasick.Automaton()
+        has_patterns = False
+        for entry in candidates:
+            if not entry.keywords:
+                continue
+            kw_list = [k.strip().lower() for k in entry.keywords.split(",") if k.strip()]
+            for kw in kw_list:
+                automaton.add_word(kw, (kw, entry))
+                has_patterns = True
 
-            for entry in candidates:
-                for kw in entry.keywords:
-                    stems = get_stems(kw)
-                    for s in stems:
-                        if s not in stem_to_entries:
-                            automaton.add_word(s, s)
-                            stem_to_entries[s] = []
-                        stem_to_entries[s].append(entry)
-                        has_keywords = True
+        if has_patterns and search_corpus.strip():
+            automaton.make_automaton()
+            corpus_lower = search_corpus.lower()
+            for end_idx, (kw, entry) in automaton.iter(corpus_lower):
+                start_idx = end_idx - len(kw) + 1
+                before_ok = (start_idx == 0) or not corpus_lower[start_idx - 1].isalnum()
+                after_ok = (end_idx == len(corpus_lower) - 1) or not corpus_lower[end_idx + 1].isalnum()
+                if before_ok and after_ok:
+                    matched_entry_ids.add(entry.id)
+                    self._add_lore_to_collections(context, entry, is_core=False)
 
-            if has_keywords:
-                automaton.make_automaton()
-                for _, stem in automaton.iter(user_text.lower()):
-                    for entry in stem_to_entries.get(stem, []):
-                        found_entries_ids.add(entry.id)
-
-        # Б) Семантический поиск (Vector Search)
+        # Б) Векторный семантический поиск
         if context.query_vector:
             distance = LorebookEntry.embedding.cosine_distance(context.query_vector)
-            vector_query = (
-                select(LorebookEntry)
+            sem_query = (
+                select(LorebookEntry, distance.label("distance"))
+                .options(joinedload(LorebookEntry.lorebook))
                 .where(and_(
                     LorebookEntry.lorebook_id.in_(relevant_lb_ids),
                     LorebookEntry.is_always_included == False,
@@ -125,42 +129,8 @@ class LorebookStage(PipelineStage):
                 .order_by(distance.asc())
                 .limit(5)
             )
-            vector_res = await context.db.execute(vector_query)
-            for entry in vector_res.scalars().all():
-                found_entries_ids.add(entry.id)
-
-        # Собираем все найденные (не core) записи, исключая повторы
-        if found_entries_ids:
-            final_res = await context.db.execute(
-                select(LorebookEntry).where(LorebookEntry.id.in_(list(found_entries_ids)))
-            )
-            for entry in final_res.scalars().all():
-                self._add_lore_to_collections(context, entry, is_core=False)
-
-    @staticmethod
-    def _add_lore_to_collections(context: PipelineContext, entry: LorebookEntry, is_core: bool = False) -> None:
-        """Распределяет факты из лорбука по категориям для промпта."""
-        fact_line = entry.content
-        category = entry.category.lower() if entry.category else "fact"
-
-        is_user_lore = entry.lorebook.type == "persona"
-
-        if is_user_lore:
-            # Если не знакомы - режем всё кроме Core и Appearance
-            if context.chat and not context.chat.is_acquainted:
-                if not is_core and category != "appearance":
-                    return
-
-            if is_core:
-                context.persona_core_attributes.append(fact_line)
-            else:
-                if category not in context.persona_categorized_facts:
-                    context.persona_categorized_facts[category] = []
-                context.persona_categorized_facts[category].append(fact_line)
-        else:
-            if is_core:
-                context.core_attributes.append(fact_line)
-            else:
-                if category not in context.categorized_facts:
-                    context.categorized_facts[category] = []
-                context.categorized_facts[category].append(fact_line)
+            sem_res = await context.db.execute(sem_query)
+            for entry, dist in sem_res.all():
+                if dist is not None and dist <= 0.65 and entry.id not in matched_entry_ids:
+                    matched_entry_ids.add(entry.id)
+                    self._add_lore_to_collections(context, entry, is_core=False)

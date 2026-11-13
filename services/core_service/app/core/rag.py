@@ -1,9 +1,8 @@
 """Модуль генерации векторных эмбеддингов и фоновой суммаризации истории чата (RAG)."""
 
 import uuid
-from typing import Optional, List
 from openai import AsyncOpenAI
-from sqlalchemy import select, desc, literal_column
+from sqlalchemy import select, literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
@@ -15,7 +14,7 @@ EMPTY_FACTS_SENTINEL = "[NO_FACTS]"
 
 async def get_embedding(text: str) -> list[float]:
     """Асинхронная генерация эмбеддинга (1536-dim) через text-embedding-3-small.
-    
+
     Используется для сохранения фактов в эпизодическую память.
 
     Args:
@@ -73,103 +72,79 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
     """
     from app.domains.chat.message_models import Message
     from app.domains.chat.models import EpisodicMemory
-    
-    cte = select(
-        Message.id, Message.parent_id, literal_column("1").label("depth")
-    ).where(Message.id == leaf_id).cte(recursive=True)
 
-    cte = cte.union_all(
-        select(Message.id, Message.parent_id, (cte.c.depth + 1).label("depth"))
-        .join(cte, Message.id == cte.c.parent_id)
-        .where(cte.c.depth < 50)
-    )
-
-    query = select(Message).join(cte, Message.id == cte.c.id).order_by(cte.c.depth)
-    res = await db.execute(query)
-    branch = list(res.scalars().all())
-
+    # 1. Восстанавливаем полную ветку от корня до листа
+    branch = []
+    curr_id = leaf_id
+    visited = set()
+    while curr_id and curr_id not in visited:
+        visited.add(curr_id)
+        msg = await db.get(Message, curr_id)
+        if not msg:
+            break
+        branch.append(msg)
+        curr_id = msg.parent_id
     branch.reverse()
-    
-    # Оставляем последние 3 пары (6 сообщений) в оперативной памяти (вместе с промптом)
+
     if len(branch) <= 6:
-        return
-        
+        return  # Все сообщения помещаются в оперативное окно
+
     # Все сообщения, вышедшие за пределы окна последних 6
     fallen_out = branch[:-6]
-    
+
     # Получаем идентификаторы сообщений этого чата, которые уже были суммаризированы
     res = await db.execute(select(EpisodicMemory.message_id).where(EpisodicMemory.chat_id == chat_id))
     summarized_ids = set(res.scalars().all())
-    
-    unsummarized_chunk = []
-    for msg in fallen_out:
-        unsummarized_chunk.append(msg)
-        if msg.id in summarized_ids:
-            unsummarized_chunk.clear()
-            
-    # Проводим саммаризацию/векторизацию, когда накопилось 6 новых "выпавших" сообщений (~3 пары)
-    if len(unsummarized_chunk) >= 6:
-        chunk_to_process = unsummarized_chunk[:8]  # Берем до 8 сообщений для контекста
-        
-        dialogue = []
-        for m in chunk_to_process:
-            role = "Юзер" if m.role == "user" else "ИИ"
-            dialogue.append(f"{role}: {m.content}")
-        text_block = "\n".join(dialogue)
-        
-        prompt = f"""Проанализируй этот фрагмент диалога. Извлеки только новые, важные факты, значимые зацепки для сюжета, информацию о персонажах или изменения в их отношениях.
-Верни ответ СТРОГО в формате JSON: {{"facts": ["факт 1", "факт 2", ...]}}.
-Если ничего важного нет, верни {{"facts": []}}.
-Игнорируй пустую болтовню. Пиши факты от 3-го лица, максимально лаконично и конкретно.
 
-Диалог:
-{text_block}
+    unsummarized = [m for m in fallen_out if m.id not in summarized_ids]
+    if len(unsummarized) >= 4:
+        chunk = unsummarized[:4]
+        chunk_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in chunk])
+        target_msg_id = chunk[-1].id  # Привязываем память к последнему сообщению пачки
+
+        prompt = f"""Extract 1 to 3 concrete, concise, standalone factual statements about events, decisions, revealed secrets, or character relationships from the following roleplay dialogue excerpt.
+Focus on permanent plot points and character facts. Ignore trivial filler, greetings, or generic small talk.
+If there are NO meaningful facts to remember, return an empty list: {{"facts": []}}.
+
+Dialogue Excerpt:
+{chunk_text}
+
+Return ONLY a valid JSON object: {{"facts": ["fact 1", "fact 2"]}}
 """
-        
+        client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
         try:
-            client = AsyncOpenAI(base_url="https://polza.ai/api/v1", api_key=settings.POLZA_API_KEY)
             response = await client.chat.completions.create(
                 model=settings.POLZA_SUMMARY_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
-                temperature=0.2
+                temperature=0.1
             )
-            
             import json
-            raw_content = response.choices[0].message.content
-            try:
-                data = json.loads(raw_content)
-                facts = data.get("facts", [])
-            except json.JSONDecodeError:
-                facts = []
-            
+            data = json.loads(response.choices[0].message.content)
+            facts = data.get("facts", [])
+
             saved_any = False
-            for fact_text in facts:
-                if not isinstance(fact_text, str):
-                    continue
-                clean_fact = fact_text.strip()
-                if not clean_fact:
-                    continue
-                    
-                embedding = await get_embedding(clean_fact)
-                if embedding:
-                    mem = EpisodicMemory(
-                        chat_id=chat_id,
-                        message_id=chunk_to_process[-1].id,
-                        summary=clean_fact,
-                        embedding=embedding
-                    )
-                    db.add(mem)
-                    saved_any = True
-            
+            for fact in facts:
+                if fact and isinstance(fact, str) and fact.strip():
+                    emb = await get_embedding(fact.strip())
+                    if emb:
+                        mem = EpisodicMemory(
+                            chat_id=chat_id,
+                            message_id=target_msg_id,
+                            fact_content=fact.strip(),
+                            embedding=emb
+                        )
+                        db.add(mem)
+                        saved_any = True
+
             if not saved_any:
                 # Помечаем чанк как обработанный сигнальным значением (sentinel), чтобы избежать повторной суммаризации
                 dummy_vector = [0.0] * 1536
                 dummy_vector[0] = 1.0
                 sentinel_mem = EpisodicMemory(
                     chat_id=chat_id,
-                    message_id=chunk_to_process[-1].id,
-                    summary=EMPTY_FACTS_SENTINEL,
+                    message_id=target_msg_id,
+                    fact_content=EMPTY_FACTS_SENTINEL,
                     embedding=dummy_vector
                 )
                 db.add(sentinel_mem)
@@ -177,4 +152,3 @@ async def process_sliding_window(db: AsyncSession, chat_id: uuid.UUID, leaf_id: 
             await db.commit()
         except Exception as e:
             print(f"[RAG] Error in process_sliding_window: {e}")
-

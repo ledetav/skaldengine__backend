@@ -3,9 +3,8 @@
 from typing import Optional
 import json
 import uuid
-from sqlalchemy import select, desc, literal
 from openai import AsyncOpenAI
-
+from sqlalchemy import select
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
 from app.domains.chat.models import Chat
@@ -34,20 +33,21 @@ class DirectorService:
             checkpoints_count: Количество промежуточных чекпоинтов (по умолчанию 3).
         """
         import random
-        from sqlalchemy import func, or_
+        from sqlalchemy import func
         from app.domains.lorebook.models import Lorebook, LorebookEntry, LorebookType
         from app.domains.character.models import character_lorebook_association
 
         async with AsyncSessionLocal() as db:
-            # 1. Получаем данные чата
-            result = await db.execute(
+            # 1. Загружаем базовые сущности диалога
+            stmt = (
                 select(Chat, Character, UserPersona, Scenario)
                 .join(Character, Chat.character_id == Character.id)
-                .join(UserPersona, Chat.user_persona_id == UserPersona.id)
-                .join(Scenario, Chat.scenario_id == Scenario.id)
+                .join(UserPersona, Chat.persona_id == UserPersona.id)
+                .outerjoin(Scenario, Chat.scenario_id == Scenario.id)
                 .where(Chat.id == chat_id)
             )
-            row = result.first()
+            res = await db.execute(stmt)
+            row = res.first()
             if not row:
                 return
 
@@ -55,43 +55,43 @@ class DirectorService:
 
             # --- Обогащение контекста лорбуками ---
             lore_facts = []
-            
+
             # 2. Поиск подходящих лорбуков фандома и персонажа
             # Критерии:
             # - type=FANDOM и совпадение фандома с character.fandom
             # - type=CHARACTER и совпадение с character.id
             # - ассоциация через таблицу связей character_lorebook_association
-            
+
             fandom_q = select(Lorebook).where(
                 Lorebook.type == LorebookType.FANDOM,
-                Lorebook.fandom == character.fandom
+                func.lower(Lorebook.fandom) == func.lower(character.fandom)
             )
             char_direct_q = select(Lorebook).where(
                 Lorebook.type == LorebookType.CHARACTER,
                 Lorebook.character_id == character.id
             )
             assoc_q = select(Lorebook).join(
-                character_lorebook_association, 
+                character_lorebook_association,
                 Lorebook.id == character_lorebook_association.c.lorebook_id
             ).where(character_lorebook_association.c.character_id == character.id)
-            
+
             # Объединение потенциальных лорбуков
             l_res_f = await db.execute(fandom_q)
             l_res_c = await db.execute(char_direct_q)
             l_res_a = await db.execute(assoc_q)
-            
+
             potential_books = list(set(
-                list(l_res_f.scalars().all()) + 
-                list(l_res_c.scalars().all()) + 
+                list(l_res_f.scalars().all()) +
+                list(l_res_c.scalars().all()) +
                 list(l_res_a.scalars().all())
             ))
-            
+
             # Выбираем до 3 случайных книг
             if len(potential_books) > 3:
                 selected_books = random.sample(potential_books, 3)
             else:
                 selected_books = potential_books
-                
+
             # Извлекаем до 6 случайных записей из выбранных книг
             if selected_books:
                 book_ids = [b.id for b in selected_books]
@@ -108,58 +108,46 @@ class DirectorService:
                     Lorebook.type == LorebookType.PERSONA,
                     Lorebook.user_persona_id == persona.id
                 )
-                p_res = await db.execute(pers_books_q)
-                p_books = p_res.scalars().all()
-                if p_books:
-                    p_book = random.choice(p_books)
+                pb_res = await db.execute(pers_books_q)
+                pers_books = list(pb_res.scalars().all())
+                if pers_books:
+                    pb_ids = [b.id for b in pers_books]
                     p_entries_q = select(LorebookEntry).where(
-                        LorebookEntry.lorebook_id == p_book.id
-                    ).order_by(func.random()).limit(3)
+                        LorebookEntry.lorebook_id.in_(pb_ids)
+                    ).order_by(func.random()).limit(4)
                     pe_res = await db.execute(p_entries_q)
                     persona_facts.extend([e.content for e in pe_res.scalars().all()])
 
             # --- Формирование промпта для генерации чекпоинтов ---
             lore_section = "\n".join([f"- {f}" for f in lore_facts]) if lore_facts else "No specific world lore provided."
             persona_lore_section = "\n".join([f"- {f}" for f in persona_facts]) if persona_facts else ""
-            
-            relationship_info = f"[RELATIONSHIP]: {chat.relationship_dynamic}" if chat.relationship_dynamic else ""
-            if chat.is_acquainted:
-                relationship_info = f"[RELATIONSHIP STATUS]: Characters are already acquainted.\n{relationship_info}"
-            else:
-                relationship_info = "[RELATIONSHIP STATUS]: First meeting."
 
-            scenario_context = scenario.internal_description or scenario.description or "No general description"
+            prompt = f"""You are a Master Narrative Designer for an interactive roleplaying game.
+Your task is to generate a sequence of {checkpoints_count} concrete, logical intermediate milestones (checkpoints) that bridge the starting premise to the final objective.
 
-            prompt = f"""You are a Professional RPG Scenario Writer.
-Your task is to plot a logical narrative path from Point A (Inciting Incident) to Point B (Finale).
+[CHARACTER]:
+Name: {character.name}
+Fandom: {character.fandom}
+Personality/Bio: {character.personality or character.description or 'Not specified'}
 
-[SCENARIO DESCRIPTION]:
-{scenario_context}
+[PLAYER PERSONA]:
+Name: {persona.name}
+Description: {persona.description or 'Not specified'}
+{f'[PLAYER LORE]:\n{persona_lore_section}' if persona_lore_section else ''}
 
-[AI CHARACTER]: {character.name}
-- Personality: {character.personality or 'Internal role instructions'}
-- Appearance: {character.appearance or 'Varies'}
-- Context/Bio: {character.description or 'No description'}
-
-[USER CHARACTER]: {persona.name}
-- Personality: {persona.personality or 'Varies'}
-- Appearance: {persona.appearance or 'Varies'}
-- Facts/Bio: {persona.facts or 'No facts provided'}
-{persona_lore_section}
-
-{relationship_info}
-
-[POINT A (Start)]: {scenario.start_point}
-[POINT B (End)]: {scenario.end_point}
-
-[WORLD/CHARACTER LORE FACTS (Randomly selected for uniqueness)]:
+[WORLD LORE]:
 {lore_section}
 
-Based on this context, create EXACTLY {checkpoints_count} intermediate narrative goals (checkpoints) that must be fulfilled in order to logically progress from Point A to Point B.
-Each goal must be formulated as a hidden directive for the AI actor (what they should push the player to do, or what event must occur).
+[SCENARIO]:
+Title: {scenario.title if scenario else 'Custom'}
+Starting Premise: {scenario.description if scenario else 'Freeform'}
+FINAL OBJECTIVE: {scenario.final_goal if scenario and scenario.final_goal else 'Reach a meaningful narrative climax'}
 
-Return a JSON object with a "checkpoints" key containing an array of objects with the "goal_description" field. All goals must be written strictly in English, regardless of the characters' primary language. Each goal should be a concise narrative milestone. 
-Example: "Character A admits their secret to Character B." or "The group reaches the abandoned temple."
+Generate a JSON object with a single key "checkpoints", which is a list of {checkpoints_count} objects.
+Each object must have:
+- "goal_description": A clear, actionable, third-person narrative milestone that moves the plot closer to the FINAL OBJECTIVE, organically integrating the character's personality and world lore.
+
+Return ONLY valid JSON.
 """
 
             try:
@@ -168,15 +156,15 @@ Example: "Character A admits their secret to Character B." or "The group reaches
                     model=settings.POLZA_CHAT_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
-                    temperature=0.8
+                    temperature=0.7
                 )
-                
-                response_text = response.choices[0].message.content
-                checkpoints_data = json.loads(response_text)
-                if isinstance(checkpoints_data, dict) and "checkpoints" in checkpoints_data:
-                    checkpoints_list = checkpoints_data["checkpoints"]
-                elif isinstance(checkpoints_data, list):
-                    checkpoints_list = checkpoints_data
+                content = response.choices[0].message.content
+                data = json.loads(content)
+
+                if isinstance(data, dict):
+                    checkpoints_list = data.get("checkpoints", list(data.values())[0] if data else [])
+                elif isinstance(data, list):
+                    checkpoints_list = data
                 else:
                     checkpoints_list = []
 
@@ -184,21 +172,27 @@ Example: "Character A admits their secret to Character B." or "The group reaches
                 for i, cp_data in enumerate(checkpoints_list[:checkpoints_count]):
                     goal = cp_data.get("goal_description")
                     if goal:
-                        checkpoint = ChatCheckpoint(
+                        cp = ChatCheckpoint(
                             chat_id=chat_id,
                             order_num=i + 1,
                             goal_description=goal,
-                            is_completed=False,
-                            messages_spent=0
+                            is_completed=False
                         )
-                        db.add(checkpoint)
-                
-                await db.commit()
-                print(f"[Director] Generated {len(checkpoints_list)} checkpoints for chat {chat_id}")
+                        db.add(cp)
 
+                # Добавляем финальную цель последним чекпоинтом
+                if scenario and scenario.final_goal:
+                    final_cp = ChatCheckpoint(
+                        chat_id=chat_id,
+                        order_num=len(checkpoints_list[:checkpoints_count]) + 1,
+                        goal_description=scenario.final_goal,
+                        is_completed=False
+                    )
+                    db.add(final_cp)
+
+                await db.commit()
             except Exception as e:
-                print(f"[Director] Error initializing scenario: {e}")
-                await db.rollback()
+                print(f"[Director] Error generating checkpoints: {e}")
 
     async def check_progress(
         self,
@@ -217,7 +211,7 @@ Example: "Character A admits their secret to Character B." or "The group reaches
         client = self.client
 
         async with AsyncSessionLocal() as db:
-            # 1. Берем текущую активную цель
+            # 1. Находим первый невыполненный чекпоинт
             result = await db.execute(
                 select(ChatCheckpoint)
                 .where(ChatCheckpoint.chat_id == chat_id, ChatCheckpoint.is_completed == False)
@@ -230,38 +224,30 @@ Example: "Character A admits their secret to Character B." or "The group reaches
             # 2. Определение активной ветки сообщений
             target_leaf_id = leaf_id
             if not target_leaf_id:
-                chat_res = await db.execute(select(Chat.active_leaf_id).where(Chat.id == chat_id))
-                target_leaf_id = chat_res.scalar_one_or_none()
+                chat_obj = await db.get(Chat, chat_id)
+                if chat_obj:
+                    target_leaf_id = chat_obj.active_leaf_id
 
-            limit = 8
-            if target_leaf_id:
-                # Рекурсивный CTE для обхода истории только по активной ветке от leaf_id
-                base_query = (
-                    select(Message.id, Message.parent_id, literal(1).label('depth'))
-                    .where(Message.id == target_leaf_id)
-                    .cte(name="director_tree", recursive=True)
-                )
-                recursive_query = (
-                    select(Message.id, Message.parent_id, (base_query.c.depth + 1).label('depth'))
-                    .join(base_query, Message.id == base_query.c.parent_id)
-                    .where(base_query.c.depth < limit)
-                )
-                cte = base_query.union_all(recursive_query)
-                query = select(Message).join(cte, Message.id == cte.c.id).order_by(cte.c.depth.asc())
-                msg_result = await db.execute(query)
-                messages = list(msg_result.scalars().all())
-                messages.reverse()
-            else:
-                # Фоллбэк: плоская выборка, если leaf_id отсутствует
-                msg_result = await db.execute(
-                    select(Message)
-                    .where(Message.chat_id == chat_id)
-                    .order_by(desc(Message.created_at))
-                    .limit(limit)
-                )
-                messages = list(reversed(msg_result.scalars().all()))
+            if not target_leaf_id:
+                return
 
-            history_text = "\n".join([f"{m.role}: {m.content}" for m in messages if m.content])
+            # Восстанавливаем цепочку сообщений текущей ветки до корня
+            branch_msgs = []
+            curr_id = target_leaf_id
+            visited = set()
+            while curr_id and curr_id not in visited and len(branch_msgs) < 50:
+                visited.add(curr_id)
+                msg_obj = await db.get(Message, curr_id)
+                if not msg_obj:
+                    break
+                branch_msgs.append(msg_obj)
+                curr_id = msg_obj.parent_id
+
+            branch_msgs.reverse()
+
+            # Собираем контекст из последних 12 сообщений ветки
+            recent_msgs = branch_msgs[-12:]
+            history_text = "\n".join([f"{m.role.upper()}: {m.content}" for m in recent_msgs])
             if not history_text:
                 return
 
@@ -270,26 +256,21 @@ Example: "Character A admits their secret to Character B." or "The group reaches
 
 [CURRENT SCENARIO GOAL]: "{current_checkpoint.goal_description}"
 
-[RECENT MESSAGES]:
+[RECENT CHAT HISTORY]:
 {history_text}
 
-Analyze the dialogue. Has the current narrative goal been effectively achieved or fully disclosed? 
-Note: A goal is considered achieved ONLY if the event has already occurred or the fact is already clearly established in the dialogue, not just mentioned as future plans.
+Has the character/player successfully achieved or clearly completed the [CURRENT SCENARIO GOAL] in the dialogue above?
+Evaluate strictly based on explicit actions and dialogue outcomes, not mere intentions.
 
-Return JSON:
-{{
-  "reasoning": "Brief logical explanation of your decision (up to 30 words).",
-  "is_achieved": true/false
-}}"""
-
+Return a JSON object: {{"is_achieved": true/false, "reason": "brief explanation"}}
+"""
             try:
                 response = await client.chat.completions.create(
-                    model=settings.POLZA_CHAT_MODEL,
+                    model=settings.POLZA_SUMMARY_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
                     temperature=0.1
                 )
-                
                 response_text = response.choices[0].message.content
                 analysis = json.loads(response_text)
                 if analysis.get("is_achieved"):
@@ -297,10 +278,7 @@ Return JSON:
                     current_checkpoint.is_completed = True
                     db.add(current_checkpoint)
                     await db.commit()
-                    print(f"[Director] Checkpoint {current_checkpoint.order_num} achieved for chat {chat_id}: {analysis.get('reasoning')}")
-                else:
-                    print(f"[Director] Progress check for chat {chat_id}: Not achieved yet. Reason: {analysis.get('reasoning')}")
+                    print(f"[Director] Checkpoint {current_checkpoint.order_num} achieved for chat {chat_id}!")
 
             except Exception as e:
                 print(f"[Director] Error checking progress: {e}")
-

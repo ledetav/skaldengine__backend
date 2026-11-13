@@ -2,8 +2,7 @@
 
 import os
 from pydantic import Field, AliasChoices, field_validator
-from typing import List, Union, Any
-import json
+from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,7 +39,7 @@ class Settings(BaseSettings):
     POLZA_TITLE_MAX_TOKENS: int = Field(50, description="Максимальное количество токенов для генерации заголовка")
     POLZA_RAG_MAX_DISTANCE: float = Field(0.60, description="Максимальное косинусное расстояние для RAG-поиска")
 
-    # Директория загрузки медиафайлов (аватары, карточки персонажей)
+    # Директория загрузки медиафайлов (аватарки, карточки персонажей)
     UPLOAD_DIR: str = Field("./uploads", validation_alias=AliasChoices("CORE_UPLOAD_DIR", "UPLOAD_DIR"))
 
     BACKEND_CORS_ORIGINS: list[str] = [
@@ -52,12 +51,12 @@ class Settings(BaseSettings):
     ]
 
     model_config = SettingsConfigDict(
-        env_file=".env", 
-        env_file_encoding='utf-8', 
-        case_sensitive=True, 
+        env_file=".env",
+        env_file_encoding='utf-8',
+        case_sensitive=True,
         extra="ignore"
     )
 
 
 settings = Settings()
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

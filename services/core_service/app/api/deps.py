@@ -1,7 +1,7 @@
 """Зависимости FastAPI (Dependencies) и внедрение зависимостей (DI) для Core Service."""
 
 from typing import AsyncGenerator
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from pydantic import BaseModel, Field
@@ -80,7 +80,7 @@ async def get_current_user(token_auth: HTTPAuthorizationCredentials = Depends(se
         token_data = payload.get("sub")
         if token_data is None:
             raise HTTPException(status_code=403, detail="Недействительный токен")
-        
+
         # Парсинг даты рождения
         birth_date_str = payload.get("birth_date")
         birth_date_val = None
@@ -252,4 +252,4 @@ async def get_user_persona_service(repo: UserPersonaRepository = Depends(get_use
 
 async def get_user_persona_controller(service: UserPersonaService = Depends(get_user_persona_service)) -> UserPersonaController:
     """Внедрение UserPersonaController."""
-    return UserPersonaController(service)
+    return UserPersonaController(service)
