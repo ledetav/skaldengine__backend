@@ -41,10 +41,14 @@ jobs:
           ENVIRONMENT: test
           SECRET_KEY: ci-test-secret-key
           JWT_SECRET: ci-test-secret-key
+          POLZA_API_KEY: ci-test-polza-key
           DATABASE_URL: sqlite+aiosqlite:///./test_ci.db
           AUTH_DATABASE_URL: sqlite+aiosqlite:///./test_auth_ci.db
           CORE_DATABASE_URL: sqlite+aiosqlite:///./test_core_ci.db
-        run: pytest
+        run: |
+          PYTHONPATH=. pytest gateway/tests
+          PYTHONPATH=services/auth_service:. pytest -o pythonpath="services/auth_service ." services/auth_service/tests
+          PYTHONPATH=services/core_service:. pytest -o pythonpath="services/core_service ." services/core_service/tests
 
       - name: Trigger Fullstack UI Audit in Frontend Repository
         if: always() && env.GH_TOKEN != ''
