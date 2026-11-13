@@ -5,7 +5,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 
-from .schemas import CharacterCreate, CharacterResponse, CharacterUpdate
+from .schemas import CharacterCreate, CharacterUpdate
 from .controller import CharacterController
 from app.api import deps
 from shared.schemas.response import BaseResponse
@@ -68,4 +68,3 @@ async def delete_character(
     """Удалить персонажа (мягкое удаление)."""
     is_admin = current_user.role in ["admin", "moderator"]
     return await controller.delete_character(character_id, current_user.id, is_admin=is_admin)
-

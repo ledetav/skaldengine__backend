@@ -2,7 +2,7 @@
 Контроллер API для работы с сообщениями (Message): стриминг, свайпы, редактирование и форки.
 """
 
-from typing import List, Optional, Any
+from typing import Any
 from uuid import UUID
 from fastapi import status, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -23,7 +23,7 @@ class MessageController(BaseController):
         self.message_service = message_service
 
     async def send_message_stream(
-        self, chat_id: UUID, current_user: Any, message_in: MessageCreate, 
+        self, chat_id: UUID, current_user: Any, message_in: MessageCreate,
         background_tasks: BackgroundTasks, db: AsyncSession
     ) -> StreamingResponse:
         """Отправить сообщение и вернуть ответ ИИ через SSE-поток."""
@@ -70,4 +70,3 @@ class MessageController(BaseController):
         if not success:
             self.handle_error("Message not found", status_code=status.HTTP_404_NOT_FOUND)
         return self.handle_success(data={"message": "Message deleted successfully"})
-

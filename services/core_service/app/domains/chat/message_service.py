@@ -2,14 +2,14 @@
 Сервисный слой для потоковой обработки сообщений (Message), ветвления, редактирования и форка чатов.
 """
 
-from typing import List, Optional, Any
+from typing import Optional, Any
 from uuid import UUID
 from fastapi import BackgroundTasks
 from shared.base.service import BaseService
 from .message_repository import MessageRepository
-from .models import Chat
 from .message_models import Message
 from .message_schemas import MessageCreate
+from .models import Chat
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update as sa_update
 
@@ -20,7 +20,7 @@ class MessageService(BaseService[MessageRepository]):
     редактирование сообщений и форк ветки в новую игровую сессию.
     """
     async def send_message_stream(
-        self, chat_id: UUID, current_user: Any, message_in: MessageCreate, 
+        self, chat_id: UUID, current_user: Any, message_in: MessageCreate,
         background_tasks: BackgroundTasks, db: AsyncSession
     ):
         """
@@ -28,9 +28,6 @@ class MessageService(BaseService[MessageRepository]):
         сборка системного промпта через PromptPipeline и запуск SSE-стриминга ответа ИИ.
         """
         from .models import Chat
-        from app.domains.character.models import Character
-        from app.domains.persona.models import UserPersona
-        from app.domains.scenario.models import Scenario
 
         chat = await db.get(Chat, chat_id)
         if not chat or str(chat.user_id) != str(current_user.id):
@@ -41,10 +38,10 @@ class MessageService(BaseService[MessageRepository]):
             chat_id=chat.id,
             role="user",
             content=message_in.content,
-            parent_id=message_in.parent_id,
+            parent_id=message_in.parent_id
         )
         db.add(user_msg)
-        
+
         # Автоматическая генерация заголовка для нового чата
         if not chat.title and not message_in.parent_id:
             from app.core.title_service import ChatTitleService
@@ -72,13 +69,13 @@ class MessageService(BaseService[MessageRepository]):
         from app.core.prompt_pipeline import PromptPipeline
         pipeline = PromptPipeline(db, chat_id, current_user=current_user, parent_id=message_in.parent_id)
         payload = await pipeline.build_payload(message_in.content)
-        
+
         # Шаблон сообщения ассистента в БД
         ai_msg = Message(
             chat_id=chat.id,
             role="assistant",
             content="",
-            parent_id=user_msg.id,
+            parent_id=user_msg.id
         )
         db.add(ai_msg)
         await db.flush()
@@ -105,20 +102,20 @@ class MessageService(BaseService[MessageRepository]):
         parent_msg = await self.repository.get(parent_id)
         if not parent_msg or parent_msg.role != "user":
             raise ValueError("Parent user message not found")
-            
+
         chat = await db.get(Chat, parent_msg.chat_id)
         if not chat or str(chat.user_id) != str(current_user.id):
             raise ValueError("Chat not found")
 
         from app.core.prompt_pipeline import PromptPipeline
-        pipeline = PromptPipeline(db, chat.id, current_user=current_user, parent_id=parent_id)
+        pipeline = PromptPipeline(db, chat.id, current_user=current_user, parent_id=parent_msg.parent_id)
         payload = await pipeline.build_payload(parent_msg.content)
-        
+
         ai_msg = Message(
             chat_id=chat.id,
             role="assistant",
             content="",
-            parent_id=parent_id,
+            parent_id=parent_msg.id
         )
         db.add(ai_msg)
         await db.flush()
@@ -135,7 +132,6 @@ class MessageService(BaseService[MessageRepository]):
         state = {}
         return generate_chat_stream(chat.id, ai_msg.id, payload, state)
 
-
     async def edit_message(self, message_id: UUID, new_content: str, user_id: UUID, db: AsyncSession) -> Message:
         """
         Редактирование сообщения в истории.
@@ -144,13 +140,13 @@ class MessageService(BaseService[MessageRepository]):
         original_msg = await self.repository.get(message_id)
         if not original_msg:
             raise ValueError("Message not found")
-            
+
         chat = await db.get(Chat, original_msg.chat_id)
         if not chat or str(chat.user_id) != str(user_id):
-            raise ValueError("Chat not found")
-            
+            raise ValueError("Chat not found or permission denied")
+
         new_msg = Message(
-            chat_id=chat.id,
+            chat_id=original_msg.chat_id,
             role=original_msg.role,
             content=new_content,
             parent_id=original_msg.parent_id,
@@ -176,27 +172,30 @@ class MessageService(BaseService[MessageRepository]):
         """
         from app.domains.chat.models import EpisodicMemory
         from app.domains.chat.models import ChatCheckpoint
-        from sqlalchemy import cast as sql_cast
 
         target_msg = await self.repository.get(message_id)
         if not target_msg:
             raise ValueError("Message not found")
-            
+
         original_chat = await db.get(Chat, target_msg.chat_id)
         if not original_chat or str(original_chat.user_id) != str(user_id):
-            raise PermissionError("Forbidden")
+            raise PermissionError("Access denied")
 
         new_chat = Chat(
             user_id=user_id,
-            character_id=original_chat.character_id,
             user_persona_id=original_chat.user_persona_id,
+            character_id=original_chat.character_id,
+            title=f"{original_chat.title or 'Chat'} (Fork)",
             mode=original_chat.mode,
             scenario_id=original_chat.scenario_id,
             is_acquainted=original_chat.is_acquainted,
             relationship_dynamic=original_chat.relationship_dynamic,
+            custom_location=original_chat.custom_location,
+            custom_plot_hook=original_chat.custom_plot_hook,
             language=original_chat.language,
             narrative_voice=original_chat.narrative_voice,
-            persona_lorebook_id=original_chat.persona_lorebook_id
+            persona_lorebook_id=original_chat.persona_lorebook_id,
+            checkpoints_count=original_chat.checkpoints_count
         )
         db.add(new_chat)
         await db.flush()
@@ -206,21 +205,22 @@ class MessageService(BaseService[MessageRepository]):
         curr = target_msg
         while curr:
             path.append(curr)
-            if not curr.parent_id: break
+            if not curr.parent_id:
+                break
             curr = await self.repository.get(curr.parent_id)
         path.reverse()
 
         old_to_new = {}
         last_id = None
         for m in path:
+            new_parent = old_to_new.get(m.parent_id) if m.parent_id else None
             cloned = Message(
                 chat_id=new_chat.id,
                 role=m.role,
                 content=m.content,
-                hidden_thought=m.hidden_thought,
-                is_edited=m.is_edited,
-                parent_id=last_id,
-                created_at=m.created_at
+                internal_thoughts=m.internal_thoughts,
+                parent_id=new_parent,
+                is_edited=m.is_edited
             )
             db.add(cloned)
             await db.flush()
@@ -237,7 +237,7 @@ class MessageService(BaseService[MessageRepository]):
             db.add(EpisodicMemory(
                 chat_id=new_chat.id,
                 message_id=old_to_new[mem.message_id],
-                summary=mem.summary,
+                fact_content=mem.fact_content,
                 embedding=mem.embedding
             ))
 
@@ -277,4 +277,3 @@ class MessageService(BaseService[MessageRepository]):
             return False
         await self.repository.delete(id=message_id)
         return True
-

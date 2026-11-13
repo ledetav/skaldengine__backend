@@ -2,7 +2,7 @@
 Репозиторий для работы с сущностями персонажей (Character).
 """
 
-from typing import List, Optional
+from typing import List
 from uuid import UUID
 from sqlalchemy import select, func
 from shared.base.repository import BaseRepository
@@ -42,4 +42,3 @@ class CharacterRepository(BaseRepository[Character]):
         )
         result = await self.db.execute(query)
         return result.scalar() or 0
-

@@ -2,7 +2,6 @@
 Контроллер API для работы с ролевыми чатами (Chat).
 """
 
-from typing import List, Optional
 from fastapi import BackgroundTasks, status
 from uuid import UUID
 from shared.base.controller import BaseController
@@ -61,4 +60,3 @@ class ChatController(BaseController):
             return self.handle_success(data=payload)
         except ValueError as e:
             self.handle_error(str(e), status_code=status.HTTP_404_NOT_FOUND)
-

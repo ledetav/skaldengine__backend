@@ -2,12 +2,11 @@
 Контроллер API для работы с персонами пользователей.
 """
 
-from typing import List, Optional
 from uuid import UUID
 from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserPersonaService
-from .schemas import UserPersonaCreate, UserPersonaUpdate, UserPersonaResponse
+from app.domains.persona.schemas import UserPersonaCreate, UserPersonaUpdate, UserPersonaResponse
 from app.domains.persona.schemas import UserStatistics
 from shared.schemas.response import BaseResponse
 
@@ -55,4 +54,3 @@ class UserPersonaController(BaseController):
         """Получить сводную статистику сущностей пользователя."""
         stats = await self.persona_service.get_user_stats(user_id)
         return self.handle_success(data=UserStatistics(**stats))
-

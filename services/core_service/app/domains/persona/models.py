@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, Integer, DateTime
+from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 from app.db.base import Base
@@ -30,4 +30,4 @@ class UserPersona(Base):
     gender: Mapped[str | None] = mapped_column(String(50), nullable=True)  # мужской, женский, другой
     facts: Mapped[str | None] = mapped_column(Text, nullable=True)  # Лор, предыстория, род деятельности
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

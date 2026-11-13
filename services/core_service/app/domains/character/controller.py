@@ -2,7 +2,7 @@
 Контроллер API для работы с персонажами (Character).
 """
 
-from typing import List, Optional, Any
+from typing import List, Any
 from uuid import UUID
 import httpx
 from fastapi import status
@@ -30,10 +30,10 @@ class CharacterController(BaseController):
         schema = CharacterAdminRead if is_admin else CharacterRead
         # Приводим к соответствующим схемам для фильтрации полей
         items = [schema.model_validate(c) for c in characters]
-        
-        # Обогащаем данными авторов
+
+        # Обогащаем публичными данными авторов из auth_service
         await self._enrich_with_authors(items)
-        
+
         return self.handle_success(data={"items": items, "total": total})
 
     async def get_character(self, character_id: UUID, is_admin: bool = False) -> BaseResponse:
@@ -41,36 +41,34 @@ class CharacterController(BaseController):
         character = await self.character_service.get_character(character_id, is_admin=is_admin)
         if not character:
             self.handle_error("Character not found", status_code=status.HTTP_404_NOT_FOUND)
-        
         schema = CharacterAdminRead if is_admin else CharacterRead
-        data = schema.model_validate(character)
-        
-        # Обогащаем данными автора
-        await self._enrich_with_authors([data])
-        
-        return self.handle_success(data=data)
+        item = schema.model_validate(character)
+
+        # Обогащаем публичными данными автора
+        await self._enrich_with_authors([item])
+
+        return self.handle_success(data=item)
 
     async def _enrich_with_authors(self, items: List[Any]) -> None:
-        """Внутренний метод для обогащения персонажей данными об авторах из auth_service."""
-        creator_ids = list(set([item.creator_id for item in items if hasattr(item, "creator_id") and item.creator_id]))
+        """Пакетно подтягивает данные авторов (username, full_name, avatar_url) из auth_service."""
+        creator_ids = list({str(item.creator_id) for item in items if getattr(item, "creator_id", None)})
         if not creator_ids:
             return
-
         try:
-            ids_str = ",".join([str(uid) for uid in creator_ids])
-            auth_url = f"{settings.AUTH_BASE_URL}{settings.API_V1_STR}/users/batch?ids={ids_str}"
-            
             async with httpx.AsyncClient() as client:
-                resp = await client.get(auth_url, timeout=5.0)
+                resp = await client.get(
+                    f"{settings.AUTH_BASE_URL}{settings.API_V1_STR}/users/batch",
+                    params={"ids": ",".join(creator_ids)},
+                    timeout=3.0
+                )
                 if resp.status_code == 200:
-                    authors_data = resp.json().get("data", [])
-                    authors_map = {str(auth["id"]): auth for auth in authors_data}
-                    
+                    users_list = resp.json().get("data", [])
+                    users_map = {str(u["id"]): u for u in users_list}
                     for item in items:
-                        if hasattr(item, "creator_id") and str(item.creator_id) in authors_map:
-                            item.author = authors_map[str(item.creator_id)]
+                        cid = str(item.creator_id) if getattr(item, "creator_id", None) else None
+                        if cid and cid in users_map:
+                            item.author = users_map[cid]
         except Exception as e:
-            # Логируем, но не прерываем основной запрос (персонажи без авторов лучше чем 500 ошибка)
             import logging
             logging.getLogger("core").error(f"Failed to enrich characters with authors: {e}")
 
@@ -81,10 +79,8 @@ class CharacterController(BaseController):
             fandom_lb = await self.lorebook_service.get_fandom_lorebook(character_in.fandom)
             if not fandom_lb:
                 self.handle_error(
-                    f"Фандом '{character_in.fandom}' не найден. "
-                    "Модераторы могут создавать персонажей только для существующих фандомов с лорбуком. "
-                    "Обратитесь к администратору для создания фандома.",
-                    status_code=status.HTTP_400_BAD_REQUEST
+                    f"Moderators cannot create characters for a new fandom '{character_in.fandom}'. Ask an Admin to create the fandom lorebook first.",
+                    status_code=status.HTTP_403_FORBIDDEN
                 )
 
         character = await self.character_service.create_character(character_in, user_id)
@@ -96,7 +92,6 @@ class CharacterController(BaseController):
         character = await self.character_service.update_character(character_id, character_update, creator_id)
         if not character:
             self.handle_error("Character not found or access denied", status_code=status.HTTP_404_NOT_FOUND)
-        
         schema = CharacterAdminRead if is_admin else CharacterRead
         return self.handle_success(data=schema.model_validate(character))
 
@@ -113,24 +108,27 @@ class CharacterController(BaseController):
         character = await self.character_service.repository.get(character_id)
         if not character:
             self.handle_error("Character not found", status_code=status.HTTP_404_NOT_FOUND)
-        
-        response_urls = {}
+
         update_data = {}
-        
+        response_urls = {}
+
         if avatar_file:
             content = await avatar_file.read()
-            url = await self.character_service.save_character_image(character_id, content, avatar_file.filename, "avatar")
+            url = await self.character_service.save_character_image(
+                character_id, content, avatar_file.filename, "avatar"
+            )
             update_data["avatar_url"] = url
             response_urls["avatar_url"] = url
-            
+
         if card_file:
             content = await card_file.read()
-            url = await self.character_service.save_character_image(character_id, content, card_file.filename, "card")
+            url = await self.character_service.save_character_image(
+                character_id, content, card_file.filename, "card"
+            )
             update_data["card_image_url"] = url
             response_urls["card_image_url"] = url
-            
+
         if update_data:
             await self.character_service.update_character(character_id, CharacterUpdate(**update_data))
-            
-        return self.handle_success(data=response_urls)
 
+        return self.handle_success(data=response_urls)
