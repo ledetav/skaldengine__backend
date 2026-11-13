@@ -1,12 +1,11 @@
 """Зависимости FastAPI (Dependencies) для микросервиса аутентификации."""
 
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
 from uuid import UUID
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.base import AsyncSessionLocal
@@ -76,13 +75,13 @@ async def get_current_user(
         token_data = payload.get("sub")
         if token_data is None:
             raise HTTPException(status_code=403, detail="Недействительный токен")
-        token_user_id = UUID(token_data) 
-    except (JWTError, ValueError): 
+        token_user_id = UUID(token_data)
+    except (JWTError, ValueError):
         raise HTTPException(status_code=403, detail="Не удалось подтвердить учетные данные")
-        
+
     user = await repo.get(token_user_id)
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
-    
-    return user
+
+    return user

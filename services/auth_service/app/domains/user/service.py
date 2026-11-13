@@ -5,7 +5,7 @@ from shared.base.service import BaseService
 from .repository import UserRepository
 from .models import User
 from app.core import security
-from .schemas import UserUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate, RoleUpdate
+from .schemas import UserUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, ProfileUpdate
 
 
 class UserService(BaseService[UserRepository]):
@@ -51,7 +51,7 @@ class UserService(BaseService[UserRepository]):
     async def update_password(self, user: User, update_in: PasswordUpdate) -> None:
         """Обновляет пароль пользователя с предварительным хешированием."""
         await self.repository.update(
-            db_obj=user, 
+            db_obj=user,
             obj_in={"password_hash": security.get_password_hash(update_in.new_password)}
         )
 
@@ -104,4 +104,3 @@ class UserService(BaseService[UserRepository]):
     async def get_all_users(self, skip: int = 0, limit: int = 20) -> tuple[list, int]:
         """Возвращает список пользователей с пагинацией и их общее количество."""
         return await self.repository.get_multi_with_count(skip=skip, limit=limit)
-

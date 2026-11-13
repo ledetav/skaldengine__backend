@@ -7,7 +7,7 @@ from .repository import UserRepository
 from .models import User
 from app.core.security import verify_password, create_access_token, get_password_hash, TokenPayload
 from app.core.config import settings
-from app.domains.user.schemas import UserCreate, UserResponse, Token
+from app.domains.user.schemas import UserCreate
 
 
 class AuthService(BaseService[UserRepository]):
@@ -26,7 +26,7 @@ class AuthService(BaseService[UserRepository]):
         user = await self.repository.get_by_email_or_login(identifier)
         if not user or not verify_password(password, user.password_hash):
             return None
-        
+
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         payload = TokenPayload(
             subject=user.id,
@@ -42,7 +42,7 @@ class AuthService(BaseService[UserRepository]):
         )
         return {
             "access_token": token,
-            "token_type": "bearer",
+            "token_type": "bearer"
         }
 
     async def register(self, user_in: UserCreate) -> User:
@@ -82,4 +82,3 @@ class AuthService(BaseService[UserRepository]):
             "avatar_url": f"https://api.dicebear.com/7.x/avataaars/svg?seed={user_in.username}"
         }
         return await self.repository.create(obj_in=user_data)
-

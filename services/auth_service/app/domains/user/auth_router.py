@@ -2,11 +2,11 @@
 
 import traceback
 from typing import Any
-from fastapi import APIRouter, Depends, status, Body
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api import deps
-from .auth_controller import AuthController
+from app.domains.user.auth_controller import AuthController
 from app.domains.user.schemas import UserCreate, UserLogin
 from shared.schemas.response import BaseResponse
 
@@ -28,8 +28,6 @@ async def login_json(
     controller: AuthController = Depends(deps.get_auth_controller)
 ) -> Any:
     """Вход с передачей JSON в теле запроса (логин + пароль) для веб-клиента."""
-    from fastapi.security import OAuth2PasswordRequestForm as _Form
-
     class _FakeForm:
         """Адаптер формы аутентификации, имитирующий структуру OAuth2PasswordRequestForm."""
         username = body.login
@@ -51,4 +49,3 @@ async def register_user(
         logger_error_trace = traceback.format_exc()
         print(f"\nОшибка при регистрации пользователя: {e}\n{logger_error_trace}")
         raise e
-

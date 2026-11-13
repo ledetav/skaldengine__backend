@@ -6,7 +6,7 @@ from fastapi import status
 from shared.base.controller import BaseController
 from .service import UserService
 from app.domains.user.models import User
-from .schemas import UserUpdate, ProfileUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, UserResponse, RoleUpdate
+from .schemas import UserUpdate, ProfileUpdate, LoginUpdate, UsernameUpdate, EmailUpdate, PasswordUpdate, FullNameUpdate, UserResponse
 from shared.schemas.response import BaseResponse
 
 
@@ -105,9 +105,9 @@ class UserController(BaseController):
         user = await self.user_service.get_by_username(username)
         if not user:
             self.handle_error("Пользователь не найден", status_code=status.HTTP_404_NOT_FOUND)
-        
+
         from .schemas import PublicProfileResponse
-        
+
         public_data = PublicProfileResponse.model_validate(user)
         return self.handle_success(data=public_data)
 
@@ -121,4 +121,3 @@ class UserController(BaseController):
         from .schemas import PublicProfileResponse
         users = await self.user_service.get_by_ids(user_ids)
         return self.handle_success(data=[PublicProfileResponse.model_validate(u) for u in users])
-

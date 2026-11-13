@@ -4,7 +4,7 @@ from fastapi import status
 from fastapi.security import OAuth2PasswordRequestForm
 from shared.base.controller import BaseController
 from .auth_service import AuthService
-from .schemas import Token, UserCreate, UserResponse
+from .schemas import UserCreate, UserResponse
 from shared.schemas.response import BaseResponse
 
 
@@ -35,4 +35,3 @@ class AuthController(BaseController):
             self.handle_error(str(e), status_code=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             self.handle_error(str(e), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
