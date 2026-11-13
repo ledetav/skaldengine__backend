@@ -6,13 +6,14 @@
 import traceback
 from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import JSONResponse
-import httpx
 
 from gateway.config import AUTH_BASE, CORE_BASE, AUTH_PREFIXES, logger
 from gateway.cors import is_origin_allowed, cors_middleware
-from gateway.proxy import _fetch, _proxy, _proxy_docs
+from gateway.proxy import _proxy
 from gateway.websocket import websocket_proxy_handler
 from gateway.routers import system_router, docs_router
+
+__all__ = ["app", "is_origin_allowed"]
 
 app = FastAPI(title="SKALD Gateway", docs_url=None)
 
@@ -32,7 +33,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     traceback.print_exc()
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Gateway Error: {exc.__class__.__name__} - {str(exc)}"},
+        content={"detail": f"Internal Gateway Error: {exc.__class__.__name__}"},
     )
 
 

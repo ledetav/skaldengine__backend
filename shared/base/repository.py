@@ -1,9 +1,8 @@
 """Базовый репозиторий для асинхронной работы с базой данных через SQLAlchemy."""
 
 from typing import Generic, TypeVar, Type, List, Optional, Any
-from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, delete
 
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType")
@@ -99,10 +98,8 @@ class BaseRepository(Generic[ModelType]):
             db_obj = self.model(**obj_in)
         elif hasattr(obj_in, 'model_dump'):
             db_obj = self.model(**obj_in.model_dump())
-        elif isinstance(obj_in, self.model):
-            db_obj = obj_in
         else:
-            db_obj = self.model(**{c.key: getattr(obj_in, c.key) for c in obj_in.__table__.columns})
+            db_obj = obj_in
         self.db.add(db_obj)
         await self.db.commit()
         await self.db.refresh(db_obj)
@@ -122,11 +119,8 @@ class BaseRepository(Generic[ModelType]):
             update_data = obj_in
         else:
             update_data = obj_in.model_dump(exclude_unset=True)
-
-        for field in update_data:
-            if hasattr(db_obj, field):
-                setattr(db_obj, field, update_data[field])
-
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
         self.db.add(db_obj)
         await self.db.commit()
         await self.db.refresh(db_obj)
@@ -145,4 +139,3 @@ class BaseRepository(Generic[ModelType]):
         result = await self.db.execute(query)
         await self.db.commit()
         return result.rowcount > 0
-
